@@ -8,6 +8,7 @@ When you clone or pull the latest changes of this repository, you want to:
 
 - place yourself at the root of the directory
 - create a virtual environment if you haven't yet: `python3 -m venv .venv`. This will add a `.venv` directory at the root of the project:
+
   <img width="232" height="30" alt="Screenshot from 2025-10-27 16-18-13" src="https://github.com/user-attachments/assets/cb111553-d164-48f1-9256-bc7446c3b431" />
 - activate it : `source .venv/bin/activate`. Now in your terminal it should show `(.venv)` before the prompt:
   
