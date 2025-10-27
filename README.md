@@ -1,4 +1,4 @@
-# python-project-3A
+# Python Project 3A
 
 The main repository for the third year python project, group 7
 
@@ -6,6 +6,13 @@ The main repository for the third year python project, group 7
 
 When you clone or pull the latest changes of this repository, you want to:
 
-- create a virtual environment if you haven't yet: `python3 -m venv .venv`
+- place yourself at the root of the directory
+- create a virtual environment if you haven't yet: `python3 -m venv .venv`. This will add a `.venv` directory at the root of the project.
+
 - activate it : `source .venv/bin/activate`
 - run `pip install -r requirements.txt` to install the dependencies
+
+## Linting/Formatting commands
+
+- lint the code (reveal the syntax errors): `ruff check .`
+- and to format the code properly: `ruff format .`
