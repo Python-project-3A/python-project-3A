@@ -4,7 +4,11 @@ The main repository for the third year python project, group 7
 
 ## Project setup
 
-When you clone or pull the latest changes of this repository, you want to:
+- Clone the repository:
+
+  ```bash
+  git clone https://github.com/Python-project-3A/python-project-3A.git
+  ```
 
 - place yourself at the root of the directory
 - create a virtual environment if you haven't yet: `python3 -m venv .venv`. This will add a `.venv` directory at the root of the project:
@@ -20,3 +24,12 @@ When you clone or pull the latest changes of this repository, you want to:
 
 - lint the code (reveal the syntax errors): `ruff check .`
 - and to format the code properly: `ruff format .`
+
+## Git commits
+
+I have put the commands to create a git commit in the common Notion document, but here they are:
+
+- `git add .` (stage all the changes)
+- `git commit -m <commit message in double quotes>` (local commit)
+  Example: `git commit -m "Init Project"`
+- `git push origin <branch name>`
