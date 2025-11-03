@@ -13,9 +13,15 @@ class Unit :
         self.time_since_attack = 0.0
 
     def is_alive(self):
+        """return True si l'unité est encore en vie """
         return self.hp > 0
     
-    def take_damage(self, attack_damage):
+    def take_damage(self, attack_damage):   
+
+        """ -calcul les degats subis apres une attaque 
+            -les soustrais aux hp
+            -indique si la troupe est encore en vie apres l'attaque """
+        
         take = max(0, attack_damage - self.armor)
         self.hp -= take
         if not self.is_alive():
