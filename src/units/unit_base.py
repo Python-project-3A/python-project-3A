@@ -32,7 +32,18 @@ class Unit :
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
         peut être utile pour le save/load et la partie statistique plus tard
         """
-        return
+        return {
+            "name": self.name,
+            "team": self.team,
+            "x": self.x,
+            "y": self.y,
+            "hp": self.hp,
+            "armor": self.armor,
+            "damage": self.damage,
+            "attack_range": self.attack_range,
+            "attack_cooldown": self.attack_cooldown,
+            "speed": self.speed,
+        }
 
     def dist_to(self, other: "Unit") -> float:
         """
