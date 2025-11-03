@@ -75,3 +75,9 @@ class Unit :
         modifie l'attribut time_since_last_attack
         """
         return
+    
+    def choose_target(self, enemies):
+        living_enemies = [e for e in enemies if e.is_alive()]
+        if not living_enemies:
+            return None
+        return min(living_enemies, key=lambda e: self.distance_to(e))
