@@ -1,0 +1,13 @@
+[tool.ruff]
+include = ["src/**/*.py", "tests/**/*.py"]
+exclude = ["venv", ".venv", "build", "dist"]
+
+target-version = "py312"
+
+lint.select = ["E", "F", "I", "B", "UP", "C90"]
+
+fix = true
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["src"]
