@@ -43,6 +43,8 @@ class Unit :
             "team": self.team,
             "x": self.x,
             "y": self.y,
+            "width": self.width,
+            "height": self.height,
             "hp": self.hp,
             "armor": self.armor,
             "damage": self.damage,
