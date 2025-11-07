@@ -1,4 +1,5 @@
 import math
+import time
 
 class Unit : 
     def __init__(self,name,team,x,y,height,width,hp,armor,damage,attack_range,
@@ -109,11 +110,25 @@ class Unit :
 
     def attack(self, other: "Unit"):
         """
-        attaquer une unité si on est assez proche
-        faut se rappeler qu'on un un délai entre les attaques (attack_cooldown)
-        modifie l'attribut time_since_last_attack
+        Attaque une unité si elle est à portée et que le cooldown est terminé.
+        Modifie la vie de la cible et met à jour le temps de la dernière attaque.
         """
-        return
+        current_time=time.time()
+
+        if not self.can_attack(other):
+            return False
+        
+        if current_time-self.time_since_last_attack <= self.attack_cooldown:
+            return False
+        
+        damage=max(0,self.damage - other.armor)
+        other.hp -= damage
+        other.hp = max(0,other.hp) #pour ne pas avoir d'hp < 0
+
+
+        self.time_since_last_attack = current_time
+        
+        return True
     
     def choose_target(self, enemies):
         living_enemies = [e for e in enemies if e.is_alive()]
