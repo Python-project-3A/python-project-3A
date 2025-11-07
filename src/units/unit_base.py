@@ -52,7 +52,7 @@ class Unit :
         """
         return
 
-    def move_towards(self, target_x: int, target_y: int, dt: float) -> bool:
+    def move_towards(self, target_x: float, target_y: float, dt: float) -> bool:
         """
         un peu compliqué, déplace l'unité vers les coordonnées de l'unité cible
         dépend de la vitesse de notre unité et du temps passé (dt)
