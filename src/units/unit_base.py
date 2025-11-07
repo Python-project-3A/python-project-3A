@@ -50,7 +50,7 @@ class Unit :
 
     def dist_to(self, other: "Unit") -> float:
         """
-        calcule et retourne la distance entre les centres de deux unités
+        calcule et retourne la distance entre deux unités
         je pense que l'utilité est évidente
         """
         return
