@@ -97,6 +97,23 @@ class Unit :
         self.x +=  dx / dist * step
         self.y += dy / dist * step
         return False
+    
+    def move_to(self, x: float, y: float, dt: float) -> bool:
+        """
+        déplace l'unité d'un pas vers une position (x, y)
+        mêmes spécifications que move_towards
+        """
+        dist = math.dist((self.x, self.y), (x, y))
+        
+        step = min(self.speed * dt, dist)
+        if step <= 0:
+            return True
+        
+        dx = x - self.x
+        dy = y - self.y
+        self.x +=  dx / dist * step
+        self.y += dy / dist * step
+        return False
 
     def can_attack(self, other: "Unit") -> bool:
         """
