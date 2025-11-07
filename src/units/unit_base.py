@@ -1,9 +1,12 @@
 class Unit : 
-    def __init__(self,name,team,x,y,hp,armor,damage,attack_range,attack_cooldown,speed):
+    def __init__(self,name,team,x,y,height,width,hp,armor,damage,attack_range,
+                 attack_cooldown,speed):
         self.name = name 
         self.team = team
         self.x = x
         self.y = y
+        self.height = height
+        self.width = width
         self.hp = hp
         self.armor = armor
         self.damage = damage
