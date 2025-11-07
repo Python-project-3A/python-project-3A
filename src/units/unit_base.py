@@ -1,3 +1,5 @@
+import math
+
 class Unit : 
     def __init__(self,name,team,x,y,height,width,hp,armor,damage,attack_range,
                  attack_cooldown,speed):
@@ -50,10 +52,11 @@ class Unit :
 
     def dist_to(self, other: "Unit") -> float:
         """
-        calcule et retourne la distance entre deux unités
+        calcule et retourne la distance entre les centres de deux unités
         je pense que l'utilité est évidente
         """
-        return
+        return math.dist((self.x, self.y), (other.x, other.y))
+
 
     def move_towards(self, target: "Unit", dt: float) -> bool:
         """
@@ -67,9 +70,13 @@ class Unit :
 
     def can_attack(self, other: "Unit") -> bool:
         """
-        vérifie si les deux unités sont assez proches (selon attack range) pour attaquer
+        vérifie si les deux unités sont assez proches (selon attack range) 
+        pour que l'une des unité puisse attaquer (self)
         """
-        return
+        if(self.dist_to(other)<=self.attack_range):
+            return True
+        else:
+            return False
 
     def attack(self, other: "Unit"):
         """
