@@ -58,22 +58,51 @@ class Unit :
         return math.dist((self.x, self.y), (other.x, other.y))
 
 
+    def edge_dist_to(self, other: "Unit") -> float:
+        """
+        différent de dist_to, retourne la différence de la distance entre les centres de
+        deux unités et la somme de leur rayons
+        nécessaire pour déterminer si l'unité cible est dans l'attack range étant donné
+        que ce dernier commence à partir du rayon de l'unité et non pas de son centre
+        """
+        center_dist = self.dist_to(other)
+        self_radius = 0.5 * math.hypot(self.width, self.height)
+        target_radius = 0.5 * math.hypot(other.width, other.height)
+        return max(0.0, center_dist - (self_radius + target_radius))
+
     def move_towards(self, target: "Unit", dt: float) -> bool:
         """
-        un peu compliqué, déplace l'unité vers les coordonnées de l'unité cible
+        déplace l'unité d'un pas vers l'unité cible
         dépend de la vitesse de notre unité et du temps passé (dt)
-        dt: secondes par tick (vu que c'est pas un mouvement instantané)
-        retourne True si l'unité atteint la position cible (diff de 1 entre les x et y)
+        dt: secondes par tick
+        retourne True si l'unité cible est dans notre attack_range
         retourne False sinon
         """
-        return
+        edge_dist = self.edge_dist_to(target)
+
+        if edge_dist <= self.attack_range or self.speed <= 0 or dt <= 0:
+            return True
+        
+        dist = self.dist_to(target)
+        if dist == 0:
+            return True
+        
+        step = min(self.speed * dt, edge_dist)
+        if step <= 0:
+            return True
+        
+        dx = target.x - self.x
+        dy = target.y - self.y
+        self.x +=  dx / dist * step
+        self.y += dy / dist * step
+        return False
 
     def can_attack(self, other: "Unit") -> bool:
         """
         vérifie si les deux unités sont assez proches (selon attack range) 
         pour que l'une des unité puisse attaquer (self)
         """
-        if(self.dist_to(other)<=self.attack_range):
+        if(self.edge_dist_to(other)<=self.attack_range):
             return True
         else:
             return False
