@@ -39,12 +39,20 @@ class Simulation:
     def run(self, max_ticks=2000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
+        last_render = 0
+        render_interval = 1 / 30  # 30 FPS (modifiable)
+
+        if visualizer:
+            visualizer.render(self.battlefield, 0)
+            time.sleep(0.05)  # laisser le temps au visualizer de se mettre en place
+
         while self.is_running and self.tick_count < max_ticks:
             self.tick()
-
-            if visualizer:
-                visualizer.render(self.map, self.tick_count)
-
-            time.sleep(self.tick_duration)
+            now = time.time()
+            if visualizer and (now - last_render) >= render_interval:
+                visualizer.render(self.battlefield, self.tick_count)
+                # print(f"TICK {self.tick_count}")  # pour debug
+                last_render = now
+                time.sleep(0.04)  # 50 ms soit 50 fps max
 
         print(f"Simulation terminée après {self.tick_count} ticks.")
