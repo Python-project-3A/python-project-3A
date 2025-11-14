@@ -1,37 +1,50 @@
+# src/engine/simulation.py
 import time
 
 
 class Simulation:
-    def __init__(self, game_map, generals, tick_duration=0.1):
-        """
-        game_map : instance de GameMap
-        generals : liste [general_joueur1, general_joueur2]
-        tick_duration : durée entre 2 ticks (en secondes)
-        """
+    """
+    Boucle de temps du jeu.
+    - Appelle les généraux pour décisions stratégiques
+    - Appelle les unités pour mouvements/attaques
+    - S'arrête en cas de victoire
+    """
+
+    def __init__(self, game_map, generals, battlefield, tick_duration=0.1):
         self.map = game_map
         self.generals = generals
+        self.battlefield = battlefield
         self.tick_duration = tick_duration
+
         self.tick_count = 0
         self.is_running = False
 
     def tick(self):
-        """Exécute un tick unique de simulation."""
+        """Exécute un tick unique."""
         self.tick_count += 1
+
+        # 1. Les généraux réfléchissent et donnent des ordres
         for general in self.generals:
-            general.update(self.map, self.tick_count)
+            general.update(self.battlefield, self.tick_count)
 
-        for unit in self.map.get_all_units():
+        # 2. Les unités agissent
+        for unit in self.battlefield.get_all_units():
             if unit.is_alive():
-                unit.update(self.map, self.tick_count)
+                unit.update(self.battlefield, self.tick_count)
 
-        if self.map.is_battle_over():
+        # 3. Condition de fin de bataille
+        if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, max_ticks=10000, visualizer=None):
+    def run(self, max_ticks=2000, visualizer=None):
+        """Boucle principale."""
         self.is_running = True
         while self.is_running and self.tick_count < max_ticks:
             self.tick()
+
             if visualizer:
                 visualizer.render(self.map, self.tick_count)
+
             time.sleep(self.tick_duration)
+
         print(f"Simulation terminée après {self.tick_count} ticks.")
