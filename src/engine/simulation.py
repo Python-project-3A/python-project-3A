@@ -41,6 +41,7 @@ class Simulation:
         self.is_running = True
         last_render = 0
         render_interval = 1 / 30  # 30 FPS (modifiable)
+        debut = time.time()
 
         if visualizer:
             visualizer.render(self.battlefield, 0)
@@ -53,6 +54,10 @@ class Simulation:
                 visualizer.render(self.battlefield, self.tick_count)
                 # print(f"TICK {self.tick_count}")  # pour debug
                 last_render = now
-                time.sleep(0.04)  # 50 ms soit 50 fps max
+                time.sleep(0.05)  # 50 ms soit 50 fps max
 
-        print(f"Simulation terminée après {self.tick_count} ticks.")
+        if visualizer:
+            visualizer.finish()
+        print(
+            f"Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s"
+        )

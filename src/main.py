@@ -10,10 +10,12 @@ from src.cli.cli import CLIVisualizer
 def parse_args():
     parser = argparse.ArgumentParser(description="AoE-like RTS simulation CLI")
 
-    parser.add_argument("--width", type=int, default=20, help="Largeur de la map")
+    parser.add_argument("--width", type=int, default=40, help="Largeur de la map")
     parser.add_argument("--height", type=int, default=20, help="Hauteur de la map")
     parser.add_argument("--ticks", type=int, default=200, help="Nombre de ticks")
-    parser.add_argument("--speed", type=float, default=0.1, help="Durée entre ticks")
+    parser.add_argument(
+        "--speed", type=float, default=0.1, help="Durée entre ticks"
+    )  # ne sert pas pour l'isntant, servira pour influer après sur la vitesse de déplacement des untiées, ex : Knight.speed = args.speed
     parser.add_argument(
         "--no-visual", action="store_true", help="Désactive l'affichage CLI"
     )
@@ -111,4 +113,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# commande de test : python -m src.main --ticks 100 --speed 0.05
+# commande de test : python -m src.main --ticks 100 --speed 0
+# commande de test : python -m src.main --no-visual
