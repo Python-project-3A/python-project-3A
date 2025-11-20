@@ -1,5 +1,5 @@
-import random
 import math
+import random
 
 from src.map.game_map import GameMap
 from src.map.tile import Tile
@@ -32,10 +32,13 @@ def test_display_projected_points():
             tile = game_map.get_tile(x, y)
             if tile and tile.occupants == [] and (x, y) in game_map.tiles:
                 # Est-ce un de nos float_points ?
-                if any(math.floor(px) == x and math.floor(py) == y for px, py in float_points):
-                    line += "*"   # point flottant projeté
+                if any(
+                    math.floor(px) == x and math.floor(py) == y
+                    for px, py in float_points
+                ):
+                    line += "*"  # point flottant projeté
                 else:
-                    line += "."   # tile normale
+                    line += "."  # tile normale
         print(line)
 
 
@@ -49,8 +52,7 @@ def test_display_large_random_points():
 
     num_points = 50
     float_points = [
-        (random.uniform(0, width), random.uniform(0, height))
-        for _ in range(num_points)
+        (random.uniform(0, width), random.uniform(0, height)) for _ in range(num_points)
     ]
 
     # Projection float → tile
@@ -61,7 +63,9 @@ def test_display_large_random_points():
     for y in range(height - 1, -1, -1):
         line = ""
         for x in range(width):
-            if any(math.floor(px) == x and math.floor(py) == y for px, py in float_points):
+            if any(
+                math.floor(px) == x and math.floor(py) == y for px, py in float_points
+            ):
                 line += "⁕"  # point flottant
             else:
                 line += "."  # vide

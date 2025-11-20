@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import Optional
-from .tile import Tile
+
 import math
+
+from .tile import Tile
 
 
 class GameMap:
@@ -19,15 +20,13 @@ class GameMap:
 
         # Grille régulière : toutes les tiles sont créées à l’initialisation
         self.tiles: dict[tuple[int, int], Tile] = {
-            (x, y): Tile()
-            for x in range(self.width)
-            for y in range(self.height)
+            (x, y): Tile() for x in range(self.width) for y in range(self.height)
         }
 
     # ---------------------------------------------------------
     # TILE ACCESS (ENTIÈRES)
     # ---------------------------------------------------------
-    def get_tile(self, i: int, j: int) -> Optional[Tile]:
+    def get_tile(self, i: int, j: int) -> Tile | None:
         """Retourne la Tile aux coordonnées entières (i, j)."""
         if 0 <= i < self.width and 0 <= j < self.height:
             return self.tiles[(i, j)]
@@ -41,7 +40,7 @@ class GameMap:
     # ---------------------------------------------------------
     # FLOAT → TILE CONVERSION
     # ---------------------------------------------------------
-    def tile_from_float(self, x: float, y: float) -> Optional[Tile]:
+    def tile_from_float(self, x: float, y: float) -> Tile | None:
         """
         Retourne la Tile correspondant à la position continue (x, y).
         Projection standard : on utilise floor().
@@ -61,7 +60,7 @@ class GameMap:
     # MISC
     # ---------------------------------------------------------
     def __contains__(self, coords: tuple[int, int]) -> bool:
-        """Permet :    (i, j) in game_map  """
+        """Permet :    (i, j) in game_map"""
         return coords in self.tiles
 
     def __repr__(self):
