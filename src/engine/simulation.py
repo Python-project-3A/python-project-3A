@@ -1,6 +1,8 @@
 # src/engine/simulation.py
 import time
 
+FPS = 30
+
 
 class Simulation:
     """
@@ -15,7 +17,6 @@ class Simulation:
         self.generals = generals
         self.battlefield = battlefield
         self.tick_duration = tick_duration
-
         self.tick_count = 0
         self.is_running = False
 
@@ -40,24 +41,25 @@ class Simulation:
         """Boucle principale."""
         self.is_running = True
         last_render = 0
-        render_interval = 1 / 30  # 30 FPS (modifiable)
+        render_interval = 1 / FPS  # 30 FPS (modifiable) timer indépendant du tick
         debut = time.time()
 
         if visualizer:
+            # On affiche le TICK 0, pour voir la position initiale des unités.
             visualizer.render(self.battlefield, 0)
             time.sleep(0.05)  # laisser le temps au visualizer de se mettre en place
 
         while self.is_running and self.tick_count < max_ticks:
             self.tick()
             now = time.time()
+            # on affiche que si le temps dépasse 1/30
             if visualizer and (now - last_render) >= render_interval:
                 visualizer.render(self.battlefield, self.tick_count)
                 # print(f"TICK {self.tick_count}")  # pour debug
                 last_render = now
-                time.sleep(0.05)  # 50 ms soit 50 fps max
+                # évite l'affichage écrasé (limiter a 50 ms soit 50 fps max)
+                time.sleep(0.05)
 
         if visualizer:
             visualizer.finish()
-        print(
-            f"Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s"
-        )
+        print(f"Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s")

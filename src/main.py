@@ -8,17 +8,14 @@ from src.cli.cli import CLIVisualizer
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="AoE-like RTS simulation CLI")
+    # création d'un objet parser (= interpréteur d'arguments)
+    parser = argparse.ArgumentParser(description="AoE-like RTS simulation CLI")  # descrption = text affiché avec : python -m src.main --help
 
-    parser.add_argument("--width", type=int, default=40, help="Largeur de la map")
+    parser.add_argument("--width", type=int, default=20, help="Largeur de la map")
     parser.add_argument("--height", type=int, default=20, help="Hauteur de la map")
     parser.add_argument("--ticks", type=int, default=200, help="Nombre de ticks")
-    parser.add_argument(
-        "--speed", type=float, default=0.1, help="Durée entre ticks"
-    )  # ne sert pas pour l'isntant, servira pour influer après sur la vitesse de déplacement des untiées, ex : Knight.speed = args.speed
-    parser.add_argument(
-        "--no-visual", action="store_true", help="Désactive l'affichage CLI"
-    )
+    parser.add_argument("--speed", type=float, default=0.1, help="Durée entre ticks")  # ne sert pas pour l'isntant, servira pour influer après sur la vitesse de déplacement des untiées, ex : Knight.speed = args.speed
+    parser.add_argument("--no-visual", action="store_true", help="Désactive l'affichage CLI")
 
     return parser.parse_args()
 
@@ -62,7 +59,7 @@ class MockUnit:
 class MockGeneral:
     """
     Général ultra simple :
-    - ne fait rien pour l’instant
+    - ne fait rien pour l'instant
     """
 
     def update(self, battlefield, tick):
@@ -70,14 +67,12 @@ class MockGeneral:
 
 
 # --- MAIN ----------------------------------------------------------
-
-
 def main():
     args = parse_args()
 
     print("=== DEMARRAGE SIMULATION ===")
 
-    bf = Battlefield(width=20, height=20)
+    bf = Battlefield(args.width, args.height)
 
     # fabrique d’unité
     def make_unit_A():
@@ -95,23 +90,21 @@ def main():
 
     # Visualizer
     visualizer = None
-    if not args.no_visual:
+    if not args.no_visual:  # Si l'utilisateur veut un visualizer, (= si il n'a pas demandé de ne pas lancer le visualiser)
         visualizer = CLIVisualizer(args.width, args.height)
 
-    # Simulation
-    sim = Simulation(
-        game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=0.1
-    )
-
-    # sim.run(max_ticks=50) #ancienne version
+    # création de laSimulation
+    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=0.1)
+    # lancement de la simulation
     sim.run(max_ticks=args.ticks, visualizer=visualizer)
 
-    print("\n--- SNAPSHOT FINAL ---")
+    print("\n--- SNAPSHOT FINAL ---\n")
     print(bf.snapshot())
 
 
+# pôur que la fonction main() ne soit exécutée que si le script est lancé directement, mais pas s'il est importé (protextion).
 if __name__ == "__main__":
     main()
 
-# commande de test : python -m src.main --ticks 100 --speed 0
-# commande de test : python -m src.main --no-visual
+# commande de test : python -m src.main --ticks 100
+# commande de test : python -m src.main --ticks 100 --no-visual

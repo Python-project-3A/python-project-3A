@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Dict, List, Tuple, Optional, Callable, Any
 import logging
-from math import hypot
+from math import hypot  # distance euclidienne : sqrt(dx*dx + dy*dy)
 
 # Try to import the real GameMap/Tile; if module not present (dev stage),
 # provide a very small mock to allow running tests.
@@ -19,13 +19,12 @@ except Exception:
         - elevation : int (hauteur)
         """
 
-        def __init__(self, terrain: str = "grass", elevation: int = 0):
-            self.terrain = terrain
+        def __init__(self, elevation: int = 0):  # , terrain: str = "grass"):
             self.elevation = elevation
-            self.occupants: List[Any] = []  # list of Unit instances
+            self.occupants: List[Any] = []  # liste d'unités
 
         def is_free(self) -> bool:
-            """Considère 'free' si pas d'occupants. (On peut redéfinir la logique)"""
+            """Considère 'free' si pas d'occupants."""  # NB : On peut redéfinir la logique si besoin -> nottament pour la taille des unités, si elles "rentrent ou non sur cette Tile"
             return len(self.occupants) == 0
 
         def add_occupant(self, unit: Any) -> None:
@@ -39,6 +38,8 @@ except Exception:
             except ValueError:
                 pass
 
+        # rajouter un get tile ?
+
     class GameMap:
         """
         Sparse grid map: dict[(ix,iy)] -> Tile.
@@ -49,12 +50,15 @@ except Exception:
         def __init__(self, width: int, height: int):
             self.width = width
             self.height = height
+            # self.tile lie une clé (x, y) → tuple d’entiers vers une valeur Tile (objet Tile)
             self.tiles: Dict[Tuple[int, int], Tile] = {}
 
         def _in_bounds(self, ix: int, iy: int) -> bool:
+            """Test si (x, y) est dans la carte."""
             return 0 <= ix < self.width and 0 <= iy < self.height
 
         def add_tile(self, ix: int, iy: int, tile: Optional[Tile] = None) -> None:
+            """Ajoute une tile en (ix, iy)."""
             if not self._in_bounds(ix, iy):
                 raise ValueError("add_tile: out of bounds")
             if tile is None:
@@ -62,10 +66,11 @@ except Exception:
             self.tiles[(ix, iy)] = tile
 
         def get_tile(self, ix: int, iy: int) -> Optional[Tile]:
+            """Récupère une tile en (ix, iy) si présent, renvoie None sinon."""
             return self.tiles.get((ix, iy))
 
         def ensure_tile(self, ix: int, iy: int) -> Tile:
-            """Return existing tile or create and return a new one in bounds."""
+            """Retourne un tile ou le crée si absent."""
             if not self._in_bounds(ix, iy):
                 raise ValueError("ensure_tile: out of bounds")
             t = self.get_tile(ix, iy)
@@ -75,9 +80,11 @@ except Exception:
             return t
 
         def is_free(self, ix: int, iy: int) -> bool:
-            """Simple free check: true if no occupants. Use terrain check separately."""
+            """Vérifie si la tile existe, et si elle est vide renvoie True"""  # plus si terrain walkable et pas d'obstacle ?
+            if not self._in_bounds(ix, iy):
+                return False
             t = self.get_tile(ix, iy)
-            return (t is None) or t.is_free()
+            return (t is None) or t.is_free()  # ATTENTION : is_free() = méthode du TILE ici -> NB : peut être qu'il faut changer de non une des deux fonctions
 
 
 logger = logging.getLogger(__name__)
@@ -105,30 +112,30 @@ class Battlefield:
     # internal helpers
     # ------------------------
     def _assign_id_if_needed(self, unit: Any) -> None:
+        """Assigne un id si besoin."""
         if not hasattr(unit, "id") or getattr(unit, "id") is None:
             unit.id = self._next_unit_id
             self._next_unit_id += 1
 
-    @staticmethod
+    @staticmethod  # fontion dans une classe qui ne dépend pas de self
     def _tile_index_from_pos(x: float, y: float) -> Tuple[int, int]:
-        # map continuous position to tile index (floor via int)
+        """Convertit une position continue (float) en coordonnées discrètes (tile) en utilisant un arrondi inférieur (floor)."""
+        # NB : int(3.99) → 3 -> jsp si c'est la meilleur option
         return int(x), int(y)
 
     # ------------------------
-    # spawn / add / remove
+    # spawn / add / remove units
     # ------------------------
-    def spawn_unit(
-        self, unit_factory: Callable[[], Any], x: float, y: float, owner: int
-    ) -> int:
+    def spawn_unit(self, unit_factory: Callable[[], Any], x: float, y: float, owner: int) -> int:
         """
-        Create instance via factory and place it.
-        Unit must expose: .position (tuple), .owner, optional .size (float radius), .hp
+        Créer une instance unité via une fonction factory et l'ajoute au Battlefield.
+        L'unité doit avoir une .position (tuple) et un .owner., optionnellement .size (float radius), .hp
         """
         unit = unit_factory()
         self._assign_id_if_needed(unit)
         unit.position = (float(x), float(y))
         unit.owner = owner
-        # default size if not provided (0.4 tile radius)
+        # taille par defaut  (0.4 tile radius)
         if not hasattr(unit, "size"):
             unit.size = 0.4
 
@@ -142,8 +149,9 @@ class Battlefield:
         return unit.id
 
     def add_existing_unit(self, unit: Any) -> int:
+        """Ajoute une unité existante au Battlefield."""
         if not hasattr(unit, "position"):
-            raise ValueError("add_existing_unit: unit has no position")
+            raise ValueError("add_existing_unit: unit n'a pas de position")
         x, y = unit.position
         unit.position = (float(x), float(y))
         self._assign_id_if_needed(unit)
@@ -157,6 +165,7 @@ class Battlefield:
         return unit.id
 
     def remove_unit(self, unit_id: int) -> None:
+        """Supprime l'unité ayant l'id unit_id."""
         unit = self.units.pop(unit_id, None)
         if unit is None:
             return
@@ -169,28 +178,28 @@ class Battlefield:
         logger.debug("removed unit %s", unit_id)
 
     # ------------------------
-    # movement with collision
+    # mouvement avec collision
     # ------------------------
-    def move_unit_on_map(
-        self, unit: Any, new_x: float, new_y: float, push: bool = False
-    ) -> None:
+    def move_unit_on_map(self, unit: Any, new_x: float, new_y: float, push: bool = False) -> None:
         """
-        Move unit to (new_x,new_y) with checks:
-        - bounds
-        - terrain block (example: water)
-        - collision: ensures no overlap with existing units (using sizes)
-        If push=True, will attempt a naive push (not implemented complexly).
-        Raises ValueError if move invalid.
+        Déplacement unité vers (new_x,new_y)
+        - terrain
+        - terrain block (example: eau)
+        - collision : assure aucune collision avec les unités existantes (avec les tailles)
+        Si push=True, va essayer de faire un push naif (pas implémenté completement).
+        Raises ValueError si déplacement invalide.
         """
-        # bounds check
+        # bounds check # TODO remplacer par la méthode in_bounds
         if not (0 <= new_x < self.width and 0 <= new_y < self.height):
             raise ValueError("move_unit_on_map: target out of bounds")
 
         # tile check (example terrain block)
         ix, iy = self._tile_index_from_pos(new_x, new_y)
         tile = self.game_map.get_tile(ix, iy)
-        if tile is not None and getattr(tile, "terrain", None) == "water":
-            raise ValueError("move_unit_on_map: target blocked by water")
+
+        # terrain check (pas utile pour l'instant)
+        # if tile is not None and getattr(tile, "terrain", None) == "water":
+        #     raise ValueError("move_unit_on_map: target blocked by water")
 
         # collision check with all units (naive O(n); optimize later)
         # unit must have .size attribute (radius)
@@ -209,14 +218,9 @@ class Battlefield:
                 # collision!
                 if push:
                     # naive: do not implement complex pushing here; raise for now
-                    raise ValueError(
-                        "move_unit_on_map: collision (would need push handling)"
-                    )
+                    raise ValueError("move_unit_on_map: collision (would need push handling)")
                 else:
-                    raise ValueError(
-                        "move_unit_on_map: collision with unit %s"
-                        % getattr(other, "id", "?")
-                    )
+                    raise ValueError("move_unit_on_map: collision with unit %s" % getattr(other, "id", "?"))
 
         # passed checks -> update occupant lists and unit.position
         old_pos = getattr(unit, "position", (None, None))
@@ -231,23 +235,25 @@ class Battlefield:
         target_tile = self.game_map.ensure_tile(ix, iy)
         target_tile.add_occupant(unit)
         unit.position = (float(new_x), float(new_y))
-        logger.debug(
-            "unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y
-        )
+        logger.debug("unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y)
 
     # ------------------------
-    # queries and utilities
+    # requêtes et utilitaires
     # ------------------------
     def get_all_units(self) -> List[Any]:
+        """Renvoie une liste des unité du Battlefield."""
         return list(self.units.values())
 
     def units_by_owner(self, owner: int) -> List[Any]:
+        """Renvoie une liste des unité du Battlefield appartenant au team owner."""
         return [u for u in self.units.values() if getattr(u, "owner", None) == owner]
 
     def find_unit(self, unit_id: int) -> Optional[Any]:
+        """Renvoie l'unité ayant l'id unit_id."""
         return self.units.get(unit_id)
 
     def units_in_radius(self, x: float, y: float, radius: float) -> List[Any]:
+        """Renvoie une liste des unité du Battlefield dans un rayon de radius autour de (x,y)."""
         result: List[Any] = []
         for u in self.units.values():
             ux, uy = getattr(u, "position", (None, None))
@@ -258,31 +264,22 @@ class Battlefield:
         return result
 
     def is_battle_over(self) -> bool:
-        teams_alive = {
-            u.owner
-            for u in self.units.values()
-            if getattr(u, "is_alive", lambda: False)()
-        }
+        """Renvoie True si la bataille est finie."""
+        teams_alive = {u.owner for u in self.units.values() if getattr(u, "is_alive", lambda: False)()}
         return len(teams_alive) <= 1
 
     def snapshot(self) -> dict:
+        """Renvoie un snapshot du Battlefield."""
         units_ser = []
         for u in self.units.values():
             units_ser.append(
                 {
                     "id": getattr(u, "id", None),
-                    "type": getattr(
-                        u, "type", getattr(u, "__class__", type(u)).__name__
-                    ),
+                    "type": getattr(u, "type", getattr(u, "__class__", type(u)).__name__),
                     "owner": getattr(u, "owner", None),
                     "position": getattr(u, "position", None),
                     "hp": getattr(u, "hp", None),
                     "size": getattr(u, "size", None),
                 }
             )
-        return {
-            "width": self.width,
-            "height": self.height,
-            "units": units_ser,
-            "generals": [str(g) for g in self.generals],
-        }
+        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
