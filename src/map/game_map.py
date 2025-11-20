@@ -1,41 +1,68 @@
+from __future__ import annotations
+from typing import Optional
 from .tile import Tile
+import math
 
 
 class GameMap:
     """
-    Représente la carte du jeu dans un espace continu.
+    Représente la carte du jeu sous forme de grille discrète (tiles).
+    Les unités, elles, évoluent dans un espace continu (floats).
+
+    - width, height : taille de la carte (en nombre de tiles)
+    - tiles[(i, j)] : Tile correspondant à la position entière (i, j)
     """
 
-    def __init__(self, width: float, height: float):
-        self.width = float(width)
-        self.height = float(height)
-        self.tiles: dict[tuple[float, float], Tile] = {}
+    def __init__(self, width: int, height: int):
+        self.width = int(width)
+        self.height = int(height)
 
-    def add_tile(self, x: float, y: float, tile: Tile | None = None):
-        """Ajoute une zone (x, y) sur la carte."""
-        self._check_bounds(x, y)
-        if tile is None:
-            tile = Tile()
-        self.tiles[(x, y)] = tile
+        # Grille régulière : toutes les tiles sont créées à l’initialisation
+        self.tiles: dict[tuple[int, int], Tile] = {
+            (x, y): Tile()
+            for x in range(self.width)
+            for y in range(self.height)
+        }
 
-    def get_tile(self, x: float, y: float):
-        """Récupère la zone (x, y) s’il y en a une (coordonnée exacte)."""
-        return self.tiles.get((x, y))
+    # ---------------------------------------------------------
+    # TILE ACCESS (ENTIÈRES)
+    # ---------------------------------------------------------
+    def get_tile(self, i: int, j: int) -> Optional[Tile]:
+        """Retourne la Tile aux coordonnées entières (i, j)."""
+        if 0 <= i < self.width and 0 <= j < self.height:
+            return self.tiles[(i, j)]
+        return None
+
+    def is_tile_free(self, i: int, j: int) -> bool:
+        """True si la tile entière (i, j) n'a pas d’occupants."""
+        tile = self.get_tile(i, j)
+        return tile is not None and tile.is_free()
+
+    # ---------------------------------------------------------
+    # FLOAT → TILE CONVERSION
+    # ---------------------------------------------------------
+    def tile_from_float(self, x: float, y: float) -> Optional[Tile]:
+        """
+        Retourne la Tile correspondant à la position continue (x, y).
+        Projection standard : on utilise floor().
+        """
+        i = math.floor(x)
+        j = math.floor(y)
+        return self.get_tile(i, j)
 
     def is_free(self, x: float, y: float) -> bool:
-        """Retourne True si la position (x, y) n'est pas occupée."""
-        tile = self.tiles.get((x, y))
-        return tile is None or tile.is_free()
+        """
+        Vérifie si la tile correspondant à la position float (x, y) est libre.
+        """
+        tile = self.tile_from_float(x, y)
+        return tile is not None and tile.is_free()
 
-    def _check_bounds(self, x: float, y: float):
-        """Vérifie que la position est dans les limites de la carte."""
-        if not (0.0 <= x <= self.width and 0.0 <= y <= self.height):
-            raise ValueError(
-                f"Position ({x}, {y}) out of bounds for map {self.width}x{self.height}"
-            )
-
-    def __contains__(self, coords: tuple[float, float]):
+    # ---------------------------------------------------------
+    # MISC
+    # ---------------------------------------------------------
+    def __contains__(self, coords: tuple[int, int]) -> bool:
+        """Permet :    (i, j) in game_map  """
         return coords in self.tiles
 
     def __repr__(self):
-        return f"<GameMap {self.width}x{self.height}, {len(self.tiles)} zones>"
+        return f"<GameMap {self.width}x{self.height}>"

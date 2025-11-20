@@ -1,24 +1,18 @@
-from dataclasses import dataclass
-
+from dataclasses import dataclass, field
+from typing import Any, List
 
 @dataclass
 class Tile:
-    """
-    Représente une case (tuile) du terrain.
+    terrain: str = "grass"  
+    elevation: float = 0.0
+    occupants: List[Any] = field(default_factory=list)
 
-    Attributes
-    ----------
-    terrain : str
-        Type de terrain (ex: 'grass', 'water', 'rock').
-    elevation : int
-        Niveau de hauteur (utile pour les bonus de combat).
-    occupied : Optional[object]
-        Référence vers un occupant (unité, obstacle...), None si libre.
-    """
+    def is_free(self) -> bool:
+        return len(self.occupants) == 0
 
-    elevation: float = 0
-    occupied: object | None = None
+    def add_occupant(self, unit: Any):
+        self.occupants.append(unit)
 
-    def is_free(self):
-        """Retourne True si la case n'est pas occupée."""
-        return self.occupied is None
+    def remove_occupant(self, unit: Any):
+        if unit in self.occupants:
+            self.occupants.remove(unit)
