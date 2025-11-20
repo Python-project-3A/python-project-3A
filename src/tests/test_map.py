@@ -1,15 +1,12 @@
-import math
 import random
 
 from src.map.game_map import GameMap
-from src.map.tile import Tile
 
 
 def test_display_projected_points():
     """
-    Affiche une grande carte, mais uniquement quelques points flottants
-    projetés sur les tiles entières correspondantes.
-    (x, y float) → tile (floor(x), floor(y))
+    Affiche une carte sparse avec seulement quelques points flottants.
+    (x, y float) → (floor(x), floor(y)).
     """
     width, height = 80, 20
     game_map = GameMap(width, height)
@@ -19,33 +16,28 @@ def test_display_projected_points():
         (12.7, 5.2),
         (18.3, 17.9),
         (23.5, 9.6),
-        (40.1, 20.4),
+        (40.1, 19.4),  # 20.4 était hors map (y=20 → hors 0..19)
     ]
 
+    # Projection float → tile integer
     for x, y in float_points:
-        i, j = math.floor(x), math.floor(y)
-        game_map.tiles[(i, j)] = Tile()
+        ix, iy = int(x), int(y)
+        if 0 <= ix < width and 0 <= iy < height:
+            game_map.ensure_tile(ix, iy)
 
+    # Affichage
     for y in range(height - 1, -1, -1):
         line = ""
         for x in range(width):
-            tile = game_map.get_tile(x, y)
-            if tile and tile.occupants == [] and (x, y) in game_map.tiles:
-                # Est-ce un de nos float_points ?
-                if any(
-                    math.floor(px) == x and math.floor(py) == y
-                    for px, py in float_points
-                ):
-                    line += "*"  # point flottant projeté
-                else:
-                    line += "."  # tile normale
+            # Est-ce un point projeté ?
+            is_point = any(int(px) == x and int(py) == y for px, py in float_points)
+            line += "*" if is_point else "."
         print(line)
 
 
 def test_display_large_random_points():
     """
-    Affiche une grande map et 50 points flottants positionnés aléatoirement.
-    Chaque float est projeté sur une tile entière : (floor(x), floor(y)).
+    Affiche une grande map sparse avec 50 points flottants aléatoires.
     """
     width, height = 80, 20
     game_map = GameMap(width, height)
@@ -55,20 +47,18 @@ def test_display_large_random_points():
         (random.uniform(0, width), random.uniform(0, height)) for _ in range(num_points)
     ]
 
-    # Projection float → tile
+    # Projection float → tile integer
     for x, y in float_points:
-        i, j = math.floor(x), math.floor(y)
-        game_map.tiles[(i, j)] = Tile()
+        ix, iy = int(x), int(y)
+        if 0 <= ix < width and 0 <= iy < height:
+            game_map.ensure_tile(ix, iy)
 
+    # Affichage
     for y in range(height - 1, -1, -1):
         line = ""
         for x in range(width):
-            if any(
-                math.floor(px) == x and math.floor(py) == y for px, py in float_points
-            ):
-                line += "⁕"  # point flottant
-            else:
-                line += "."  # vide
+            is_point = any(int(px) == x and int(py) == y for px, py in float_points)
+            line += "⁕" if is_point else "."
         print(line)
 
 

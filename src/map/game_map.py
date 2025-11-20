@@ -1,67 +1,76 @@
 from __future__ import annotations
 
-import math
-
 from .tile import Tile
 
 
 class GameMap:
     """
-    Représente la carte du jeu sous forme de grille discrète (tiles).
-    Les unités, elles, évoluent dans un espace continu (floats).
-
-    - width, height : taille de la carte (en nombre de tiles)
-    - tiles[(i, j)] : Tile correspondant à la position entière (i, j)
+    Sparse grid map: dict[(ix, iy)] -> Tile.
+    Units move in continuous space (floats),
+    terrain and occupancy are indexed by integer tiles.
     """
 
     def __init__(self, width: int, height: int):
         self.width = int(width)
         self.height = int(height)
+        self.tiles: dict[tuple[int, int], Tile] = {}  # sparse
 
-        # Grille régulière : toutes les tiles sont créées à l’initialisation
-        self.tiles: dict[tuple[int, int], Tile] = {
-            (x, y): Tile() for x in range(self.width) for y in range(self.height)
-        }
+    # --------------------------
+    # Bounds
+    # --------------------------
+    def _in_bounds(self, ix: int, iy: int) -> bool:
+        return 0 <= ix < self.width and 0 <= iy < self.height
 
-    # ---------------------------------------------------------
-    # TILE ACCESS (ENTIÈRES)
-    # ---------------------------------------------------------
-    def get_tile(self, i: int, j: int) -> Tile | None:
-        """Retourne la Tile aux coordonnées entières (i, j)."""
-        if 0 <= i < self.width and 0 <= j < self.height:
-            return self.tiles[(i, j)]
-        return None
+    # --------------------------
+    # Discrete access
+    # --------------------------
+    def get_tile(self, ix: int, iy: int) -> Tile | None:
+        """Return the tile if stored (sparse)."""
+        return self.tiles.get((ix, iy))
 
-    def is_tile_free(self, i: int, j: int) -> bool:
-        """True si la tile entière (i, j) n'a pas d’occupants."""
-        tile = self.get_tile(i, j)
-        return tile is not None and tile.is_free()
+    def add_tile(self, ix: int, iy: int, tile: Tile | None = None) -> None:
+        """Create or replace a tile at integer coords."""
+        if not self._in_bounds(ix, iy):
+            raise ValueError("add_tile: out of bounds")
+        if tile is None:
+            tile = Tile()
+        self.tiles[(ix, iy)] = tile
 
-    # ---------------------------------------------------------
-    # FLOAT → TILE CONVERSION
-    # ---------------------------------------------------------
+    def ensure_tile(self, ix: int, iy: int) -> Tile:
+        """Return a tile; create if absent."""
+        if not self._in_bounds(ix, iy):
+            raise ValueError("ensure_tile: out of bounds")
+
+        tile = self.tiles.get((ix, iy))
+        if tile is None:
+            tile = Tile()
+            self.tiles[(ix, iy)] = tile
+        return tile
+
+    def is_free(self, ix: int, iy: int) -> bool:
+        """True if tile has no occupants or is not present (default empty)."""
+        tile = self.get_tile(ix, iy)
+        return tile is None or tile.is_free()
+
+    # --------------------------
+    # Float → Tile conversion
+    # --------------------------
     def tile_from_float(self, x: float, y: float) -> Tile | None:
-        """
-        Retourne la Tile correspondant à la position continue (x, y).
-        Projection standard : on utilise floor().
-        """
-        i = math.floor(x)
-        j = math.floor(y)
-        return self.get_tile(i, j)
+        ix = int(x)
+        iy = int(y)
+        if not self._in_bounds(ix, iy):
+            return None
+        return self.ensure_tile(ix, iy)
 
-    def is_free(self, x: float, y: float) -> bool:
-        """
-        Vérifie si la tile correspondant à la position float (x, y) est libre.
-        """
+    def is_free_float(self, x: float, y: float) -> bool:
         tile = self.tile_from_float(x, y)
-        return tile is not None and tile.is_free()
+        return tile.is_free() if tile else False
 
-    # ---------------------------------------------------------
-    # MISC
-    # ---------------------------------------------------------
-    def __contains__(self, coords: tuple[int, int]) -> bool:
-        """Permet :    (i, j) in game_map"""
+    # --------------------------
+    # Utils
+    # --------------------------
+    def __contains__(self, coords):
         return coords in self.tiles
 
     def __repr__(self):
-        return f"<GameMap {self.width}x{self.height}>"
+        return f"<SparseGameMap {self.width}x{self.height} / {len(self.tiles)} tiles>"
