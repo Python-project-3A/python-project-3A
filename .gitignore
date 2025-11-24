@@ -1,4 +1,7 @@
 .vscode
 .venv
 .ruff_cache
-**/__pycache__
+__pycache__/
+src/tempCodeRunnerFile.py
+pyproject.toml
+

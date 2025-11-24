@@ -6,8 +6,18 @@ target-version = "py312"
 
 lint.select = ["E", "F", "I", "B", "UP", "C90"]
 
+lint.ignore = ["E501"]
+
 fix = true
+
+line-length = 250
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+skip-magic-trailing-comma = true
+indent-style = "space"
+# (pas de line-length ici !)
