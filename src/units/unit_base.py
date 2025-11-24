@@ -56,7 +56,6 @@ class Unit :
     def dist_to(self, other: "Unit") -> float:
         """
         calcule et retourne la distance entre les centres de deux unités
-        je pense que l'utilité est évidente
         """
         return math.dist((self.x, self.y), (other.x, other.y))
 
@@ -78,27 +77,21 @@ class Unit :
         déplace l'unité d'un pas vers l'unité cible
         dépend de la vitesse de notre unité et du temps passé (dt)
         dt: secondes par tick
-        retourne True si l'unité cible est dans notre attack_range
-        retourne False sinon
+        déplace l'unité seulement si l'unité cible est déjà assez proche pour attaquer
+        OU la vitesse de l'unité est supérieure à 0
+        OU dt = 0
         """
         edge_dist = self.edge_dist_to(target)
 
-        if edge_dist <= self.attack_range or self.speed <= 0 or dt <= 0:
-            return True
+        if not self.can_attack(target) and self.speed > 0 and dt > 0:
+            dist = self.dist_to(target)
+            step = min(self.speed * dt, edge_dist)
+            dx = target.x - self.x
+            dy = target.y - self.y
+            self.x +=  dx / dist * step
+            self.y += dy / dist * step
         
-        dist = self.dist_to(target)
-        if dist == 0:
-            return True
-        
-        step = min(self.speed * dt, edge_dist)
-        if step <= 0:
-            return True
-        
-        dx = target.x - self.x
-        dy = target.y - self.y
-        self.x +=  dx / dist * step
-        self.y += dy / dist * step
-        return False
+        return (self.x, self.y)
     
     def move_to(self, x: float, y: float, dt: float) -> bool:
         """
@@ -106,16 +99,12 @@ class Unit :
         mêmes spécifications que move_towards
         """
         dist = math.dist((self.x, self.y), (x, y))
-        
         step = min(self.speed * dt, dist)
-        if step <= 0:
-            return True
-        
         dx = x - self.x
         dy = y - self.y
         self.x +=  dx / dist * step
         self.y += dy / dist * step
-        return False
+        return (self.x, self.y)
 
     def can_attack(self, other: "Unit") -> bool:
         """
