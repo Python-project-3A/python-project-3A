@@ -201,88 +201,80 @@ class Battlefield:
     # ------------------------
     # mouvement
     # ------------------------
+    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
+        """
+        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y)
+        et n'importe quelle autre unité.
+        Retourne True s'il y a collision, False sinon.
+        NE MODIFIE RIEN.
+        """
+        u_w = getattr(unit, "width", 0.4)
+        u_h = getattr(unit, "height", 0.4)
 
+        for other in self.units.values():
+            # on ignore l'unité testée
+            if other is unit:
+                continue
 
-def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
-    """
-    Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y)
-    et n'importe quelle autre unité.
-    Retourne True s'il y a collision, False sinon.
-    NE MODIFIE RIEN.
-    """
-    u_w = getattr(unit, "width", 0.4)
-    u_h = getattr(unit, "height", 0.4)
+            # si l'unité a is_alive() et est morte, on ignore (optionnel mais utile)
+            is_alive = getattr(other, "is_alive", None)
+            if callable(is_alive) and not is_alive():
+                continue
 
-    for other in self.units.values():
-        # on ignore l'unité testée
-        if other is unit:
-            continue
+            o_w = getattr(other, "width", 0.4)
+            o_h = getattr(other, "height", 0.4)
 
-        # si l'unité n'a pas de position, on ignore
-        op = getattr(other, "position", None)
-        if op is None:
-            continue
-        ox, oy = op
+            # Test AABB : il doit y avoir chevauchement sur les 2 axes pour collision
+            ox, oy = other.position
+            overlap_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
+            overlap_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
 
-        # si l'unité a is_alive() et est morte, on ignore (optionnel mais utile)
-        is_alive = getattr(other, "is_alive", None)
-        if callable(is_alive) and not is_alive():
-            continue
+            if overlap_x and overlap_y:
+                return True  # collision détectée
 
-        o_w = getattr(other, "width", 0.4)
-        o_h = getattr(other, "height", 0.4)
+        return False  # pas de collision
 
-        # Test AABB : il doit y avoir chevauchement sur les 2 axes pour collision
-        overlap_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
-        overlap_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
+    def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
+        """
+        Tente de déplacer `unit` à (new_x, new_y).
+        - Vérifie les bounds.
+        - Vérifie la collision via check_collision (AABB).
+        - Si collision : NE FAIT RIEN et retourne False.
+        - Si OK : met à jour les occupant/liste de tiles et unit.position, retourne True.
+        """
+        # bounds check
+        if not (0 <= new_x < self.width and 0 <= new_y < self.height):
+            # hors carte -> pas de déplacement
+            return False
 
-        if overlap_x and overlap_y:
-            return True  # collision détectée
+        # tile (utile pour traiter le terrain plus tard)
+        ix, iy = self._tile_index_from_pos(new_x, new_y)
+        # tile = self.game_map.get_tile(ix, iy)  # pas nécessaire pour l'instant
 
-    return False  # pas de collision
+        # collision check (AABB)
+        if self.check_collision(unit, new_x, new_y):
+            return False  # collision détectée -> on n'applique pas le déplacement
 
+        # --- Aucune collision, on applique le déplacement ---
 
-def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
-    """
-    Tente de déplacer `unit` à (new_x, new_y).
-    - Vérifie les bounds.
-    - Vérifie la collision via check_collision (AABB).
-    - Si collision : NE FAIT RIEN et retourne False.
-    - Si OK : met à jour les occupant/liste de tiles et unit.position, retourne True.
-    """
-    # bounds check
-    if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-        # hors carte -> pas de déplacement
-        return False
+        # retirer de l'ancienne tile
+        old_pos = getattr(unit, "position", (None, None))
+        if old_pos is not None:
+            ox, oy = old_pos
+            oix, oiy = self._tile_index_from_pos(ox, oy)
+            otile = self.game_map.get_tile(oix, oiy)
+            if otile is not None:
+                otile.remove_occupant(unit)
 
-    # tile (utile pour traiter le terrain plus tard)
-    ix, iy = self._tile_index_from_pos(new_x, new_y)
-    # tile = self.game_map.get_tile(ix, iy)  # pas nécessaire pour l'instant
+        # ajouter à la nouvelle tile (on s'assure qu'elle existe)
+        target_tile = self.game_map.ensure_tile(ix, iy)
+        target_tile.add_occupant(unit)
 
-    # collision check (AABB)
-    if self.check_collision(unit, new_x, new_y):
-        return False  # collision détectée -> on n'applique pas le déplacement
+        # mise à jour des coordonnées de l'unité
+        unit.position = (float(new_x), float(new_y))
+        # logger.debug("unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y)
 
-    # --- Aucune collision, on applique le déplacement ---
-
-    # retirer de l'ancienne tile
-    old_pos = getattr(unit, "position", (None, None))
-    if old_pos is not None:
-        ox, oy = old_pos
-        oix, oiy = self._tile_index_from_pos(ox, oy)
-        otile = self.game_map.get_tile(oix, oiy)
-        if otile is not None:
-            otile.remove_occupant(unit)
-
-    # ajouter à la nouvelle tile (on s'assure qu'elle existe)
-    target_tile = self.game_map.ensure_tile(ix, iy)
-    target_tile.add_occupant(unit)
-
-    # mise à jour des coordonnées de l'unité
-    unit.position = (float(new_x), float(new_y))
-    logger.debug("unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y)
-
-    return True
+        return True
 
     # ------------------------
     # requêtes et utilitaires
