@@ -8,6 +8,8 @@ class Crossbowman(Unit):
             team=team,
             x=x,
             y=y,
+            width=0.7,
+            height=0.7,
             hp=35,
             armor=0,
             damage=5,

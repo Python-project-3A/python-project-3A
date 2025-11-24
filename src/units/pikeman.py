@@ -8,6 +8,8 @@ class Pikeman(Unit):
             team=team,
             x=x,
             y=y,
+            width=1,
+            height=1,
             hp=55,
             armor=0,
             damage=4,
