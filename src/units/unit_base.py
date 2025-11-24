@@ -1,13 +1,13 @@
 import math
 import time
+from src.engine.battlefield import Battlefield
 
 class Unit : 
     def __init__(self,name,team,x,y,height,width,hp,armor,damage,attack_range,
                  attack_cooldown,speed):
         self.name = name 
         self.team = team
-        self.x = x
-        self.y = y
+        self.position=(float(x),float(y))
         self.height = height
         self.width = width
         self.hp = hp
@@ -143,3 +143,12 @@ class Unit :
         if not living_enemies:
             return None
         return min(living_enemies, key=lambda e: self.distance_to(e))
+    
+def update(self,Battlefield,tick):
+    """met à jour l'etat de l'unité pour le tick donné"""
+    if not self.is_alive():
+        if hasattr(self, 'id'):
+                 Battlefield.remove_unit(self.id)
+        return
+    
+    
