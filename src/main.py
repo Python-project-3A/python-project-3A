@@ -3,10 +3,10 @@ from src.engine.battlefield import Battlefield
 from src.engine.simulation import Simulation
 import argparse
 from src.cli.cli import CLIVisualizer
+from src.units.pikeman import Pikeman
+
 
 # --- gestion des arguments ---------------------------------------------
-
-
 def parse_args():
     # création d'un objet parser (= interpréteur d'arguments)
     parser = argparse.ArgumentParser(description="AoE-like RTS simulation CLI")  # descrption = text affiché avec : python -m src.main --help
@@ -77,15 +77,15 @@ def main():
     bf = Battlefield(args.width, args.height)
 
     # fabrique d’unité
-    def make_unit_A():
-        return Unit_minimal("k", size=0.5)
+    def make_Pikeman_team0():
+        return Pikeman(0, 1.0, 1.0)
 
-    def make_unit_B():
-        return Unit_minimal("p", size=0.5)
+    def make_Pikeman_team1():
+        return Pikeman(1, 10.0, 10.0)
 
     # spawn deux unités
-    u1 = bf.spawn_unit(make_unit_A, 1.0, 1.0, owner=0)
-    u2 = bf.spawn_unit(make_unit_B, 10.0, 10.0, owner=1)
+    u1 = bf.spawn_unit(make_Pikeman_team0, 1.0, 1.0, owner=0)
+    u2 = bf.spawn_unit(make_Pikeman_team1, 10.0, 10.0, owner=1)
 
     # ajout d’un général
     bf.generals.append(General_minimal())

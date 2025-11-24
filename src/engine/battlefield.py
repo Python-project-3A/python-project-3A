@@ -129,15 +129,13 @@ class Battlefield:
     def spawn_unit(self, unit_factory: Callable[[], Any], x: float, y: float, owner: int) -> int:
         """
         Créer une instance unité via une fonction factory et l'ajoute au Battlefield.
-        L'unité doit avoir une .position (tuple) et un .owner., optionnellement .size (float radius), .hp
+        Renvoie l'id de l'unité.
         """
         unit = unit_factory()
         self._assign_id_if_needed(unit)
         unit.position = (float(x), float(y))
         unit.owner = owner
-        # taille par defaut  (0.4 tile radius)
-        if not hasattr(unit, "size"):
-            unit.size = 0.4
+        unit.battlefield = self
 
         ix, iy = self._tile_index_from_pos(x, y)
         # ensure tile exists
@@ -148,15 +146,13 @@ class Battlefield:
         logger.debug("spawned unit %s at (%.2f,%.2f) owner=%s", unit.id, x, y, owner)
         return unit.id
 
-    def add_existing_unit(self, unit: Any) -> int:
+    def add_existing_unit(self, unit) -> int:
         """Ajoute une unité existante au Battlefield."""
         if not hasattr(unit, "position"):
             raise ValueError("add_existing_unit: unit n'a pas de position")
         x, y = unit.position
         unit.position = (float(x), float(y))
         self._assign_id_if_needed(unit)
-        if not hasattr(unit, "size"):
-            unit.size = 0.4
         ix, iy = self._tile_index_from_pos(x, y)
         tile = self.game_map.ensure_tile(ix, iy)
         tile.add_occupant(unit)
@@ -170,59 +166,98 @@ class Battlefield:
         if unit is None:
             return
         x, y = getattr(unit, "position", (None, None))
-        if x is not None:
-            ix, iy = self._tile_index_from_pos(x, y)
-            tile = self.game_map.get_tile(ix, iy)
-            if tile is not None:
-                tile.remove_occupant(unit)
+        ix, iy = self._tile_index_from_pos(x, y)
+        tile = self.game_map.get_tile(ix, iy)
+        if tile is not None:
+            tile.remove_occupant(unit)
         logger.debug("removed unit %s", unit_id)
 
-    # ------------------------
-    # mouvement avec collision
-    # ------------------------
-    def move_unit_on_map(self, unit: Any, new_x: float, new_y: float, push: bool = False) -> None:
+    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
         """
-        Déplacement unité vers (new_x,new_y)
-        - terrain
-        - terrain block (example: eau)
-        - collision : assure aucune collision avec les unités existantes (avec les tailles)
-        Si push=True, va essayer de faire un push naif (pas implémenté completement).
-        Raises ValueError si déplacement invalide.
+        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y) et n'importe quelle autre unité.
+        Retourne True si collision, False sinon.
         """
-        # bounds check # TODO remplacer par la méthode in_bounds
-        if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-            raise ValueError("move_unit_on_map: target out of bounds")
+        u_w = unit.width
+        u_h = unit.height
 
-        # tile check (example terrain block)
-        ix, iy = self._tile_index_from_pos(new_x, new_y)
-        tile = self.game_map.get_tile(ix, iy)
-
-        # terrain check (pas utile pour l'instant)
-        # if tile is not None and getattr(tile, "terrain", None) == "water":
-        #     raise ValueError("move_unit_on_map: target blocked by water")
-
-        # collision check with all units (naive O(n); optimize later)
-        # unit must have .size attribute (radius)
-        u_size = getattr(unit, "size", 0.4)
         for other in self.units.values():
+            # on ignore l'unité testée
             if other is unit:
                 continue
-            op = getattr(other, "position", None)
-            if op is None:
-                continue
-            ox, oy = op
-            # compute euclidean distance
-            dist = hypot(ox - new_x, oy - new_y)
-            other_size = getattr(other, "size", 0.4)
-            if dist < (u_size + other_size):
-                # collision!
-                if push:
-                    # naive: do not implement complex pushing here; raise for now
-                    raise ValueError("move_unit_on_map: collision (would need push handling)")
-                else:
-                    raise ValueError("move_unit_on_map: collision with unit %s" % getattr(other, "id", "?"))
 
-        # passed checks -> update occupant lists and unit.position
+            ox, oy = other.position
+            o_w = other.width
+            o_h = other.height
+
+            # Test AABB (Axis-Aligned Bounding Box).
+            chevauvechement_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
+            chevauvechement_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
+
+            if chevauvechement_x and chevauvechement_y:
+                return True  # collision
+
+        return False  # pas de collision
+
+    # ------------------------
+    # mouvement
+    # ------------------------
+    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
+        """
+        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y)
+        et n'importe quelle autre unité.
+        Retourne True s'il y a collision, False sinon.
+        NE MODIFIE RIEN.
+        """
+        u_w = getattr(unit, "width", 0.4)
+        u_h = getattr(unit, "height", 0.4)
+
+        for other in self.units.values():
+            # on ignore l'unité testée
+            if other is unit:
+                continue
+
+            # si l'unité a is_alive() et est morte, on ignore (optionnel mais utile)
+            is_alive = getattr(other, "is_alive", None)
+            if callable(is_alive) and not is_alive():
+                continue
+
+            o_w = getattr(other, "width", 0.4)
+            o_h = getattr(other, "height", 0.4)
+
+            # Test AABB : il doit y avoir chevauchement sur les 2 axes pour collision
+            ox, oy = other.position
+            overlap_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
+            overlap_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
+
+            if overlap_x and overlap_y:
+                return True  # collision détectée
+
+        return False  # pas de collision
+
+    def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
+        """
+        Tente de déplacer `unit` à (new_x, new_y).
+        - Vérifie les bounds.
+        - Vérifie la collision via check_collision (AABB).
+        - Si collision : NE FAIT RIEN et retourne False.
+        - Si OK : met à jour les occupant/liste de tiles et unit.position, retourne True.
+        """
+        # bounds check
+        if not (0 <= new_x < self.width and 0 <= new_y < self.height):
+            # hors carte -> pas de déplacement
+            return False
+
+        # tile (utile pour traiter le terrain plus tard)
+        ix, iy = self._tile_index_from_pos(new_x, new_y)
+        # tile = self.game_map.get_tile(ix, iy)  # pas nécessaire pour l'instant
+
+        # collision check (AABB)
+        if self.check_collision(unit, new_x, new_y):
+            return False  # collision détectée -> on n'applique pas le déplacement
+
+        # --- Aucune collision, on applique le déplacement ---
+
+        # retirer de l'ancienne tile
         old_pos = getattr(unit, "position", (None, None))
         if old_pos is not None:
             ox, oy = old_pos
@@ -231,11 +266,15 @@ class Battlefield:
             if otile is not None:
                 otile.remove_occupant(unit)
 
-        # ensure target tile exists
+        # ajouter à la nouvelle tile (on s'assure qu'elle existe)
         target_tile = self.game_map.ensure_tile(ix, iy)
         target_tile.add_occupant(unit)
+
+        # mise à jour des coordonnées de l'unité
         unit.position = (float(new_x), float(new_y))
-        logger.debug("unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y)
+        # logger.debug("unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y)
+
+        return True
 
     # ------------------------
     # requêtes et utilitaires
@@ -279,7 +318,8 @@ class Battlefield:
                     "owner": getattr(u, "owner", None),
                     "position": getattr(u, "position", None),
                     "hp": getattr(u, "hp", None),
-                    "size": getattr(u, "size", None),
+                    "u_width": getattr(u, "width", None),
+                    "u_height": getattr(u, "height", None),
                 }
             )
         return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
