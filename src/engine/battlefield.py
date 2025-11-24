@@ -135,6 +135,8 @@ class Battlefield:
         self._assign_id_if_needed(unit)
         unit.position = (float(x), float(y))
         unit.owner = owner
+        unit.battlefield = self
+        unit.x, unit.y = x, y
         # taille par defaut  (0.4 tile radius)
         if not hasattr(unit, "size"):
             unit.size = 0.4
