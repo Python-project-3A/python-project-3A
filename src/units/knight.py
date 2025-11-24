@@ -8,6 +8,8 @@ class Knight(Unit):
             team=team,
             x=x,
             y=y,
+            width=1,
+            height=2,
             hp=100,
             armor=2,
             damage=10,
