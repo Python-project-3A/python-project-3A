@@ -20,6 +20,9 @@ class Unit:
         self.id = None
         self.battlefield = None
 
+    def __repr__(self):
+        return f"<Unit_minimal id={self.id} pos={self.position}>"
+
     def is_alive(self):
         """return True si l'unité est encore en vie"""
         return self.hp > 0
@@ -71,39 +74,43 @@ class Unit:
         target_radius = 0.5 * math.hypot(other.width, other.height)
         return max(0.0, center_dist - (self_radius + target_radius))
 
-    def move_towards(self, target: "Unit", dt: float) -> bool:
+    def move_towards(self, target: "Unit", dt: float, bf: Battlefield) -> bool:
         """
         déplace l'unité d'un pas vers l'unité cible
         dépend de la vitesse de notre unité et du temps passé (dt)
         dt: secondes par tick
         déplace l'unité seulement si l'unité cible est déjà assez proche pour attaquer
         OU la vitesse de l'unité est supérieure à 0
-        OU dt = 0
+        OU dt > 0
         """
         edge_dist = self.edge_dist_to(target)
 
         if not self.can_attack(target) and self.speed > 0 and dt > 0:
             dist = self.dist_to(target)
             step = min(self.speed * dt, edge_dist)
-            dx = target.x - self.x
-            dy = target.y - self.y
-            self.x += dx / dist * step
-            self.y += dy / dist * step
+            target_x, target_y = target.position
+            x, y = self.position
+            dx = target_x - x
+            dy = target_y - y
+            new_x += dx / dist * step
+            new_y += dy / dist * step
 
-        return (self.x, self.y)
+            bf.move_unit_on_map(self, new_x, new_y)
 
-    def move_to(self, x: float, y: float, dt: float) -> bool:
+    def move_to(self, px: float, py: float, dt: float, bf: Battlefield) -> bool:
         """
         déplace l'unité d'un pas vers une position (x, y)
         mêmes spécifications que move_towards
         """
-        dist = math.dist((self.x, self.y), (x, y))
+        dist = math.dist(self.position, (px, py))
         step = min(self.speed * dt, dist)
-        dx = x - self.x
-        dy = y - self.y
-        self.x += dx / dist * step
-        self.y += dy / dist * step
-        return (self.x, self.y)
+        x, y = self.position
+        dx = px - x
+        dy = py - y
+        x += dx / dist * step
+        y += dy / dist * step
+
+        bf.move_unit_on_map(self, x, y)
 
     def can_attack(self, other: "Unit") -> bool:
         """
@@ -149,3 +156,18 @@ def update(self, Battlefield, tick):
         if hasattr(self, "id"):
             Battlefield.remove_unit(self.id)
         return
+
+
+def update(self, bf, tick):
+    """
+    Déplacement simple pour test :
+    avance de 0.1 sur x à chaque tick mais vérifie collisions + terrain via battlefield.move_unit_on_map
+    """
+    x, y = self.position
+    new_x = x + 0.1
+    new_y = y
+    try:
+        bf.move_unit_on_map(self, new_x, new_y)
+    except ValueError:
+        # collision ou limite → ne bouge plus
+        pass
