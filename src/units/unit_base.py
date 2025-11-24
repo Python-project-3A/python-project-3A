@@ -149,25 +149,16 @@ class Unit:
             return None
         return min(living_enemies, key=lambda e: self.distance_to(e))
 
+    def update(self, bf: Battlefield, tick: int):
+        """Met à jour l'état de l'unité pour le tick donné."""
+        if not self.is_alive():
+            if hasattr(self, "id"):
+                bf.remove_unit(self.id)
+            return
 
-def update(self, Battlefield, tick):
-    """met à jour l'etat de l'unité pour le tick donné"""
-    if not self.is_alive():
-        if hasattr(self, "id"):
-            Battlefield.remove_unit(self.id)
-        return
-
-
-def update(self, bf, tick):
-    """
-    Déplacement simple pour test :
-    avance de 0.1 sur x à chaque tick mais vérifie collisions + terrain via battlefield.move_unit_on_map
-    """
-    x, y = self.position
-    new_x = x + 0.1
-    new_y = y
-    try:
-        bf.move_unit_on_map(self, new_x, new_y)
-    except ValueError:
-        # collision ou limite → ne bouge plus
-        pass
+        # exemple simple de déplacement automatique pour test
+        x, y = self.position
+        new_x = x + 0.1
+        new_y = y
+        moved = bf.move_unit_on_map(self, new_x, new_y)
+        # moved=True si déplacement effectué, False sinon

@@ -31,7 +31,7 @@ class CLIVisualizer:
 
             # les afficher avec des symboles :
             if 0 <= x < self.width and 0 <= y < self.height:
-                symbol = unit.type[0].upper()
+                symbol = unit.name[0].upper()
                 if unit.owner == 0:
                     symbol = f"\033[34m{symbol}\033[0m"  # bleu joueur 0
                 if unit.owner == 1:
