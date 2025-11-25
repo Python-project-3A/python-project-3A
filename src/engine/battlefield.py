@@ -106,7 +106,7 @@ class Battlefield:
         self.units: Dict[int, Any] = {}
         self.generals: List[Any] = []
         self._next_unit_id: int = 1
-        logger.info("Battlefield initialized %dx%d", width, height)
+        # logger.info("Battlefield initialized %dx%d", width, height)
 
     # ---------- HELEPERS--------------
     def isalmost(self, n, m, d=1e-2):  # 1e-2 ou 1e-3 ???
@@ -121,8 +121,7 @@ class Battlefield:
     @staticmethod  # fontion dans une classe qui ne dépend pas de self
     def _tile_index_from_pos(x: float, y: float) -> Tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile) en utilisant un arrondi inférieur (floor)."""
-        # NB : int(3.99) → 3 -> jsp si c'est la meilleur option
-        return int(x), int(y)
+        return int(x), int(y)  # NB : int(3.99) → 3 -> jsp si c'est la meilleur option. Sinon on peut utiliser round()
 
     def spawn_unit(self, unit_factory: Callable[[], Any], x: float, y: float, owner: int) -> int:
         """
@@ -145,7 +144,7 @@ class Battlefield:
         return unit.id
 
     def add_existing_unit(self, unit) -> int:
-        """Ajoute une unité existante au Battlefield (tile) et renvoie son id."""
+        """Ajoute une unité existante au Battlefield (tile) et renvoie son id. Pour chager un scénario."""
         x, y = unit.position
         self._assign_id_if_needed(unit)
         tx, ty = self._tile_index_from_pos(x, y)
@@ -154,20 +153,24 @@ class Battlefield:
         self.units[unit.id] = unit
         return unit.id
 
-    def _add_unit_to_tile(self, unit, x, y):
-        """Ajoute une unité à une tile via sa position."""
-        ix, iy = self._tile_index_from_pos(x, y)
+    def add_unit_to_tile(self, unit: Any):
+        """
+        Ajoute une unité à la tile correspondante à sa position flottante.
+        Sert uniquement pour affichage ou regroupement rapide.
+        """
+        ix, iy = self._tile_index_from_pos(*unit.position)
         tile = self.game_map.ensure_tile(ix, iy)
-        tile.add_occupant(unit)
-        unit.position = (float(x), float(y))
+        if unit not in tile.occupants:
+            tile.add_occupant(unit)
 
-    def remove_unit(self, unit_id: int) -> None:
-        """Supprime l'unité ayant l'id unit_id."""
-        unit = self.units.pop(unit_id, None)
-        x, y = unit.position
-        tx, ty = self._tile_index_from_pos(x, y)
-        tile = self.game_map.get_tile(tx, ty)
-        if tile:
+    def remove_unit_from_old_tile(self, unit: Any):
+        """
+        Retire l'unité de la tile correspondant à sa position actuelle.
+        Sert uniquement pour mise à jour de la map pour affichage.
+        """
+        ix, iy = self._tile_index_from_pos(*unit.position)
+        tile = self.game_map.get_tile(ix, iy)
+        if tile and unit in tile.occupants:
             tile.remove_occupant(unit)
 
     def check_position(self, unit, new_x: float, new_y: float) -> bool:
@@ -178,14 +181,6 @@ class Battlefield:
             if self.isalmost(other.position[0], new_x) and self.isalmost(other.position[1], new_y):
                 return True
         return False
-
-    def _remove_unit_from_old_tile(self, unit):
-        """Retire l'unité de la tile correspondant à son ancienne position."""
-        ox, oy = unit.position
-        otx, oty = self._tile_index_from_pos(ox, oy)
-        tile = self.game_map.get_tile(otx, oty)
-        if tile:  # sécurité minimale
-            tile.remove_occupant(unit)
 
     def in_map(self, x: float, y: float) -> bool:
         return 0 <= x < self.width and 0 <= y < self.height
@@ -198,24 +193,24 @@ class Battlefield:
         """
 
         # mouvement direct
-        if not self.check_collision(unit, new_x, new_y):
+        if not self.check_position(unit, new_x, new_y):
             return new_x, new_y
 
         ux, uy = unit.position
 
         # 1) slide horizontal
-        if not self.check_collision(unit, new_x, uy):
+        if not self.check_position(unit, new_x, uy):
             return new_x, uy
 
         # 2) slide vertical
-        if not self.check_collision(unit, ux, new_y):
+        if not self.check_position(unit, ux, new_y):
             return ux, new_y
 
         # 3) petit décalage orthogonal
         eps = 0.3
-        if not self.check_collision(unit, new_x, new_y + eps):
+        if not self.check_position(unit, new_x, new_y + eps):
             return new_x, new_y + eps
-        if not self.check_collision(unit, new_x, new_y - eps):
+        if not self.check_position(unit, new_x, new_y - eps):
             return new_x, new_y - eps
 
         # rien à faire → bloqué
@@ -223,26 +218,31 @@ class Battlefield:
 
     def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
         """
-        Tente de déplacer `unit` à (new_x, new_y).
+        Déplace `unit` à (new_x, new_y) en float.
         - Vérifie les bordures de map.
-        - Vérifie la collision (position).
-        - Si collision : tente un slide move.
-        - Si OK : met à jour les occupant/liste de tiles et unit.position, retourne True.
+        - Vérifie la collision avec d'autres unités (float).
+        - Si collision, tente un sliding move.
+        - Mets à jour la position flottante de l'unité.
+        - Mets à jour les occupants des tiles (pour affichage/optimisation).
         """
         # --------- CHECK BORDURES  ----------
         if not self.in_map(new_x, new_y):
-            return False  # hors carte -> pas de déplacement
+            return False
 
-        # --------- CHECK COLLISION ---------
+        # --------- CHECK COLLISION  ----------
         if self.check_position(unit, new_x, new_y):
-            sx, sy = self.attempt_sliding_move(unit, new_x, new_y)
-            if (sx, sy) == unit.position:
-                return False  # bloqué -> pas de déplacement
-            new_x, new_y = sx, sy  # sinon on remplace la cible par la version slidée
+            # tente sliding move
+            nx, ny = self.attempt_sliding_move(unit, new_x, new_y)
+        else:
+            nx, ny = new_x, new_y
 
-        # --- Aucune collision, on applique le déplacement -------------
-        self._remove_unit_from_old_tile(unit)  # retirer de l'ancienne tile
-        self._add_unit_to_tile(unit, new_x, new_y)  # ajouter à la nouvelle
+        if (nx, ny) == unit.position:  # Si toujours bloqué, ne bouge pas
+            return False
+
+        # --- Mise à jour des tiles pour affichage ---
+        self.remove_unit_from_old_tile(unit)
+        unit.position = (nx, ny)  # source de vérité en float
+        self.add_unit_to_tile(unit)
 
         return True
 

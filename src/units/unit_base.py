@@ -23,7 +23,7 @@ class Unit:
     def __repr__(self):
         return f"<Unit_minimal id={self.id} pos={self.position}>"
 
-    def is_alive(self):
+    def is_alive(self) -> bool:
         """return True si l'unité est encore en vie"""
         return self.hp > 0
 
@@ -126,7 +126,7 @@ class Unit:
         else:
             return False
 
-    def attack(self, other: "Unit"):
+    def attack(self, other: "Unit") -> bool:
         """Attaque si le cooldown est fini."""
         if not self.can_attack(other):
             return False
@@ -143,7 +143,7 @@ class Unit:
 
         return True
 
-    def choose_target(self, enemies):
+    def choose_target(self, enemies: list):
         living_enemies = [e for e in enemies if e.is_alive()]
         if not living_enemies:
             return None
@@ -163,6 +163,6 @@ class Unit:
 
         # exemple de déplacement automatique (à remplacer par de l'IA plus tard)
         x, y = self.position
-        new_x = x + self.speed
+        new_x = x + 0.1 * self.speed
         new_y = y
         bf.move_unit_on_map(self, new_x, new_y)

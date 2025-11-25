@@ -79,16 +79,9 @@ def main():
 
     bf = Battlefield(args.width, args.height)
 
-    # fabrique d’unité
-    def make_Pikeman_team0():
-        return Pikeman(0, 1.0, 1.0)
-
-    def make_Pikeman_team1():
-        return Pikeman(1, 10.0, 10.0)
-
     # spawn deux unités
-    u1 = bf.spawn_unit(make_Pikeman_team0, 1.0, 1.0, owner=0)
-    u2 = bf.spawn_unit(make_Pikeman_team1, 10.0, 10.0, owner=1)
+    u1_id = bf.spawn_unit(lambda: Pikeman(team=0, x=0, y=0), 33.0, 0.0, owner=0)
+    u2_id = bf.spawn_unit(lambda: Pikeman(team=0, x=0, y=1), 35.0, 0.0, owner=1)
 
     # ajout d’un général
     bf.generals.append(General_minimal())
