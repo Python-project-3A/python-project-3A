@@ -5,6 +5,11 @@ import msvcrt
 FPS = 30
 paused = False
 
+# === CONSTANTES GLOBALES DU MOTEUR TEMPS ===
+DEFAULT_FPS = 30  # FPS max du visualiseur (affichage)
+DEFAULT_SPEED = 1.0  # x1 (sera modifié via argparse dans main)
+# Le vrai rythme du jeu dépend de tick_duration passé au constructeur
+
 
 def read_key():
     """
@@ -33,7 +38,7 @@ class Simulation:
         self.map = game_map
         self.generals = generals
         self.battlefield = battlefield
-        self.tick_duration = tick_duration
+        self.tick_duration = tick_duration  # tick_duration = durée réelle (en secondes) entre deux ticks. Exemple : 1/30 = 0.033s → 30 ticks/sec ou (1/30) / 2 = 0.016s → x2 vitesse
         self.tick_count = 0
         self.is_running = False
         self.paused = False
@@ -55,12 +60,17 @@ class Simulation:
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, max_ticks=2000, visualizer=None):
+    def run(self, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
-        last_render = 0
-        render_interval = 1 / FPS  # 30 FPS (modifiable) timer indépendant du tick
         debut = time.time()
+
+        # Gestion FPS du visualiseur
+        last_render = 0
+        render_interval = 1 / DEFAULT_FPS  # 30 FPS (modifiable) timer indépendant du tick
+
+        # Horloge interne
+        next_tick_time = time.time()
 
         if visualizer:
             # On affiche le TICK 0, pour voir la position initiale des unités.
@@ -82,11 +92,18 @@ class Simulation:
                         break
                     time.sleep(0.05)
 
-            # -------- MODE NORMAL --------
-            self.tick()
-            now = time.time()  # NB : techniquement c'est utilie que si on a un visualizer -> a changer ?
+            # -------- TICK LOGIQUE --------
+            if visualizer:
+                # Mode VISUEL → respecter le temps réel
+                now = time.time()
+                if now >= next_tick_time:
+                    self.tick()
+                    next_tick_time += self.tick_duration
+            else:
+                # Mode SANS VISUEL → ticks en vitesse max
+                self.tick()
 
-            if visualizer and (now - last_render) >= render_interval:  # on affiche que si le temps dépasse 1/30
+            if visualizer and (now - last_render) >= render_interval:
                 visualizer.render(self.battlefield, self.tick_count)
                 # print(f"TICK {self.tick_count}")  # pour debug
                 last_render = now

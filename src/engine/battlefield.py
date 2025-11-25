@@ -108,9 +108,10 @@ class Battlefield:
         self._next_unit_id: int = 1
         logger.info("Battlefield initialized %dx%d", width, height)
 
-    # ------------------------
-    # internal helpers
-    # ------------------------
+    # ---------- HELEPERS--------------
+    def isalmost(self, n, m, d=1e-2):  # 1e-2 ou 1e-3 ???
+        return (abs(n - m)) < d
+
     def _assign_id_if_needed(self, unit: Any) -> None:
         """Assigne un id si besoin."""
         if not hasattr(unit, "id") or getattr(unit, "id") is None:
@@ -123,9 +124,6 @@ class Battlefield:
         # NB : int(3.99) → 3 -> jsp si c'est la meilleur option
         return int(x), int(y)
 
-    # ------------------------
-    # spawn / add / remove units
-    # ------------------------
     def spawn_unit(self, unit_factory: Callable[[], Any], x: float, y: float, owner: int) -> int:
         """
         Créer une instance unité via une fonction factory et l'ajoute au Battlefield.
@@ -147,138 +145,108 @@ class Battlefield:
         return unit.id
 
     def add_existing_unit(self, unit) -> int:
-        """Ajoute une unité existante au Battlefield."""
-        if not hasattr(unit, "position"):
-            raise ValueError("add_existing_unit: unit n'a pas de position")
+        """Ajoute une unité existante au Battlefield (tile) et renvoie son id."""
         x, y = unit.position
-        unit.position = (float(x), float(y))
         self._assign_id_if_needed(unit)
+        tx, ty = self._tile_index_from_pos(x, y)
+        tile = self.game_map.ensure_tile(tx, ty)
+        tile.add_occupant(unit)
+        self.units[unit.id] = unit
+        return unit.id
+
+    def _add_unit_to_tile(self, unit, x, y):
+        """Ajoute une unité à une tile via sa position."""
         ix, iy = self._tile_index_from_pos(x, y)
         tile = self.game_map.ensure_tile(ix, iy)
         tile.add_occupant(unit)
-        self.units[unit.id] = unit
-        logger.debug("added existing unit %s at (%.2f,%.2f)", unit.id, x, y)
-        return unit.id
+        unit.position = (float(x), float(y))
 
     def remove_unit(self, unit_id: int) -> None:
         """Supprime l'unité ayant l'id unit_id."""
         unit = self.units.pop(unit_id, None)
-        if unit is None:
-            return
-        x, y = getattr(unit, "position", (None, None))
-        ix, iy = self._tile_index_from_pos(x, y)
-        tile = self.game_map.get_tile(ix, iy)
-        if tile is not None:
+        x, y = unit.position
+        tx, ty = self._tile_index_from_pos(x, y)
+        tile = self.game_map.get_tile(tx, ty)
+        if tile:
             tile.remove_occupant(unit)
-        logger.debug("removed unit %s", unit_id)
 
-    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
-        """
-        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y) et n'importe quelle autre unité.
-        Retourne True si collision, False sinon.
-        """
-        u_w = unit.width
-        u_h = unit.height
-
+    def check_position(self, unit, new_x: float, new_y: float) -> bool:
+        """vérifie si une unité est présente sur ces coordonnées."""
         for other in self.units.values():
-            # on ignore l'unité testée
             if other is unit:
                 continue
+            if self.isalmost(other.position[0], new_x) and self.isalmost(other.position[1], new_y):
+                return True
+        return False
 
-            ox, oy = other.position
-            o_w = other.width
-            o_h = other.height
+    def _remove_unit_from_old_tile(self, unit):
+        """Retire l'unité de la tile correspondant à son ancienne position."""
+        ox, oy = unit.position
+        otx, oty = self._tile_index_from_pos(ox, oy)
+        tile = self.game_map.get_tile(otx, oty)
+        if tile:  # sécurité minimale
+            tile.remove_occupant(unit)
 
-            # Test AABB (Axis-Aligned Bounding Box).
-            chevauvechement_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
-            chevauvechement_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
+    def in_map(self, x: float, y: float) -> bool:
+        return 0 <= x < self.width and 0 <= y < self.height
 
-            if chevauvechement_x and chevauvechement_y:
-                return True  # collision
+    # ------------- MOUVEMENT --------------
 
-        return False  # pas de collision
-
-    # ------------------------
-    # mouvement
-    # ------------------------
-    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
+    def attempt_sliding_move(self, unit, new_x, new_y):
+        """Tente un glissement si le mouvement direct est bloqué.
+        Retourne (x,y) soit corrigé soit identique.
         """
-        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y)
-        et n'importe quelle autre unité.
-        Retourne True s'il y a collision, False sinon.
-        NE MODIFIE RIEN.
-        """
-        u_w = getattr(unit, "width", 0.4)
-        u_h = getattr(unit, "height", 0.4)
 
-        for other in self.units.values():
-            # on ignore l'unité testée
-            if other is unit:
-                continue
+        # mouvement direct
+        if not self.check_collision(unit, new_x, new_y):
+            return new_x, new_y
 
-            # si l'unité a is_alive() et est morte, on ignore (optionnel mais utile)
-            is_alive = getattr(other, "is_alive", None)
-            if callable(is_alive) and not is_alive():
-                continue
+        ux, uy = unit.position
 
-            o_w = getattr(other, "width", 0.4)
-            o_h = getattr(other, "height", 0.4)
+        # 1) slide horizontal
+        if not self.check_collision(unit, new_x, uy):
+            return new_x, uy
 
-            # Test AABB : il doit y avoir chevauchement sur les 2 axes pour collision
-            ox, oy = other.position
-            overlap_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
-            overlap_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
+        # 2) slide vertical
+        if not self.check_collision(unit, ux, new_y):
+            return ux, new_y
 
-            if overlap_x and overlap_y:
-                return True  # collision détectée
+        # 3) petit décalage orthogonal
+        eps = 0.3
+        if not self.check_collision(unit, new_x, new_y + eps):
+            return new_x, new_y + eps
+        if not self.check_collision(unit, new_x, new_y - eps):
+            return new_x, new_y - eps
 
-        return False  # pas de collision
+        # rien à faire → bloqué
+        return unit.position
 
     def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
         """
         Tente de déplacer `unit` à (new_x, new_y).
-        - Vérifie les bounds.
-        - Vérifie la collision via check_collision (AABB).
-        - Si collision : NE FAIT RIEN et retourne False.
+        - Vérifie les bordures de map.
+        - Vérifie la collision (position).
+        - Si collision : tente un slide move.
         - Si OK : met à jour les occupant/liste de tiles et unit.position, retourne True.
         """
-        # bounds check
-        if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-            # hors carte -> pas de déplacement
-            return False
+        # --------- CHECK BORDURES  ----------
+        if not self.in_map(new_x, new_y):
+            return False  # hors carte -> pas de déplacement
 
-        # tile (utile pour traiter le terrain plus tard)
-        ix, iy = self._tile_index_from_pos(new_x, new_y)
-        # tile = self.game_map.get_tile(ix, iy)  # pas nécessaire pour l'instant
+        # --------- CHECK COLLISION ---------
+        if self.check_position(unit, new_x, new_y):
+            sx, sy = self.attempt_sliding_move(unit, new_x, new_y)
+            if (sx, sy) == unit.position:
+                return False  # bloqué -> pas de déplacement
+            new_x, new_y = sx, sy  # sinon on remplace la cible par la version slidée
 
-        # collision check (AABB)
-        if self.check_collision(unit, new_x, new_y):
-            return False  # collision détectée -> on n'applique pas le déplacement
-
-        # --- Aucune collision, on applique le déplacement ---
-
-        # retirer de l'ancienne tile
-        old_pos = getattr(unit, "position", (None, None))
-        if old_pos is not None:
-            ox, oy = old_pos
-            oix, oiy = self._tile_index_from_pos(ox, oy)
-            otile = self.game_map.get_tile(oix, oiy)
-            if otile is not None:
-                otile.remove_occupant(unit)
-
-        # ajouter à la nouvelle tile (on s'assure qu'elle existe)
-        target_tile = self.game_map.ensure_tile(ix, iy)
-        target_tile.add_occupant(unit)
-
-        # mise à jour des coordonnées de l'unité
-        unit.position = (float(new_x), float(new_y))
-        # logger.debug("unit %s moved to (%.2f,%.2f)", getattr(unit, "id", None), new_x, new_y)
+        # --- Aucune collision, on applique le déplacement -------------
+        self._remove_unit_from_old_tile(unit)  # retirer de l'ancienne tile
+        self._add_unit_to_tile(unit, new_x, new_y)  # ajouter à la nouvelle
 
         return True
 
-    # ------------------------
-    # requêtes et utilitaires
-    # ------------------------
+    # ------------- UTILS --------------
     def get_all_units(self) -> List[Any]:
         """Renvoie une liste des unité du Battlefield."""
         return list(self.units.values())
@@ -294,8 +262,8 @@ class Battlefield:
     def units_in_radius(self, x: float, y: float, radius: float) -> List[Any]:
         """Renvoie une liste des unité du Battlefield dans un rayon de radius autour de (x,y)."""
         result: List[Any] = []
-        for u in self.units.values():
-            ux, uy = getattr(u, "position", (None, None))
+        for u in self.get_all_units():
+            ux, uy = u.position
             if ux is None:
                 continue
             if hypot(ux - x, uy - y) <= float(radius):
@@ -313,13 +281,13 @@ class Battlefield:
         for u in self.units.values():
             units_ser.append(
                 {
-                    "id": getattr(u, "id", None),
-                    "type": getattr(u, "type", getattr(u, "__class__", type(u)).__name__),
-                    "owner": getattr(u, "owner", None),
-                    "position": getattr(u, "position", None),
-                    "hp": getattr(u, "hp", None),
-                    "u_width": getattr(u, "width", None),
-                    "u_height": getattr(u, "height", None),
+                    "id": u.id,
+                    "type": u.name,
+                    "owner": u.owner,
+                    "position": u.position,  # "position": tuple(int(v * 100) / 100 for v in u.position
+                    "hp": u.hp,
+                    "u_width": u.width,
+                    "u_height": u.height,
                 }
             )
-        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
+        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals], "tiles": len(self.game_map.tiles)}
