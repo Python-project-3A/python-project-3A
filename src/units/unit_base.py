@@ -4,31 +4,31 @@ from src.engine.battlefield import Battlefield
 
 
 class Unit:
-    def __init__(self, name, team, x, y, **stats ):
+    def __init__(self, name, team, x, y, height, width, hp, armor, damage, attack_range, attack_cooldown, speed):
         self.name = name
         self.team = team
         self.position = (float(x), float(y))
+        self.height = height
+        self.width = width
+        self.hp = hp
+        self.armor = armor
+        self.damage = damage
+        self.attack_range = attack_range
+        self.attack_cooldown = attack_cooldown
+        self.speed = speed
         self.time_since_last_attack = 0.0
-
-        self.hp = stats.get('hp')
-        self.armor = stats.get('armor')
-        self.damage = stats.get('damage')
-        self.attack_range = stats.get('attack_range')
-        self.attack_cooldown = stats.get('attack_cooldown')
-        self.speed = stats.get('speed')
-        self.height = stats.get('height')
-        self.width = stats.get('width')
-
         self.id = None
         self.battlefield = None
 
-    @classmethod
-    def from_stats(cls, stats: dict, team: str, x: float, y: float):
-        """
-        Crée une nouvelle unité en utilisant un dictionnaire de statistiques.
-        """
-        name = stats['name']
-        return cls(name, team, x, y, **stats)   
+    def take_damage(self, attack_damage):   
+        """ -calcul les degats subis apres une attaque 
+            -les soustrais aux hp
+            -indique si la troupe est encore en vie apres l'attaque """
+        
+        take = max(0, attack_damage)
+        self.hp -= take
+        if not self.is_alive():
+            pass #que faire quand une unité meurt 
 
     def __repr__(self):
         return f"<Unit_minimal id={self.id} pos={self.position}>"
@@ -36,17 +36,7 @@ class Unit:
     def is_alive(self):
         """return True si l'unité est encore en vie"""
         return self.hp > 0
-
-    def take_damage(self, attack_damage):
-        """-calcul les degats subis apres une attaque
-        -les soustrais aux hp
-        -indique si la troupe est encore en vie apres l'attaque"""
-
-        take = max(0, attack_damage - self.armor)
-        self.hp -= take
-        if not self.is_alive():
-            pass
-
+    
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
@@ -146,8 +136,9 @@ class Unit:
             return False
 
         damage = max(0, self.damage - other.armor)
-        other.hp -= damage
-        other.hp = max(0, other.hp)  # pour ne pas avoir d'hp < 0
+        #other.hp -= damage
+        #other.hp = max(0, other.hp)  # pour ne pas avoir d'hp < 0
+        other.take_damage(self,damage)
 
         self.time_since_last_attack = current_time
 
