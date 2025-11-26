@@ -26,17 +26,7 @@ class Unit:
     def is_alive(self):
         """return True si l'unité est encore en vie"""
         return self.hp > 0
-
-    def take_damage(self, attack_damage):
-        """-calcul les degats subis apres une attaque
-        -les soustrais aux hp
-        -indique si la troupe est encore en vie apres l'attaque"""
-
-        take = max(0, attack_damage - self.armor)
-        self.hp -= take
-        if not self.is_alive():
-            pass
-
+    
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
