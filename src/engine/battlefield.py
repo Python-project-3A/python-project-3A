@@ -3,6 +3,13 @@ from __future__ import annotations
 from typing import Dict, List, Tuple, Optional, Callable, Any
 import logging
 from math import hypot  # distance euclidienne : sqrt(dx*dx + dy*dy)
+from unit_base import Unit
+from data_loader import load_unit_stats
+
+# Verifier le chemin mais il devrait etre bon (doute puisque fichier data )
+UNIT_STATS_DATA = load_unit_stats("units.json")
+
+
 
 # Try to import the real GameMap/Tile; if module not present (dev stage),
 # provide a very small mock to allow running tests.
