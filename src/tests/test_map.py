@@ -43,9 +43,7 @@ def test_display_large_random_points():
     game_map = GameMap(width, height)
 
     num_points = 50
-    float_points = [
-        (random.uniform(0, width), random.uniform(0, height)) for _ in range(num_points)
-    ]
+    float_points = [(random.uniform(0, width), random.uniform(0, height)) for _ in range(num_points)]
 
     # Projection float → tile integer
     for x, y in float_points:

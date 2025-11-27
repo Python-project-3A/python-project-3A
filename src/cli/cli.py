@@ -1,6 +1,5 @@
 # src/cli/cli.py
 import sys
-import time
 
 
 class CLIVisualizer:

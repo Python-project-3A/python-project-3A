@@ -1,8 +1,10 @@
 # src/engine/battlefield.py
 from __future__ import annotations
-from typing import Dict, List, Tuple, Optional, Callable, Any
+
 import logging
+from collections.abc import Callable
 from math import hypot  # distance euclidienne : sqrt(dx*dx + dy*dy)
+from typing import Any
 
 # Try to import the real GameMap/Tile; if module not present (dev stage),
 # provide a very small mock to allow running tests.
@@ -21,7 +23,7 @@ except Exception:
 
         def __init__(self, elevation: int = 0):  # , terrain: str = "grass"):
             self.elevation = elevation
-            self.occupants: List[Any] = []  # liste d'unités
+            self.occupants: list[Any] = []  # liste d'unités
 
         def is_free(self) -> bool:
             """Considère 'free' si pas d'occupants."""  # NB : On peut redéfinir la logique si besoin -> nottament pour la taille des unités, si elles "rentrent ou non sur cette Tile"
@@ -51,13 +53,13 @@ except Exception:
             self.width = width
             self.height = height
             # self.tile lie une clé (x, y) → tuple d’entiers vers une valeur Tile (objet Tile)
-            self.tiles: Dict[Tuple[int, int], Tile] = {}
+            self.tiles: dict[tuple[int, int], Tile] = {}
 
         def _in_bounds(self, ix: int, iy: int) -> bool:
             """Test si (x, y) est dans la carte."""
             return 0 <= ix < self.width and 0 <= iy < self.height
 
-        def add_tile(self, ix: int, iy: int, tile: Optional[Tile] = None) -> None:
+        def add_tile(self, ix: int, iy: int, tile: Tile | None = None) -> None:
             """Ajoute une tile en (ix, iy)."""
             if not self._in_bounds(ix, iy):
                 raise ValueError("add_tile: out of bounds")
@@ -65,7 +67,7 @@ except Exception:
                 tile = Tile()
             self.tiles[(ix, iy)] = tile
 
-        def get_tile(self, ix: int, iy: int) -> Optional[Tile]:
+        def get_tile(self, ix: int, iy: int) -> Tile | None:
             """Récupère une tile en (ix, iy) si présent, renvoie None sinon."""
             return self.tiles.get((ix, iy))
 
@@ -103,8 +105,8 @@ class Battlefield:
         self.width = width
         self.height = height
         self.game_map: GameMap = GameMap(width, height)
-        self.units: Dict[int, Any] = {}
-        self.generals: List[Any] = []
+        self.units: dict[int, Any] = {}
+        self.generals: list[Any] = []
         self._next_unit_id: int = 1
         logger.info("Battlefield initialized %dx%d", width, height)
 
@@ -113,12 +115,12 @@ class Battlefield:
     # ------------------------
     def _assign_id_if_needed(self, unit: Any) -> None:
         """Assigne un id si besoin."""
-        if not hasattr(unit, "id") or getattr(unit, "id") is None:
+        if not hasattr(unit, "id") or unit.id is None:
             unit.id = self._next_unit_id
             self._next_unit_id += 1
 
     @staticmethod  # fontion dans une classe qui ne dépend pas de self
-    def _tile_index_from_pos(x: float, y: float) -> Tuple[int, int]:
+    def _tile_index_from_pos(x: float, y: float) -> tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile) en utilisant un arrondi inférieur (floor)."""
         # NB : int(3.99) → 3 -> jsp si c'est la meilleur option
         return int(x), int(y)
@@ -171,32 +173,6 @@ class Battlefield:
         if tile is not None:
             tile.remove_occupant(unit)
         logger.debug("removed unit %s", unit_id)
-
-    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
-        """
-        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y) et n'importe quelle autre unité.
-        Retourne True si collision, False sinon.
-        """
-        u_w = unit.width
-        u_h = unit.height
-
-        for other in self.units.values():
-            # on ignore l'unité testée
-            if other is unit:
-                continue
-
-            ox, oy = other.position
-            o_w = other.width
-            o_h = other.height
-
-            # Test AABB (Axis-Aligned Bounding Box).
-            chevauvechement_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
-            chevauvechement_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
-
-            if chevauvechement_x and chevauvechement_y:
-                return True  # collision
-
-        return False  # pas de collision
 
     # ------------------------
     # mouvement
@@ -279,21 +255,21 @@ class Battlefield:
     # ------------------------
     # requêtes et utilitaires
     # ------------------------
-    def get_all_units(self) -> List[Any]:
+    def get_all_units(self) -> list[Any]:
         """Renvoie une liste des unité du Battlefield."""
         return list(self.units.values())
 
-    def units_by_owner(self, owner: int) -> List[Any]:
+    def units_by_owner(self, owner: int) -> list[Any]:
         """Renvoie une liste des unité du Battlefield appartenant au team owner."""
         return [u for u in self.units.values() if getattr(u, "owner", None) == owner]
 
-    def find_unit(self, unit_id: int) -> Optional[Any]:
+    def find_unit(self, unit_id: int) -> Any | None:
         """Renvoie l'unité ayant l'id unit_id."""
         return self.units.get(unit_id)
 
-    def units_in_radius(self, x: float, y: float, radius: float) -> List[Any]:
+    def units_in_radius(self, x: float, y: float, radius: float) -> list[Any]:
         """Renvoie une liste des unité du Battlefield dans un rayon de radius autour de (x,y)."""
-        result: List[Any] = []
+        result: list[Any] = []
         for u in self.units.values():
             ux, uy = getattr(u, "position", (None, None))
             if ux is None:

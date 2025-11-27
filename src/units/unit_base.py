@@ -1,5 +1,6 @@
 import math
 import time
+
 from src.engine.battlefield import Battlefield
 
 
@@ -26,7 +27,7 @@ class Unit:
     def is_alive(self):
         """return True si l'unité est encore en vie"""
         return self.hp > 0
-    
+
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
