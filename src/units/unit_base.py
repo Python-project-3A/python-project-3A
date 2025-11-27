@@ -51,7 +51,9 @@ class Unit:
         """
         calcule et retourne la distance entre les centres de deux unités
         """
-        return math.dist((self.x, self.y), (other.x, other.y))
+        x, y = self.position
+        ox, oy = other.position
+        return math.dist((x, y), (ox, oy))
 
     def edge_dist_to(self, other: "Unit") -> float:
         """
@@ -108,10 +110,7 @@ class Unit:
         vérifie si les deux unités sont assez proches (selon attack range)
         pour que l'une des unité puisse attaquer (self)
         """
-        if self.edge_dist_to(other) <= self.attack_range:
-            return True
-        else:
-            return False
+        return self.edge_dist_to(other) <= self.attack_range
 
     def attack(self, other: "Unit"):
         """
