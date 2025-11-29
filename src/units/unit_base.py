@@ -1,5 +1,6 @@
 import math
 import time
+
 from src.engine.battlefield import Battlefield
 
 
@@ -31,13 +32,6 @@ class Unit:
         """return True si l'unité est encore en vie"""
         return self.hp > 0
 
-    def take_damage(self, attack_damage):
-        """-calcul les degats subis apres une attaque et les soustrais aux hp"""
-        if not self.is_alive():
-            pass
-        take = max(0, attack_damage - self.armor)
-        self.hp -= take
-
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
@@ -62,7 +56,9 @@ class Unit:
         """
         calcule et retourne la distance entre les centres de deux unités
         """
-        return math.dist(self.position, other.position)
+        x, y = self.position
+        ox, oy = other.position
+        return math.dist((x, y), (ox, oy))
 
     def edge_dist_to(self, other: "Unit") -> float:
         """calcule et retourne la distance entre les hitbox de deux unités"""
@@ -168,7 +164,10 @@ class Unit:
     # ------ ATTACKS ------
 
     def can_attack(self, other: "Unit") -> bool:
-        """Peut attaquer si distance (bord à bord) <= attack range."""
+        """
+        vérifie si les deux unités sont assez proches (selon attack range)
+        pour que l'une des unité puisse attaquer (self)
+        """
         return self.edge_dist_to(other) <= self.attack_range
 
     def attack(self, other: "Unit") -> bool:

@@ -1,8 +1,9 @@
 # src/main.py
+import argparse
+
+from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
 from src.engine.simulation import Simulation
-import argparse
-from src.cli.cli import CLIVisualizer
 from src.units.pikeman import Pikeman
 from src.engine.simulation import DEFAULT_FPS
 

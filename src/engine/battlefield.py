@@ -1,9 +1,14 @@
 # src/engine/battlefield.py
 from __future__ import annotations
-from typing import Dict, List, Tuple, Optional, Callable, Any
+
+import logging
+from collections.abc import Callable
 from math import hypot  # distance euclidienne : sqrt(dx*dx + dy*dy)
+from typing import Any
+
 from src.map.game_map import GameMap
-from src.map.tile import Tile
+
+logger = logging.getLogger(__name__)
 
 
 class Battlefield:
@@ -19,8 +24,8 @@ class Battlefield:
         self.width = width
         self.height = height
         self.game_map: GameMap = GameMap(width, height)
-        self.units: Dict[int, Any] = {}
-        self.generals: List[Any] = []
+        self.units: dict[int, Any] = {}
+        self.generals: list[Any] = []
         self._next_unit_id: int = 1
 
     # ---------- HELPERS--------------
@@ -29,12 +34,12 @@ class Battlefield:
 
     def _assign_id_if_needed(self, unit: Any) -> None:
         """Assigne un id si besoin."""
-        if not hasattr(unit, "id") or getattr(unit, "id") is None:
+        if not hasattr(unit, "id") or unit.id is None:
             unit.id = self._next_unit_id
             self._next_unit_id += 1
 
     @staticmethod  # fontion dans une classe qui ne dépend pas de self
-    def _tile_index_from_pos(x: float, y: float) -> Tuple[int, int]:
+    def _tile_index_from_pos(x: float, y: float) -> tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile) en utilisant un arrondi inférieur (floor)."""
         return int(x), int(y)  # NB : int(3.99) → 3 -> jsp si c'est la meilleur option. Sinon on peut utiliser round()
 
@@ -77,38 +82,11 @@ class Battlefield:
         if unit not in tile.occupants:
             tile.add_occupant(unit)
 
-    def remove_unit_from_old_tile(self, unit: Any):
-        """
-        Retire l'unité de la tile correspondant à sa position actuelle.
-        Sert uniquement pour mise à jour de la map pour affichage.
-        """
-        ix, iy = self._tile_index_from_pos(*unit.position)
-        tile = self.game_map.get_tile(ix, iy)
-        if tile and unit in tile.occupants:
-            tile.remove_occupant(unit)
+    # ------------------------
+    # mouvement
+    # ------------------------
+    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
 
-    # ---------- UTILS COLLISIONS ----------
-
-    def check_position(self, unit, new_x: float, new_y: float) -> bool:
-        """vérifie si une unité est présente sur ces coordonnées."""
-        for other in self.units.values():
-            if other is unit:
-                continue
-            if unit.collides_with_position(other, new_x, new_y):
-                return True
-        return False
-
-    def resolve_soft_collisions(self, unit):
-        for other in self.units.values():
-            if other is unit:
-                continue
-            unit.soft_push(other)
-
-    # ------------- MOUVEMENT --------------
-
-    def attempt_sliding_move(self, unit, new_x, new_y):
-        """Tente un glissement si le mouvement direct est bloqué.
-        Retourne (x,y) soit corrigé soit identique.
         """
 
         # tentative direct
@@ -167,28 +145,28 @@ class Battlefield:
 
         return True
 
-    # ------------- UTILS --------------
-    def in_map(self, x: float, y: float) -> bool:
-        """Test si (x, y) est dans la carte."""
-        return 0 <= x < self.width and 0 <= y < self.height
-
-    def get_all_units(self) -> List[Any]:
+    # ------------------------
+    # requêtes et utilitaires
+    # ------------------------
+    def get_all_units(self) -> list[Any]:
         """Renvoie une liste des unité du Battlefield."""
         return list(self.units.values())
 
-    def units_by_owner(self, owner: int) -> List[Any]:
+    def units_by_owner(self, owner: int) -> list[Any]:
         """Renvoie une liste des unité du Battlefield appartenant au team owner."""
         return [u for u in self.units.values() if getattr(u, "owner", None) == owner]
 
-    def find_unit(self, unit_id: int) -> Optional[Any]:
+    def find_unit(self, unit_id: int) -> Any | None:
         """Renvoie l'unité ayant l'id unit_id."""
         return self.units.get(unit_id)
 
-    def units_in_radius(self, x: float, y: float, radius: float) -> List[Any]:
+    def units_in_radius(self, x: float, y: float, radius: float) -> list[Any]:
         """Renvoie une liste des unité du Battlefield dans un rayon de radius autour de (x,y)."""
-        result: List[Any] = []
-        for u in self.get_all_units():
-            ux, uy = u.position
+
+        result: list[Any] = []
+        for u in self.units.values():
+            ux, uy = getattr(u, "position", (None, None))
+            
             if ux is None:
                 continue
             if hypot(ux - x, uy - y) <= float(radius):
