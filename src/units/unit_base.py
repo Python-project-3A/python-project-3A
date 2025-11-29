@@ -40,6 +40,7 @@ class Unit:
         self.position = (float(x), float(y))
         self.height = height
         self.width = width
+        self.radius = max(self.width, self.height) * 0.5
 
         # Combat stats
         self.hp = hp

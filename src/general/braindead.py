@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from src.engine.system import CombatSystem
+
 from .general_base import BaseGeneral
 
 if TYPE_CHECKING:
     from src.engine.battlefield import Battlefield
-    from src.engine.system import CombatSystem
 
 
 class GeneralBraindead(BaseGeneral):
