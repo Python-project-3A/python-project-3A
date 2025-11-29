@@ -6,6 +6,7 @@ from .general_base import BaseGeneral
 
 if TYPE_CHECKING:
     from src.engine.battlefield import Battlefield
+    from src.engine.system import CombatSystem
 
 
 class GeneralBraindead(BaseGeneral):
@@ -37,16 +38,11 @@ class GeneralBraindead(BaseGeneral):
             if not unit.is_alive():
                 continue
 
-            # Find enemies within attack range (no chasing)
-            enemies_in_range = [
-                e for e in enemies 
-                if unit.can_attack(e)
-            ]
-
+            enemies_in_range = CombatSystem.get_enemies_in_range(unit, enemies)
+            
             if enemies_in_range:
-                # Enemy is right next to us - attack the nearest one
-                nearest_enemy = min(enemies_in_range, key=lambda e: unit.dist_to(e))
-                unit.current_order = {"type": "attack_unit", "target": nearest_enemy}
+                target = CombatSystem.choose_nearest_target(unit, enemies_in_range)
+                if target:
+                    unit.current_order = {"type": "attack_unit", "target": target}
             else:
-                # No enemies nearby - do nothing (idle)
                 unit.current_order = None

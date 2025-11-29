@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.engine.battlefield import Battlefield
+from src.engine.system import CombatSystem
 
 from .general_base import BaseGeneral
 
@@ -39,7 +40,7 @@ class GeneralDaft(BaseGeneral):
                 continue
 
             # Find nearest enemy to THIS unit
-            nearest_enemy = min(enemies, key=lambda e: unit.dist_to(e))
-
-            # Order this unit to attack that enemy
-            unit.current_order = {"type": "attack_unit", "target": nearest_enemy}
+            target = CombatSystem.choose_nearest_target(unit, enemies)
+                        
+            if target:
+                unit.current_order = {"type": "attack_unit", "target": target}

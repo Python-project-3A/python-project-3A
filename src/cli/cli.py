@@ -49,13 +49,14 @@ class CLIVisualizer:
                     # Plusieurs unités sur la même case
                     # Jaune pour collision
                     import re
-                    existing_clean = re.sub(r'\033\[\d+m', '', current_tile)
-            
+
+                    existing_clean = re.sub(r"\033\[\d+m", "", current_tile)
+
                     if existing_clean.isdigit():
                         count = int(existing_clean) + 1
                     else:
                         count = 2  # First collision
-                            
+
                     # Color yellow and show number
                     grille[y][x] = f"\033[93m{count}\033[0m"
 

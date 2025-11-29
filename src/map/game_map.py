@@ -41,15 +41,9 @@ class GameMap:
     # Tile neighbors
     # --------------------------
     def neighbors(self, ix: int, iy: int, diag=False):
-        around = [
-            (ix+1, iy), (ix-1, iy),
-            (ix, iy+1), (ix, iy-1)
-        ]
+        around = [(ix + 1, iy), (ix - 1, iy), (ix, iy + 1), (ix, iy - 1)]
         if diag:
-            around += [
-                (ix+1, iy+1), (ix+1, iy-1),
-                (ix-1, iy+1), (ix-1, iy-1)
-            ]
+            around += [(ix + 1, iy + 1), (ix + 1, iy - 1), (ix - 1, iy + 1), (ix - 1, iy - 1)]
         return [(x, y) for (x, y) in around if self.in_bounds(x, y)]
 
     # --------------------------

@@ -93,7 +93,7 @@ class CombatSystem:
         return True
 
     @staticmethod
-    def choose_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
+    def choose_nearest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
         """Choose nearest living enemy"""
         living_enemies = [e for e in enemies if e.is_alive()]
 
@@ -102,7 +102,32 @@ class CombatSystem:
 
         return min(living_enemies, key=lambda e: unit.dist_to(e))
 
-
+    @staticmethod
+    def choose_weakest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
+        """
+        Choose the weakest (lowest HP) living enemy.
+        Useful for focus-fire strategies (for other generals than braindead and daft)
+        """
+        living_enemies = [e for e in enemies if e.is_alive()]
+        
+        if not living_enemies:
+            return None
+        
+        return min(living_enemies, key=lambda e: e.hp)
+    
+    @staticmethod
+    def get_enemies_in_range(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
+        """
+        Filter enemies to only those within attack range.
+        
+        Args:
+            unit: The unit checking range
+            enemies: List of potential enemies
+        
+        Returns:
+            List of enemies that can be attacked right now
+        """
+        return [e for e in enemies if e.is_alive() and unit.can_attack(e)]
 class UnitController:
     """Main controller that coordinates unit behavior"""
 
@@ -122,7 +147,7 @@ class UnitController:
         if order["type"] == "move_to":
             target_pos = order["target"]
             target_pos_x, target_pos_y = target_pos
-            reached = MovementSystem.move_to_position(unit, target_pos_x,target_pos_y, dt, battlefield)
+            reached = MovementSystem.move_to_position(unit, target_pos_x, target_pos_y, dt, battlefield)
 
             # Clear order if reached
             if reached and unit.dist_to_point(target_pos) < 0.5:
@@ -135,7 +160,7 @@ class UnitController:
             enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
 
             if enemies:
-                target = CombatSystem.choose_target(unit, enemies)
+                target = min(enemies, key=lambda e: unit.dist_to(e))
                 if target:
                     # Try to attack if in range
                     if unit.can_attack(target):

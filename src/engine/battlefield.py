@@ -70,7 +70,7 @@ class Battlefield:
         unit = self.units.pop(unit_id, None)
         if unit is None:
             return
-        
+
         x, y = unit.position
         ix, iy = self._tile_index_from_pos(x, y)
         tile = self.game_map.get_tile(ix, iy)
@@ -166,20 +166,13 @@ class Battlefield:
 
     def units_in_radius(self, x: float, y: float, radius: float) -> list[Unit]:
         r2 = radius * radius
-        return [
-            u
-            for u in self.units.values()
-            if (dx := u.position[0] - x) * dx + (dy := u.position[1] - y) * dy <= r2
-        ]
-    
+        return [u for u in self.units.values() if (dx := u.position[0] - x) * dx + (dy := u.position[1] - y) * dy <= r2]
+
     def units_in_los(self, unit: Unit) -> list[Unit]:
         vision = getattr(unit, "vision_range", 4.0)
         x, y = unit.position
-        return [
-            u for u in self.units.values()
-            if u is not unit and u.is_alive() and unit.dist_to(u) <= vision
-        ]
-    
+        return [u for u in self.units.values() if u is not unit and u.is_alive() and unit.dist_to(u) <= vision]
+
     def is_battle_over(self) -> bool:
         """Renvoie True si la bataille est finie."""
         teams_alive = {u.owner for u in self.units.values() if u.is_alive()}
@@ -189,18 +182,5 @@ class Battlefield:
         """Renvoie un snapshot du Battlefield."""
         units_ser = []
         for u in self.units.values():
-            units_ser.append({
-                "id": u.id,
-                "type": u.name,
-                "owner": u.owner,
-                "position": u.position,
-                "hp": u.hp,
-                "u_width": u.width,
-                "u_height": u.height,
-            })
-        return {
-            "width": self.width,
-            "height": self.height,
-            "units": units_ser,
-            "generals": [str(g) for g in self.generals]
-        }
+            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "u_width": u.width, "u_height": u.height})
+        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
