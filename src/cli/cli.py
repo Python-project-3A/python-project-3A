@@ -26,8 +26,10 @@ class CLIVisualizer:
             if not unit.is_alive():
                 continue
 
-            x = int(unit.position[0])
-            y = int(unit.position[1])
+            # x = int(unit.position[0])
+            # y = int(unit.position[1])
+            x = min(max(round(unit.position[0]), 0), self.width - 1)
+            y = min(max(round(unit.position[1]), 0), self.height - 1)
 
             # les afficher avec des symboles :
             if 0 <= x < self.width and 0 <= y < self.height:
@@ -37,10 +39,8 @@ class CLIVisualizer:
                 if unit.owner == 1:
                     symbol = f"\033[91m{symbol}\033[0m"  # Rouge joueur 1
 
-                if grille[y][x] == ".":
-                    grille[y][x] = symbol
-                else:
-                    grille[y][x] = "*"
+                # if grille[y][x] == ".":
+                grille[y][x] = symbol
 
         # Affichage
         print(f"=== TICK {tick} ===")

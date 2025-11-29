@@ -16,9 +16,10 @@ class GameMap:
         self.tiles: dict[tuple[int, int], Tile] = {}  # sparse
 
     # --------------------------
-    # Bounds
+    # Bordures
     # --------------------------
     def _in_bounds(self, ix: int, iy: int) -> bool:
+        """Test si (x, y) est dans la carte."""
         return 0 <= ix < self.width and 0 <= iy < self.height
 
     # --------------------------

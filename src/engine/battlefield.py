@@ -1,93 +1,9 @@
 # src/engine/battlefield.py
 from __future__ import annotations
 from typing import Dict, List, Tuple, Optional, Callable, Any
-import logging
 from math import hypot  # distance euclidienne : sqrt(dx*dx + dy*dy)
-
-# Try to import the real GameMap/Tile; if module not present (dev stage),
-# provide a very small mock to allow running tests.
-try:
-    from src.map.game_map import GameMap
-    from src.map.tile import Tile
-except Exception:
-    # Minimal mock implementations for local testing
-    class Tile:
-        """
-        Représente une case de terrain (grid cell).
-        - occupants : liste d'unités présentes sur la tile (peut être vide)
-        - terrain : string (ex: "grass", "water", "rock")
-        - elevation : int (hauteur)
-        """
-
-        def __init__(self, elevation: int = 0):  # , terrain: str = "grass"):
-            self.elevation = elevation
-            self.occupants: List[Any] = []  # liste d'unités
-
-        def is_free(self) -> bool:
-            """Considère 'free' si pas d'occupants."""  # NB : On peut redéfinir la logique si besoin -> nottament pour la taille des unités, si elles "rentrent ou non sur cette Tile"
-            return len(self.occupants) == 0
-
-        def add_occupant(self, unit: Any) -> None:
-            """Ajoute une unité à occupants."""
-            self.occupants.append(unit)
-
-        def remove_occupant(self, unit: Any) -> None:
-            """Retire une unité si présente."""
-            try:
-                self.occupants.remove(unit)
-            except ValueError:
-                pass
-
-        # rajouter un get tile ?
-
-    class GameMap:
-        """
-        Sparse grid map: dict[(ix,iy)] -> Tile.
-        - The indexing (ix,iy) are integers (tile indices).
-        - Units keep float positions; we map floats to tile index via int(x), int(y).
-        """
-
-        def __init__(self, width: int, height: int):
-            self.width = width
-            self.height = height
-            # self.tile lie une clé (x, y) → tuple d’entiers vers une valeur Tile (objet Tile)
-            self.tiles: Dict[Tuple[int, int], Tile] = {}
-
-        def _in_bounds(self, ix: int, iy: int) -> bool:
-            """Test si (x, y) est dans la carte."""
-            return 0 <= ix < self.width and 0 <= iy < self.height
-
-        def add_tile(self, ix: int, iy: int, tile: Optional[Tile] = None) -> None:
-            """Ajoute une tile en (ix, iy)."""
-            if not self._in_bounds(ix, iy):
-                raise ValueError("add_tile: out of bounds")
-            if tile is None:
-                tile = Tile()
-            self.tiles[(ix, iy)] = tile
-
-        def get_tile(self, ix: int, iy: int) -> Optional[Tile]:
-            """Récupère une tile en (ix, iy) si présent, renvoie None sinon."""
-            return self.tiles.get((ix, iy))
-
-        def ensure_tile(self, ix: int, iy: int) -> Tile:
-            """Retourne un tile ou le crée si absent."""
-            if not self._in_bounds(ix, iy):
-                raise ValueError("ensure_tile: out of bounds")
-            t = self.get_tile(ix, iy)
-            if t is None:
-                t = Tile()
-                self.tiles[(ix, iy)] = t
-            return t
-
-        def is_free(self, ix: int, iy: int) -> bool:
-            """Vérifie si la tile existe, et si elle est vide renvoie True"""  # plus si terrain walkable et pas d'obstacle ?
-            if not self._in_bounds(ix, iy):
-                return False
-            t = self.get_tile(ix, iy)
-            return (t is None) or t.is_free()  # ATTENTION : is_free() = méthode du TILE ici -> NB : peut être qu'il faut changer de non une des deux fonctions
-
-
-logger = logging.getLogger(__name__)
+from src.map.game_map import GameMap
+from src.map.tile import Tile
 
 
 class Battlefield:
@@ -96,7 +12,7 @@ class Battlefield:
     - game_map
     - unités (dict id -> instance)
     - généraux (liste)
-    - spawn/add/remove/move with collision checking based on unit.size (radius)
+    - spawn/add/remove/move unit
     """
 
     def __init__(self, width: int, height: int):
@@ -106,9 +22,8 @@ class Battlefield:
         self.units: Dict[int, Any] = {}
         self.generals: List[Any] = []
         self._next_unit_id: int = 1
-        # logger.info("Battlefield initialized %dx%d", width, height)
 
-    # ---------- HELEPERS--------------
+    # ---------- HELPERS--------------
     def isalmost(self, n, m, d=1e-2):  # 1e-2 ou 1e-3 ???
         return (abs(n - m)) < d
 
@@ -123,6 +38,8 @@ class Battlefield:
         """Convertit une position continue (float) en coordonnées discrètes (tile) en utilisant un arrondi inférieur (floor)."""
         return int(x), int(y)  # NB : int(3.99) → 3 -> jsp si c'est la meilleur option. Sinon on peut utiliser round()
 
+    # ---------- SPAWN/ADD/REMOVE UNIT--------------
+
     def spawn_unit(self, unit_factory: Callable[[], Any], x: float, y: float, owner: int) -> int:
         """
         Créer une instance unité via une fonction factory et l'ajoute au Battlefield.
@@ -135,12 +52,9 @@ class Battlefield:
         unit.battlefield = self
 
         ix, iy = self._tile_index_from_pos(x, y)
-        # ensure tile exists
-        tile = self.game_map.ensure_tile(ix, iy)
-        # add unit to structures
-        tile.add_occupant(unit)
+        tile = self.game_map.ensure_tile(ix, iy)  # ensure tile exists
+        tile.add_occupant(unit)  # add unit to structures
         self.units[unit.id] = unit
-        logger.debug("spawned unit %s at (%.2f,%.2f) owner=%s", unit.id, x, y, owner)
         return unit.id
 
     def add_existing_unit(self, unit) -> int:
@@ -173,17 +87,22 @@ class Battlefield:
         if tile and unit in tile.occupants:
             tile.remove_occupant(unit)
 
+    # ---------- UTILS COLLISIONS ----------
+
     def check_position(self, unit, new_x: float, new_y: float) -> bool:
         """vérifie si une unité est présente sur ces coordonnées."""
         for other in self.units.values():
             if other is unit:
                 continue
-            if self.isalmost(other.position[0], new_x) and self.isalmost(other.position[1], new_y):
+            if unit.collides_with_position(other, new_x, new_y):
                 return True
         return False
 
-    def in_map(self, x: float, y: float) -> bool:
-        return 0 <= x < self.width and 0 <= y < self.height
+    def resolve_soft_collisions(self, unit):
+        for other in self.units.values():
+            if other is unit:
+                continue
+            unit.soft_push(other)
 
     # ------------- MOUVEMENT --------------
 
@@ -192,21 +111,21 @@ class Battlefield:
         Retourne (x,y) soit corrigé soit identique.
         """
 
-        # mouvement direct
+        # tentative direct
         if not self.check_position(unit, new_x, new_y):
             return new_x, new_y
 
         ux, uy = unit.position
 
-        # 1) slide horizontal
+        # slide horizontal
         if not self.check_position(unit, new_x, uy):
             return new_x, uy
 
-        # 2) slide vertical
+        # slide vertical
         if not self.check_position(unit, ux, new_y):
             return ux, new_y
 
-        # 3) petit décalage orthogonal
+        # petit décalage orthogonal
         eps = 0.3
         if not self.check_position(unit, new_x, new_y + eps):
             return new_x, new_y + eps
@@ -218,10 +137,11 @@ class Battlefield:
 
     def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
         """
-        Déplace `unit` à (new_x, new_y) en float.
+        Déplace une unit ciruculaire à (new_x, new_y) en float.
         - Vérifie les bordures de map.
-        - Vérifie la collision avec d'autres unités (float).
-        - Si collision, tente un sliding move.
+        - test  collision cicrulaire.
+        - sliding si necessaire.
+        - soft collision pour eviter overlap circulaire.
         - Mets à jour la position flottante de l'unité.
         - Mets à jour les occupants des tiles (pour affichage/optimisation).
         """
@@ -232,21 +152,26 @@ class Battlefield:
         # --------- CHECK COLLISION  ----------
         if self.check_position(unit, new_x, new_y):
             # tente sliding move
-            nx, ny = self.attempt_sliding_move(unit, new_x, new_y)
-        else:
-            nx, ny = new_x, new_y
+            new_x, new_y = self.attempt_sliding_move(unit, new_x, new_y)
 
-        if (nx, ny) == unit.position:  # Si toujours bloqué, ne bouge pas
+        if (new_x, new_y) == unit.position:  # Si toujours bloqué, ne bouge pas
             return False
 
         # --- Mise à jour des tiles pour affichage ---
         self.remove_unit_from_old_tile(unit)
-        unit.position = (nx, ny)  # source de vérité en float
+        unit.position = (new_x, new_y)  # source de vérité en float
         self.add_unit_to_tile(unit)
+
+        # ---------- SOFT COLLISION  ----------
+        self.resolve_soft_collisions(unit)
 
         return True
 
     # ------------- UTILS --------------
+    def in_map(self, x: float, y: float) -> bool:
+        """Test si (x, y) est dans la carte."""
+        return 0 <= x < self.width and 0 <= y < self.height
+
     def get_all_units(self) -> List[Any]:
         """Renvoie une liste des unité du Battlefield."""
         return list(self.units.values())
@@ -284,10 +209,10 @@ class Battlefield:
                     "id": u.id,
                     "type": u.name,
                     "owner": u.owner,
-                    "position": u.position,  # "position": tuple(int(v * 100) / 100 for v in u.position
+                    # "position": u.position,
+                    "position": tuple(int(v * 100) / 100 for v in u.position),  # position arrondie
                     "hp": u.hp,
-                    "u_width": u.width,
-                    "u_height": u.height,
+                    "hibtox": u.radius,
                 }
             )
         return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals], "tiles": len(self.game_map.tiles)}

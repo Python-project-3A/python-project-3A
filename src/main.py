@@ -21,42 +21,7 @@ def parse_args():
     return parser.parse_args()
 
 
-# --- Implementations minimal de Unit et General pour les tests ---------------------------------------------
-
-
-class Unit_minimal:
-    """
-    Unité simple pour tests :
-    - se déplace légèrement à droite sur x à chaque tick
-    """
-
-    def __init__(self, owner, utype="Unit", size=0.4):
-        self.id = None
-        self.owner = owner
-        self.type = utype
-        self.position = (0.0, 0.0)
-        self.hp = 10
-        self.size = size
-
-    def is_alive(self):
-        return self.hp > 0
-
-    def update(self, bf, tick):
-        """
-        Déplacement simple pour test :
-        avance de 0.1 sur x à chaque tick mais vérifie collisions + terrain via battlefield.move_unit_on_map
-        """
-        x, y = self.position
-        new_x = x + 0.1
-        new_y = y
-        try:
-            bf.move_unit_on_map(self, new_x, new_y)
-        except ValueError:
-            # collision ou limite → ne bouge plus
-            pass
-
-    def __repr__(self):
-        return f"<Unit_minimal id={self.id} pos={self.position}>"
+# --- Implementations minimal de General pour les tests ---------------------------------------------
 
 
 class General_minimal:

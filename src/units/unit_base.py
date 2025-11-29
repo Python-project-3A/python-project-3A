@@ -4,18 +4,20 @@ from src.engine.battlefield import Battlefield
 
 
 class Unit:
-    def __init__(self, name, team, x, y, height, width, hp, armor, damage, attack_range, attack_cooldown, speed):
+    def __init__(self, name, team, x, y, r, hp, armor, damage, attack_range, attack_cooldown, speed):
         self.name = name
         self.team = team
+
         self.position = (float(x), float(y))
-        self.height = height
-        self.width = width
+        self.radius = float(r)  # hitbox ronde des unites
+
         self.hp = hp
         self.armor = armor
         self.damage = damage
         self.attack_range = attack_range
         self.attack_cooldown = attack_cooldown
         self.speed = speed
+
         self.cooldown_remaining = 0  # en ticks
         self.id = None
         self.battlefield = None
@@ -23,19 +25,18 @@ class Unit:
     def __repr__(self):
         return f"<Unit_minimal id={self.id} pos={self.position}>"
 
+    # -------- BASICS --------
+
     def is_alive(self) -> bool:
         """return True si l'unité est encore en vie"""
         return self.hp > 0
 
     def take_damage(self, attack_damage):
-        """-calcul les degats subis apres une attaque
-        -les soustrais aux hp
-        -indique si la troupe est encore en vie apres l'attaque"""
-
-        take = max(0, attack_damage - self.armor)
-        self.hp -= take
+        """-calcul les degats subis apres une attaque et les soustrais aux hp"""
         if not self.is_alive():
             pass
+        take = max(0, attack_damage - self.armor)
+        self.hp -= take
 
     def to_dict(self):
         """
@@ -46,8 +47,7 @@ class Unit:
             "name": self.name,
             "team": self.team,
             "position": self.position,
-            "width": self.width,
-            "height": self.height,
+            "hitbox": self.radius,
             "hp": self.hp,
             "armor": self.armor,
             "damage": self.damage,
@@ -56,27 +56,72 @@ class Unit:
             "speed": self.speed,
         }
 
+    # ------ DISTANCES -------
+
     def dist_to(self, other: "Unit") -> float:
         """
         calcule et retourne la distance entre les centres de deux unités
         """
-        return math.dist((self.x, self.y), (other.x, other.y))
+        return math.dist(self.position, other.position)
 
     def edge_dist_to(self, other: "Unit") -> float:
-        """
-        différent de dist_to, retourne la différence de la distance entre les centres de
-        deux unités et la somme de leur rayons
-        nécessaire pour déterminer si l'unité cible est dans l'attack range étant donné
-        que ce dernier commence à partir du rayon de l'unité et non pas de son centre
-        """
+        """calcule et retourne la distance entre les hitbox de deux unités"""
         center_dist = self.dist_to(other)
-        self_radius = 0.5 * math.hypot(self.width, self.height)
-        target_radius = 0.5 * math.hypot(other.width, other.height)
-        return max(0.0, center_dist - (self_radius + target_radius))
+        return center_dist - (self.radius + other.radius)
+
+    # ------ COLLSIONS ------
+
+    def collision(self, other):  # deux unités ne doivent pas avoir leurs centres trop proches
+        """retourne True si deux unité sont en collision"""
+        return self.dist_to(other) < self.radius + other.radius
+
+    def collides_with_position(self, other, x, y):
+        """Vérifie si 'unit' placée à (px, py) entrerait en collision avec 'other'."""
+        ox, oy = other.position
+        dx = x - ox
+        dy = y - oy
+        return math.hypot(dx, dy) < (self.radius + other.radius)
+
+    def soft_push(self, other, push_strength=0.5):
+        """Applique un 'soft push' entre deux unités si elles overlappent."""
+        ox, oy = other.position
+        sx, sy = self.position
+
+        # vecteur entre les centres
+        dx = sx - ox
+        dy = sy - oy
+        dist = math.hypot(dx, dy)
+
+        min_dist = self.radius + other.radius  # distance à respecter
+
+        if dist >= min_dist or dist == 0:
+            return  # rien à faire, elles ne se chevauchent pas
+
+        # quantité d'overlap (chevauchement des hitbox)
+        overlap = min_dist - dist
+
+        # vecteur orthogonal exact
+        # normal au vecteur distance (dx,dy) => (dy, -dx)
+        ortho_x = dy
+        ortho_y = -dx
+
+        ortho_len = math.hypot(ortho_x, ortho_y)
+        if ortho_len == 0:
+            return
+
+        # normalisation
+        ortho_x /= ortho_len
+        ortho_y /= ortho_len
+
+        # déplacement proportionnel au recouvrement
+        push_x = ortho_x * overlap * push_strength  # entre 0.2 et 0.5
+        push_y = ortho_y * overlap * push_strength
+
+        # appliquer la correction
+        self.position = (sx + push_x, sy + push_y)
 
     def move_towards(self, target: "Unit", bf: Battlefield):
         """Se déplace vers la cible d'au maximum 'speed' unités par tick."""
-        edge_dist = self.edge_dist_to(target)
 
         # si déjà à portée → pas besoin d'avancer
         if self.can_attack(target):
@@ -92,7 +137,11 @@ class Unit:
         if dist == 0:
             return False
 
+        # distance dont on peut encore s'approcher sans toucher la hitbox de target
+        edge_dist = self.edge_dist_to(target)
         step = min(self.speed, edge_dist)
+        if step <= 0:
+            return False
 
         new_x = x + dx / dist * step
         new_y = y + dy / dist * step
@@ -116,21 +165,17 @@ class Unit:
 
         return bf.move_unit_on_map(self, new_x, new_y)
 
+    # ------ ATTACKS ------
+
     def can_attack(self, other: "Unit") -> bool:
-        """
-        vérifie si les deux unités sont assez proches (selon attack range)
-        pour que l'une des unité puisse attaquer (self)
-        """
-        if self.edge_dist_to(other) <= self.attack_range:
-            return True
-        else:
-            return False
+        """Peut attaquer si distance (bord à bord) <= attack range."""
+        return self.edge_dist_to(other) <= self.attack_range
 
     def attack(self, other: "Unit") -> bool:
         """Attaque si le cooldown est fini."""
+
         if not self.can_attack(other):
             return False
-
         if self.cooldown_remaining > 0:
             return False
 
@@ -148,6 +193,8 @@ class Unit:
         if not living_enemies:
             return None
         return min(living_enemies, key=lambda e: self.distance_to(e))
+
+    # ------ UPDATE ------
 
     def update(self, bf: Battlefield, tick: int):
         """Update logique de l'unité à chaque tick."""
