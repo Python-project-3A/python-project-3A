@@ -1,4 +1,3 @@
-# src/engine/battlefield.py
 from __future__ import annotations
 
 import logging
@@ -7,6 +6,7 @@ from math import hypot  # distance euclidienne : sqrt(dx*dx + dy*dy)
 from typing import Any
 
 from src.map.game_map import GameMap
+from src.units.unit_base import Unit
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class Battlefield:
     """
     Battlefield: état global. Gère:
     - game_map
-    - unités (dict id -> instance)
+    - unités
     - généraux (liste)
     - spawn/add/remove/move with collision checking based on unit.size (radius)
     """
@@ -24,24 +24,13 @@ class Battlefield:
         self.width = width
         self.height = height
         self.game_map: GameMap = GameMap(width, height)
-        self.units: dict[int, Any] = {}
+        self.units: dict[int, Unit] = {}
         self.generals: list[Any] = []
-        self._next_unit_id: int = 1
         logger.info("Battlefield initialized %dx%d", width, height)
-
-    # ------------------------
-    # internal helpers
-    # ------------------------
-    def _assign_id_if_needed(self, unit: Any) -> None:
-        """Assigne un id si besoin."""
-        if not hasattr(unit, "id") or unit.id is None:
-            unit.id = self._next_unit_id
-            self._next_unit_id += 1
 
     @staticmethod  # fontion dans une classe qui ne dépend pas de self
     def _tile_index_from_pos(x: float, y: float) -> tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile) en utilisant un arrondi inférieur (floor)."""
-        # NB : int(3.99) → 3 -> jsp si c'est la meilleur option
         return int(x), int(y)
 
     # ------------------------
@@ -53,10 +42,8 @@ class Battlefield:
         Renvoie l'id de l'unité.
         """
         unit = unit_factory()
-        self._assign_id_if_needed(unit)
         unit.position = (float(x), float(y))
         unit.owner = owner
-        unit.battlefield = self
 
         ix, iy = self._tile_index_from_pos(x, y)
         # ensure tile exists
@@ -67,13 +54,13 @@ class Battlefield:
         logger.debug("spawned unit %s at (%.2f,%.2f) owner=%s", unit.id, x, y, owner)
         return unit.id
 
-    def add_existing_unit(self, unit) -> int:
+    def add_existing_unit(self, unit: Unit) -> int:
         """Ajoute une unité existante au Battlefield."""
         if not hasattr(unit, "position"):
             raise ValueError("add_existing_unit: unit n'a pas de position")
+
         x, y = unit.position
         unit.position = (float(x), float(y))
-        self._assign_id_if_needed(unit)
         ix, iy = self._tile_index_from_pos(x, y)
         tile = self.game_map.ensure_tile(ix, iy)
         tile.add_occupant(unit)
@@ -84,9 +71,10 @@ class Battlefield:
     def remove_unit(self, unit_id: int) -> None:
         """Supprime l'unité ayant l'id unit_id."""
         unit = self.units.pop(unit_id, None)
+
         if unit is None:
             return
-        x, y = getattr(unit, "position", (None, None))
+        x, y = unit.position
         ix, iy = self._tile_index_from_pos(x, y)
         tile = self.game_map.get_tile(ix, iy)
         if tile is not None:
@@ -96,40 +84,38 @@ class Battlefield:
     # ------------------------
     # mouvement
     # ------------------------
-    def check_collision(self, unit: Any, new_x: float, new_y: float) -> bool:
+    def check_collision(self, unit: Unit, new_x: float, new_y: float) -> bool:
         """
         Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y)
         et n'importe quelle autre unité.
         Retourne True s'il y a collision, False sinon.
         NE MODIFIE RIEN.
         """
-        u_w = getattr(unit, "width", 0.4)
-        u_h = getattr(unit, "height", 0.4)
+        u_w = unit.width
+        u_h = unit.height
 
         for other in self.units.values():
             # on ignore l'unité testée
             if other is unit:
                 continue
 
-            # si l'unité a is_alive() et est morte, on ignore (optionnel mais utile)
-            is_alive = getattr(other, "is_alive", None)
-            if callable(is_alive) and not is_alive():
+            is_alive = other.is_alive()
+            if is_alive:
                 continue
 
-            o_w = getattr(other, "width", 0.4)
-            o_h = getattr(other, "height", 0.4)
+            o_w = other.width
+            o_h = other.height
 
             # Test AABB : il doit y avoir chevauchement sur les 2 axes pour collision
             ox, oy = other.position
             overlap_x = abs(ox - new_x) < (u_w / 2 + o_w / 2)
             overlap_y = abs(oy - new_y) < (u_h / 2 + o_h / 2)
 
-            if overlap_x and overlap_y:
-                return True  # collision détectée
+            return overlap_x and overlap_y  # collision détectée
 
         return False  # pas de collision
 
-    def move_unit_on_map(self, unit: Any, new_x: float, new_y: float) -> bool:
+    def move_unit_on_map(self, unit: Unit, new_x: float, new_y: float) -> bool:
         """
         Tente de déplacer `unit` à (new_x, new_y).
         - Vérifie les bounds.
@@ -142,10 +128,6 @@ class Battlefield:
             # hors carte -> pas de déplacement
             return False
 
-        # tile (utile pour traiter le terrain plus tard)
-        ix, iy = self._tile_index_from_pos(new_x, new_y)
-        # tile = self.game_map.get_tile(ix, iy)  # pas nécessaire pour l'instant
-
         # collision check (AABB)
         if self.check_collision(unit, new_x, new_y):
             return False  # collision détectée -> on n'applique pas le déplacement
@@ -153,7 +135,7 @@ class Battlefield:
         # --- Aucune collision, on applique le déplacement ---
 
         # retirer de l'ancienne tile
-        old_pos = getattr(unit, "position", (None, None))
+        old_pos = unit.position
         if old_pos is not None:
             ox, oy = old_pos
             oix, oiy = self._tile_index_from_pos(ox, oy)
@@ -162,6 +144,7 @@ class Battlefield:
                 otile.remove_occupant(unit)
 
         # ajouter à la nouvelle tile (on s'assure qu'elle existe)
+        ix, iy = self._tile_index_from_pos(new_x, new_y)
         target_tile = self.game_map.ensure_tile(ix, iy)
         target_tile.add_occupant(unit)
 
@@ -174,23 +157,23 @@ class Battlefield:
     # ------------------------
     # requêtes et utilitaires
     # ------------------------
-    def get_all_units(self) -> list[Any]:
+    def get_all_units(self) -> list[Unit]:
         """Renvoie une liste des unité du Battlefield."""
         return list(self.units.values())
 
-    def units_by_owner(self, owner: int) -> list[Any]:
+    def units_by_owner(self, owner: int) -> list[Unit]:
         """Renvoie une liste des unité du Battlefield appartenant au team owner."""
         return [u for u in self.units.values() if getattr(u, "owner", None) == owner]
 
-    def find_unit(self, unit_id: int) -> Any | None:
+    def find_unit(self, unit_id: int) -> Unit | None:
         """Renvoie l'unité ayant l'id unit_id."""
         return self.units.get(unit_id)
 
-    def units_in_radius(self, x: float, y: float, radius: float) -> list[Any]:
+    def units_in_radius(self, x: float, y: float, radius: float) -> list[Unit]:
         """Renvoie une liste des unité du Battlefield dans un rayon de radius autour de (x,y)."""
-        result: list[Any] = []
+        result: list[Unit] = []
         for u in self.units.values():
-            ux, uy = getattr(u, "position", (None, None))
+            ux, uy = u.position
             if ux is None:
                 continue
             if hypot(ux - x, uy - y) <= float(radius):
