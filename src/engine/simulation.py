@@ -1,10 +1,14 @@
-# src/engine/simulation.py
-
 import platform  # Pour vérifier le système d'exploitation (OS)
 import sys  # Pour l'accès à stdout et stdin
 import time
 
-# --- Imports pour la lecture de touche multiplateforme ---
+from src.engine.battlefield import Battlefield
+from src.general.general_base import BaseGeneral
+from src.map.game_map import GameMap
+
+from .system import UnitController
+
+# --- Imports pour la lecture de touche multi-plateforme ---
 system_name = platform.system()
 
 if system_name == "Windows":
@@ -68,7 +72,7 @@ class Simulation:
     - S'arrête en cas de victoire
     """
 
-    def __init__(self, game_map, generals, battlefield, tick_duration=0.1):
+    def __init__(self, game_map: GameMap, generals: list[BaseGeneral], battlefield: Battlefield, tick_duration=0.1):
         self.map = game_map
         self.generals = generals
         self.battlefield = battlefield
@@ -88,13 +92,13 @@ class Simulation:
         # 2. Les unités agissent
         for unit in self.battlefield.get_all_units():
             if unit.is_alive():
-                unit.update(self.battlefield, self.tick_count)
+                UnitController.update(unit, self.battlefield, self.tick_duration)
 
         # 3. Condition de fin de bataille
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, max_ticks=20000, visualizer=None):
+    def run(self, max_ticks=20000, visualizer=None):  # noqa: C901
         """Boucle principale."""
         self.is_running = True
         last_render = 0

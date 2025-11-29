@@ -1,0 +1,38 @@
+{
+  "name": "Small Battle",
+  "description": "10v10 Pikemen on open field",
+  "map": {
+    "width": 50,
+    "height": 30
+  },
+  "armies": [
+    {
+      "player_id": 0,
+      "general": "daft",
+      "units": [
+        {
+          "type": "Pikeman",
+          "count": 10,
+          "formation": "column",
+          "start_x": 5,
+          "start_y": 10,
+          "spacing": 1.5
+        }
+      ]
+    },
+    {
+      "player_id": 1,
+      "general": "braindead",
+      "units": [
+        {
+          "type": "Pikeman",
+          "count": 10,
+          "formation": "column",
+          "start_x": 40,
+          "start_y": 10,
+          "spacing": 1.5
+        }
+      ]
+    }
+  ]
+}
