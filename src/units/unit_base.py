@@ -58,7 +58,9 @@ class Unit:
     def __repr__(self):
         return f"<Unit_minimal id={self.id} pos={self.position}>"
 
-    def is_alive(self):
+    # -------- BASICS --------
+
+    def is_alive(self) -> bool:
         """return True si l'unité est encore en vie"""
         return self.hp > 0
 
@@ -72,16 +74,9 @@ class Unit:
         return math.dist((x, y), (ox, oy))
 
     def edge_dist_to(self, other: "Unit") -> float:
-        """
-        différent de dist_to, retourne la différence de la distance entre les centres de
-        deux unités et la somme de leur rayons
-        nécessaire pour déterminer si l'unité cible est dans l'attack range étant donné
-        que ce dernier commence à partir du rayon de l'unité et non pas de son centre
-        """
+        """calcule et retourne la distance entre les hitbox de deux unités"""
         center_dist = self.dist_to(other)
-        self_radius = 0.5 * math.hypot(self.width, self.height)
-        target_radius = 0.5 * math.hypot(other.width, other.height)
-        return max(0.0, center_dist - (self_radius + target_radius))
+        return center_dist - (self.radius + other.radius)
 
     def can_attack(self, other: "Unit") -> bool:
         """

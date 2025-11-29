@@ -25,8 +25,10 @@ class CLIVisualizer:
             if not unit.is_alive():
                 continue
 
-            x = int(unit.position[0])
-            y = int(unit.position[1])
+            # x = int(unit.position[0])
+            # y = int(unit.position[1])
+            x = min(max(round(unit.position[0]), 0), self.width - 1)
+            y = min(max(round(unit.position[1]), 0), self.height - 1)
 
             if 0 <= x < self.width and 0 <= y < self.height:
                 # Symbole de l'unité (première lettre du nom)

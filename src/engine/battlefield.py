@@ -30,6 +30,9 @@ class Battlefield:
     def _tile_index_from_pos(x: float, y: float) -> tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile)."""
         return int(x), int(y)
+    
+    def isalmost(self, n, m, d=1e-2):  # 1e-2 ou 1e-3 ???
+        return (abs(n - m)) < d
 
     # -----------------------------------------------------
     # SPAWN / REMOVE
@@ -48,13 +51,10 @@ class Battlefield:
         tile.add_occupant(unit)
 
         self.units[unit.id] = unit
-        logger.debug("spawned unit %s at (%.2f,%.2f) owner=%s", unit.id, x, y, owner)
         return unit.id
 
     def add_existing_unit(self, unit: Unit) -> int:
         """Ajoute une unité existante au Battlefield."""
-        if not hasattr(unit, "position"):
-            raise ValueError("add_existing_unit: unit n'a pas de position")
 
         x, y = unit.position
         unit.position = (float(x), float(y))
@@ -64,7 +64,6 @@ class Battlefield:
         tile.add_occupant(unit)
 
         self.units[unit.id] = unit
-        logger.debug("added existing unit %s at (%.2f,%.2f)", unit.id, x, y)
         return unit.id
 
     def remove_unit(self, unit_id: int) -> None:
@@ -247,5 +246,5 @@ class Battlefield:
         """Renvoie un snapshot du Battlefield."""
         units_ser = []
         for u in self.units.values():
-            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "width": u.width, "height": u.height})
+            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "width": u.width, "height": u.height, "hibtox": u.radius})
         return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
