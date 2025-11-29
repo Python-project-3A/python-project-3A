@@ -34,16 +34,30 @@ class CLIVisualizer:
 
                 # Couleur selon l'équipe
                 if unit.owner == 0:
-                    symbol = f"\033[34m{symbol}\033[0m"  # Bleu
+                    colored_symbol = f"\033[34m{symbol}\033[0m"  # Bleu
                 elif unit.owner == 1:
-                    symbol = f"\033[91m{symbol}\033[0m"  # Rouge
+                    colored_symbol = f"\033[91m{symbol}\033[0m"  # Rouge
+                else:
+                    colored_symbol = symbol
 
+                current_tile = grille[y][x]
                 # Placer dans la grille
-                if grille[y][x] == ".":
-                    grille[y][x] = symbol
+
+                if current_tile == ".":
+                    grille[y][x] = colored_symbol
                 else:
                     # Plusieurs unités sur la même case
-                    grille[y][x] = "\033[93m*\033[0m"  # Jaune pour collision
+                    # Jaune pour collision
+                    import re
+                    existing_clean = re.sub(r'\033\[\d+m', '', current_tile)
+            
+                    if existing_clean.isdigit():
+                        count = int(existing_clean) + 1
+                    else:
+                        count = 2  # First collision
+                            
+                    # Color yellow and show number
+                    grille[y][x] = f"\033[93m{count}\033[0m"
 
         # Compter les unités vivantes
         alive_by_owner = {0: 0, 1: 0}
