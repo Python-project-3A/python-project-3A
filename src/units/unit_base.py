@@ -5,26 +5,30 @@ from src.engine.battlefield import Battlefield
 
 
 class Unit:
-    def __init__(self, name, team, x, y, height, width, hp, armor, damage, attack_range, attack_cooldown, speed):
+    def __init__(self, name, team, x, y, r, hp, armor, damage, attack_range, attack_cooldown, speed):
         self.name = name
         self.team = team
+
         self.position = (float(x), float(y))
-        self.height = height
-        self.width = width
+        self.radius = float(r)  # hitbox ronde des unites
+
         self.hp = hp
         self.armor = armor
         self.damage = damage
         self.attack_range = attack_range
         self.attack_cooldown = attack_cooldown
         self.speed = speed
-        self.time_since_last_attack = 0.0
+
+        self.cooldown_remaining = 0  # en ticks
         self.id = None
         self.battlefield = None
 
     def __repr__(self):
         return f"<Unit_minimal id={self.id} pos={self.position}>"
 
-    def is_alive(self):
+    # -------- BASICS --------
+
+    def is_alive(self) -> bool:
         """return True si l'unité est encore en vie"""
         return self.hp > 0
 
@@ -37,8 +41,7 @@ class Unit:
             "name": self.name,
             "team": self.team,
             "position": self.position,
-            "width": self.width,
-            "height": self.height,
+            "hitbox": self.radius,
             "hp": self.hp,
             "armor": self.armor,
             "damage": self.damage,
@@ -46,6 +49,8 @@ class Unit:
             "attack_cooldown": self.attack_cooldown,
             "speed": self.speed,
         }
+
+    # ------ DISTANCES -------
 
     def dist_to(self, other: "Unit") -> float:
         """
@@ -56,54 +61,107 @@ class Unit:
         return math.dist((x, y), (ox, oy))
 
     def edge_dist_to(self, other: "Unit") -> float:
-        """
-        différent de dist_to, retourne la différence de la distance entre les centres de
-        deux unités et la somme de leur rayons
-        nécessaire pour déterminer si l'unité cible est dans l'attack range étant donné
-        que ce dernier commence à partir du rayon de l'unité et non pas de son centre
-        """
+        """calcule et retourne la distance entre les hitbox de deux unités"""
         center_dist = self.dist_to(other)
-        self_radius = 0.5 * math.hypot(self.width, self.height)
-        target_radius = 0.5 * math.hypot(other.width, other.height)
-        return max(0.0, center_dist - (self_radius + target_radius))
+        return center_dist - (self.radius + other.radius)
 
-    def move_towards(self, target: "Unit", dt: float, bf: Battlefield) -> bool:
-        """
-        déplace l'unité d'un pas vers l'unité cible
-        dépend de la vitesse de notre unité et du temps passé (dt)
-        dt: secondes par tick
-        déplace l'unité seulement si l'unité cible est déjà assez proche pour attaquer
-        OU la vitesse de l'unité est supérieure à 0
-        OU dt > 0
-        """
+    # ------ COLLSIONS ------
+
+    def collision(self, other):  # deux unités ne doivent pas avoir leurs centres trop proches
+        """retourne True si deux unité sont en collision"""
+        return self.dist_to(other) < self.radius + other.radius
+
+    def collides_with_position(self, other, x, y):
+        """Vérifie si 'unit' placée à (px, py) entrerait en collision avec 'other'."""
+        ox, oy = other.position
+        dx = x - ox
+        dy = y - oy
+        return math.hypot(dx, dy) < (self.radius + other.radius)
+
+    def soft_push(self, other, push_strength=0.5):
+        """Applique un 'soft push' entre deux unités si elles overlappent."""
+        ox, oy = other.position
+        sx, sy = self.position
+
+        # vecteur entre les centres
+        dx = sx - ox
+        dy = sy - oy
+        dist = math.hypot(dx, dy)
+
+        min_dist = self.radius + other.radius  # distance à respecter
+
+        if dist >= min_dist or dist == 0:
+            return  # rien à faire, elles ne se chevauchent pas
+
+        # quantité d'overlap (chevauchement des hitbox)
+        overlap = min_dist - dist
+
+        # vecteur orthogonal exact
+        # normal au vecteur distance (dx,dy) => (dy, -dx)
+        ortho_x = dy
+        ortho_y = -dx
+
+        ortho_len = math.hypot(ortho_x, ortho_y)
+        if ortho_len == 0:
+            return
+
+        # normalisation
+        ortho_x /= ortho_len
+        ortho_y /= ortho_len
+
+        # déplacement proportionnel au recouvrement
+        push_x = ortho_x * overlap * push_strength  # entre 0.2 et 0.5
+        push_y = ortho_y * overlap * push_strength
+
+        # appliquer la correction
+        self.position = (sx + push_x, sy + push_y)
+
+    def move_towards(self, target: "Unit", bf: Battlefield):
+        """Se déplace vers la cible d'au maximum 'speed' unités par tick."""
+
+        # si déjà à portée → pas besoin d'avancer
+        if self.can_attack(target):
+            return False
+
+        x, y = self.position
+        tx, ty = target.position
+
+        dx = tx - x
+        dy = ty - y
+        dist = math.hypot(dx, dy)
+
+        if dist == 0:
+            return False
+
+        # distance dont on peut encore s'approcher sans toucher la hitbox de target
         edge_dist = self.edge_dist_to(target)
+        step = min(self.speed, edge_dist)
+        if step <= 0:
+            return False
 
-        if not self.can_attack(target) and self.speed > 0 and dt > 0:
-            dist = self.dist_to(target)
-            step = min(self.speed * dt, edge_dist)
-            target_x, target_y = target.position
-            x, y = self.position
-            dx = target_x - x
-            dy = target_y - y
-            new_x += dx / dist * step
-            new_y += dy / dist * step
+        new_x = x + dx / dist * step
+        new_y = y + dy / dist * step
 
-            bf.move_unit_on_map(self, new_x, new_y)
+        return bf.move_unit_on_map(self, new_x, new_y)
 
-    def move_to(self, px: float, py: float, dt: float, bf: Battlefield) -> bool:
-        """
-        déplace l'unité d'un pas vers une position (x, y)
-        mêmes spécifications que move_towards
-        """
-        dist = math.dist(self.position, (px, py))
-        step = min(self.speed * dt, dist)
+    def move_to(self, px: float, py: float, bf: Battlefield):
+        """Se déplace vers (px, py) d'au maximum 'speed' unités par tick."""
         x, y = self.position
         dx = px - x
         dy = py - y
-        x += dx / dist * step
-        y += dy / dist * step
 
-        bf.move_unit_on_map(self, x, y)
+        dist = math.hypot(dx, dy)
+        if dist == 0:
+            return False
+
+        step = min(self.speed, dist)
+
+        new_x = x + dx / dist * step
+        new_y = y + dy / dist * step
+
+        return bf.move_unit_on_map(self, new_x, new_y)
+
+    # ------ ATTACKS ------
 
     def can_attack(self, other: "Unit") -> bool:
         """
@@ -112,43 +170,45 @@ class Unit:
         """
         return self.edge_dist_to(other) <= self.attack_range
 
-    def attack(self, other: "Unit"):
-        """
-        Attaque une unité si elle est à portée et que le cooldown est terminé.
-        Modifie la vie de la cible et met à jour le temps de la dernière attaque.
-        """
-        current_time = time.time()
+    def attack(self, other: "Unit") -> bool:
+        """Attaque si le cooldown est fini."""
 
         if not self.can_attack(other):
             return False
-
-        if current_time - self.time_since_last_attack <= self.attack_cooldown:
+        if self.cooldown_remaining > 0:
             return False
 
+        # inflige les dégâts
         damage = max(0, self.damage - other.armor)
-        other.hp -= damage
-        other.hp = max(0, other.hp)  # pour ne pas avoir d'hp < 0
+        other.hp = max(0, other.hp - damage)
 
-        self.time_since_last_attack = current_time
+        # réarme le cooldown
+        self.cooldown_remaining = self.attack_cooldown
 
         return True
 
-    def choose_target(self, enemies):
+    def choose_target(self, enemies: list):
         living_enemies = [e for e in enemies if e.is_alive()]
         if not living_enemies:
             return None
         return min(living_enemies, key=lambda e: self.distance_to(e))
 
+    # ------ UPDATE ------
+
     def update(self, bf: Battlefield, tick: int):
-        """Met à jour l'état de l'unité pour le tick donné."""
+        """Update logique de l'unité à chaque tick."""
+
+        # si morte → suppression
         if not self.is_alive():
-            if hasattr(self, "id"):
-                bf.remove_unit(self.id)
+            bf.remove_unit(self.id)
             return
 
-        # exemple simple de déplacement automatique pour test
+        # mettre à jour le cooldown
+        if self.cooldown_remaining > 0:
+            self.cooldown_remaining -= 1
+
+        # exemple de déplacement automatique (à remplacer par de l'IA plus tard)
         x, y = self.position
-        new_x = x + 0.1
+        new_x = x + 0.1 * self.speed
         new_y = y
-        moved = bf.move_unit_on_map(self, new_x, new_y)
-        # moved=True si déplacement effectué, False sinon
+        bf.move_unit_on_map(self, new_x, new_y)

@@ -20,6 +20,11 @@ else:
 FPS = 30
 # 'paused = False' a été retiré car défini dans la classe
 
+# === CONSTANTES GLOBALES DU MOTEUR TEMPS ===
+DEFAULT_FPS = 30  # FPS max du visualiseur (affichage)
+DEFAULT_SPEED = 1.0  # x1 (sera modifié via argparse dans main)
+# Le vrai rythme du jeu dépend de tick_duration passé au constructeur
+
 
 def read_key():
     """
@@ -67,7 +72,7 @@ class Simulation:
         self.map = game_map
         self.generals = generals
         self.battlefield = battlefield
-        self.tick_duration = tick_duration
+        self.tick_duration = tick_duration  # tick_duration = durée réelle (en secondes) entre deux ticks. Exemple : 1/30 = 0.033s → 30 ticks/sec ou (1/30) / 2 = 0.016s → x2 vitesse
         self.tick_count = 0
         self.is_running = False
         self.paused = False
@@ -89,7 +94,7 @@ class Simulation:
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, max_ticks=2000, visualizer=None):
+    def run(self, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
         last_render = 0
