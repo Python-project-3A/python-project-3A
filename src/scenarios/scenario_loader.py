@@ -94,7 +94,7 @@ class ScenarioLoader:
         )
 
     @staticmethod
-    def spawn_scenario(scenario_data: dict, battlefield: Battlefield, general_overrides: dict[int, str] = None) -> dict[int, str]:
+    def spawn_scenario(scenario_data: dict, battlefield: Battlefield, general_overrides: dict[int, str] | None = None) -> dict[int, str]:
         """
         Spawn units from scenario data onto battlefield.
 

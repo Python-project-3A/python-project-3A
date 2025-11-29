@@ -43,4 +43,3 @@ class GeneralDaft(BaseGeneral):
 
             # Order this unit to attack that enemy
             unit.current_order = {"type": "attack_unit", "target": nearest_enemy}
-            print(unit.current_order)

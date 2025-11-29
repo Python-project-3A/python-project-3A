@@ -121,7 +121,8 @@ class UnitController:
 
         if order["type"] == "move_to":
             target_pos = order["target"]
-            reached = MovementSystem.move_to_position(unit, target_pos[0], target_pos[1], dt, battlefield)
+            target_pos_x, target_pos_y = target_pos
+            reached = MovementSystem.move_to_position(unit, target_pos_x,target_pos_y, dt, battlefield)
 
             # Clear order if reached
             if reached and unit.dist_to_point(target_pos) < 0.5:

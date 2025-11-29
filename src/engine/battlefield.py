@@ -1,9 +1,7 @@
-# src/engine/battlefield.py
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from math import hypot
 from typing import Any
 
 from src.map.game_map import GameMap
@@ -84,17 +82,8 @@ class Battlefield:
     # mouvement
     # ------------------------
     def check_collision(self, unit: Unit, new_x: float, new_y: float) -> bool:
-        """
-        Vérifie s'il y a collision AABB entre `unit` déplacée à (new_x,new_y)
-        et n'importe quelle autre unité VIVANTE.
-        
-        Permet un léger chevauchement pour que les unités puissent s'engager au combat.
-        Retourne True si chevauchement > 70%, False sinon.
-        """
         u_w = unit.width
         u_h = unit.height
-        
-        OVERLAP_TOLERANCE = 0.7  # Only block if 70% overlap or more
 
         for other in self.units.values():
             # Skip the unit itself
@@ -109,21 +98,22 @@ class Battlefield:
             o_h = other.height
             ox, oy = other.position
 
-            # Calculate actual overlap on each axis
-            # Distance between centers
             dx = abs(ox - new_x)
             dy = abs(oy - new_y)
-            
-            # Required distance for no overlap (sum of half-widths)
+
             required_x = (u_w + o_w) / 2
             required_y = (u_h + o_h) / 2
-            
-            # ✅ Only block if overlap exceeds tolerance
-            # This allows units to get closer for melee combat
-            if dx < required_x * OVERLAP_TOLERANCE and dy < required_y * OVERLAP_TOLERANCE:
-                return True  # Too much overlap, block movement
+
+            # ALLOW 80% overlap
+            overlap_x = required_x - dx
+            overlap_y = required_y - dy
+
+            # If they overlap more than 20%, block
+            if overlap_x > required_x * 0.8 and overlap_y > required_y * 0.8:
+                return True
 
         return False
+
     def move_unit_on_map(self, unit: Unit, new_x: float, new_y: float) -> bool:
         """
         Tente de déplacer `unit` à (new_x, new_y).
@@ -161,6 +151,7 @@ class Battlefield:
     # ------------------------
     # requêtes et utilitaires
     # ------------------------
+
     def get_all_units(self) -> list[Unit]:
         """Renvoie une liste des unités du Battlefield."""
         return list(self.units.values())
@@ -174,14 +165,21 @@ class Battlefield:
         return self.units.get(unit_id)
 
     def units_in_radius(self, x: float, y: float, radius: float) -> list[Unit]:
-        """Renvoie une liste des unités dans un rayon de radius autour de (x,y)."""
-        result: list[Unit] = []
-        for u in self.units.values():
-            ux, uy = u.position
-            if hypot(ux - x, uy - y) <= radius:
-                result.append(u)
-        return result
-
+        r2 = radius * radius
+        return [
+            u
+            for u in self.units.values()
+            if (dx := u.position[0] - x) * dx + (dy := u.position[1] - y) * dy <= r2
+        ]
+    
+    def units_in_los(self, unit: Unit) -> list[Unit]:
+        vision = getattr(unit, "vision_range", 4.0)
+        x, y = unit.position
+        return [
+            u for u in self.units.values()
+            if u is not unit and u.is_alive() and unit.dist_to(u) <= vision
+        ]
+    
     def is_battle_over(self) -> bool:
         """Renvoie True si la bataille est finie."""
         teams_alive = {u.owner for u in self.units.values() if u.is_alive()}
