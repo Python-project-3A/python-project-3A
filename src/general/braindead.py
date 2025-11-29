@@ -39,7 +39,7 @@ class GeneralBraindead(BaseGeneral):
                 continue
 
             enemies_in_range = CombatSystem.get_enemies_in_range(unit, enemies)
-            
+
             if enemies_in_range:
                 target = CombatSystem.choose_nearest_target(unit, enemies_in_range)
                 if target:

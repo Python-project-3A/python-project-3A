@@ -41,6 +41,6 @@ class GeneralDaft(BaseGeneral):
 
             # Find nearest enemy to THIS unit
             target = CombatSystem.choose_nearest_target(unit, enemies)
-                        
+
             if target:
                 unit.current_order = {"type": "attack_unit", "target": target}

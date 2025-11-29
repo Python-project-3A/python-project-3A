@@ -109,25 +109,27 @@ class CombatSystem:
         Useful for focus-fire strategies (for other generals than braindead and daft)
         """
         living_enemies = [e for e in enemies if e.is_alive()]
-        
+
         if not living_enemies:
             return None
-        
+
         return min(living_enemies, key=lambda e: e.hp)
-    
+
     @staticmethod
     def get_enemies_in_range(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
         """
         Filter enemies to only those within attack range.
-        
+
         Args:
             unit: The unit checking range
             enemies: List of potential enemies
-        
+
         Returns:
             List of enemies that can be attacked right now
         """
         return [e for e in enemies if e.is_alive() and unit.can_attack(e)]
+
+
 class UnitController:
     """Main controller that coordinates unit behavior"""
 
