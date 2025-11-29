@@ -13,7 +13,7 @@ class MoveToOrder(TypedDict):
 
 class AttackMoveOrder(TypedDict):
     type: Literal["attack_move"]
-    target: "Unit"
+    target: tuple[float, float]
 
 
 class AttackUnitOrder(TypedDict):

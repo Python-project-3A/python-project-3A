@@ -1,64 +1,149 @@
 import argparse
+import sys
 
 from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
 from src.engine.simulation import Simulation
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
-from src.units.pikeman import Pikeman
+from src.scenarios.scenario_loader import ScenarioLoader
 
 
-# --- gestion des arguments ---------------------------------------------
 def parse_args():
-    parser = argparse.ArgumentParser(description="AoE-like RTS simulation CLI")
+    parser = argparse.ArgumentParser(
+        description="AoE-like RTS simulation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python -m src.main run small_battle daft braindead
+  python -m src.main run knights_vs_pikemen smart daft -t
+  python -m src.main list
+        """,
+    )
 
-    parser.add_argument("--width", type=int, default=40, help="Largeur de la map")
-    parser.add_argument("--height", type=int, default=20, help="Hauteur de la map")
-    parser.add_argument("--ticks", type=int, default=500, help="Nombre de ticks max")
-    parser.add_argument("--speed", type=float, default=0.1, help="Durée entre ticks (secondes)")
-    parser.add_argument("--no-visual", action="store_true", help="Désactive l'affichage CLI")
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
-    # Général arguments
-    parser.add_argument("--general0", type=str, default="daft", choices=["braindead", "daft"], help="Type de général pour le joueur 0")
-    parser.add_argument("--general1", type=str, default="braindead", choices=["braindead", "daft"], help="Type de général pour le joueur 1")
+    # --- COMMAND: list ---
+    subparsers.add_parser("list", help="List available scenarios")
 
-    # Army size
-    parser.add_argument("--units", type=int, default=10, help="Nombre d'unités par équipe")
+    # --- COMMAND: run ---
+    run_parser = subparsers.add_parser("run", help="Run a battle scenario")
+    run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
+    run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
+    run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
+    run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
+    run_parser.add_argument("--ticks", type=int, default=1000, help="Maximum number of ticks")
+    run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
+
+    # --- COMMAND: load (TODO) ---
+    load_parser = subparsers.add_parser("load", help="Load a saved game (TODO)")
+    load_parser.add_argument("savefile", type=str, help="Save file path")
+
+    # --- COMMAND: tourney (TODO) ---
+    tourney_parser = subparsers.add_parser("tourney", help="Run tournament (TODO)")
+    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft"], help="Generals to include in tournament")
+    tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
+    tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
+    tourney_parser.add_argument("--no-alternate", action="store_true", help="Don't alternate player positions")
 
     return parser.parse_args()
 
 
 def create_general(general_type: str, player_id: int):
-    """Factory pour créer un général selon son type"""
+    """Factory to create generals"""
     if general_type == "braindead":
         return GeneralBraindead(player_id)
     elif general_type == "daft":
         return GeneralDaft(player_id)
     else:
-        raise ValueError(f"Type de général inconnu: {general_type}")
+        raise ValueError(f"Unknown general type: {general_type}")
 
 
-def spawn_army(battlefield, owner: int, num_units: int, start_x: float, start_y: float):
-    """Spawn une armée pour un joueur"""
-    for i in range(num_units):
-        # Disposition en colonne
-        x = start_x
-        y = start_y + (i * 1.5)  # Espacement vertical
+def command_list():
+    """List all available scenarios"""
+    scenarios = ScenarioLoader.list_available_scenarios()
 
-        # Factory pour créer l'unité
-        def make_pikeman():
-            return Pikeman(owner=owner, x=x, y=y)
+    print("\n" + "=" * 60)
+    print("AVAILABLE SCENARIOS")
+    print("=" * 60)
 
-        battlefield.spawn_unit(make_pikeman, x, y, owner=owner)
+    if not scenarios:
+        print("No scenarios found in data/scenarios/")
+        return
+
+    for scenario_name in scenarios:
+        try:
+            data = ScenarioLoader.load_scenario(scenario_name)
+            print(f"\n📋 {scenario_name}")
+            print(f"   {data.get('description', 'No description')}")
+            print(f"   Map: {data['map']['width']}x{data['map']['height']}")
+
+            for army in data["armies"]:
+                total_units = sum(g["count"] for g in army["units"])
+                unit_types = ", ".join(f"{g['count']} {g['type']}" for g in army["units"])
+                print(f"   Player {army['player_id']}: {unit_types} (Total: {total_units})")
+        except Exception as e:
+            print(f"\n⚠️  {scenario_name}: Error loading - {e}")
+
+    print("\n" + "=" * 60 + "\n")
+
+
+def command_run(args):
+    """Run a battle scenario"""
+    print("=" * 60)
+    print("=== LOADING SCENARIO ===")
+    print("=" * 60)
+
+    # Load scenario
+    try:
+        scenario_data = ScenarioLoader.load_scenario(args.scenario)
+    except FileNotFoundError as e:
+        print(f"\n❌ Error: {e}\n")
+        return
+
+    print(f"\n📋 Scenario: {scenario_data['name']}")
+    print(f"📝 {scenario_data.get('description', '')}")
+    print(f"🗺️  Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
+
+    # Create battlefield
+    bf = Battlefield(width=scenario_data["map"]["width"], height=scenario_data["map"]["height"])
+
+    # Create generals
+    general_0 = create_general(args.general0, player_id=0)
+    general_1 = create_general(args.general1, player_id=1)
+    bf.generals = [general_0, general_1]
+
+    print(f"\n⚔️  Battle: {general_0.name} VS {general_1.name}\n")
+
+    # Spawn scenario with general overrides
+    general_overrides = {0: args.general0, 1: args.general1}
+    ScenarioLoader.spawn_scenario(scenario_data, bf, general_overrides)
+
+    # Count spawned units
+    units_0 = len(bf.units_by_owner(0))
+    units_1 = len(bf.units_by_owner(1))
+    print(f"✅ Spawned {units_0} units for Player 0")
+    print(f"✅ Spawned {units_1} units for Player 1")
+
+    # Create visualizer
+    visualizer = CLIVisualizer(bf.width, bf.height)
+
+    # Create and run simulation
+    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
+
+    print("\n🎬 Starting battle...\n")
+    sim.run(max_ticks=args.ticks, visualizer=visualizer)
+
+    # Print results
+    print_battle_result(bf)
 
 
 def print_battle_result(battlefield):
-    """Affiche le résultat de la bataille"""
+    """Print battle results"""
     print("\n" + "=" * 60)
-    print("=== RÉSULTAT DE LA BATAILLE ===")
+    print("=== BATTLE RESULT ===")
     print("=" * 60)
 
-    # Compter les survivants par équipe
     survivors_by_owner = {}
     for unit in battlefield.get_all_units():
         if unit.is_alive():
@@ -66,95 +151,54 @@ def print_battle_result(battlefield):
                 survivors_by_owner[unit.owner] = []
             survivors_by_owner[unit.owner].append(unit)
 
-    # Afficher les stats
     for owner_id in [0, 1]:
         general = battlefield.generals[owner_id]
         survivors = survivors_by_owner.get(owner_id, [])
 
-        print(f"\n🎖️  {general.name} (Joueur {owner_id}):")
-        print(f"   Survivants: {len(survivors)} unités")
+        print(f"\n🎖️  {general.name} (Player {owner_id}):")
+        print(f"   Survivors: {len(survivors)} units")
 
         if survivors:
             total_hp = sum(u.hp for u in survivors)
             avg_hp = total_hp / len(survivors)
-            print(f"   HP total: {total_hp:.1f}")
-            print(f"   HP moyen: {avg_hp:.1f}")
+            print(f"   Total HP: {total_hp:.1f}")
+            print(f"   Avg HP: {avg_hp:.1f}")
 
-    # Déterminer le vainqueur
     print("\n" + "-" * 60)
     if len(survivors_by_owner) == 0:
-        print("⚔️  MATCH NUL - Toutes les unités sont mortes!")
+        print("⚔️  DRAW - All units eliminated!")
     elif len(survivors_by_owner) == 1:
         winner_id = list(survivors_by_owner.keys())[0]
         winner_general = battlefield.generals[winner_id]
-        print(f"🏆  VICTOIRE pour {winner_general.name} (Joueur {winner_id})!")
+        print(f"🏆  VICTORY for {winner_general.name} (Player {winner_id})!")
     else:
-        # Les deux ont des survivants, celui avec le plus gagne
         counts = {owner: len(units) for owner, units in survivors_by_owner.items()}
         winner_id = max(counts, key=counts.get)
         winner_general = battlefield.generals[winner_id]
-        print(f"🏆  VICTOIRE TACTIQUE pour {winner_general.name} (Joueur {winner_id})!")
+        print(f"🏆  TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
 
     print("=" * 60 + "\n")
 
 
-# --- MAIN ----------------------------------------------------------
 def main():
     args = parse_args()
 
-    print("=" * 60)
-    print("=== DÉMARRAGE SIMULATION ===")
-    print("=" * 60)
+    if args.command == "list":
+        command_list()
 
-    # Créer le battlefield
-    bf = Battlefield(args.width, args.height)
+    elif args.command == "run":
+        command_run(args)
 
-    # Créer les généraux
-    general_0 = create_general(args.general0, player_id=0)
-    general_1 = create_general(args.general1, player_id=1)
+    elif args.command == "load":
+        print("⚠️  'load' command not yet implemented")
 
-    bf.generals = [general_0, general_1]
+    elif args.command == "tourney":
+        print("⚠️  'tourney' command not yet implemented")
 
-    print(f"\n⚔️  Bataille: {general_0.name} VS {general_1.name}")
-    print(f"📍 Carte: {args.width}x{args.height}")
-    print(f"👥 Armées: {args.units} unités par équipe")
-    print(f"⏱️  Vitesse: {args.speed}s par tick\n")
-
-    # Spawn les armées
-    # Équipe 0 à gauche
-    spawn_army(bf, owner=0, num_units=args.units, start_x=5.0, start_y=5.0)
-
-    # Équipe 1 à droite
-    spawn_army(bf, owner=1, num_units=args.units, start_x=args.width - 10.0, start_y=5.0)
-
-    # Créer le visualizer
-    visualizer = None
-    if not args.no_visual:
-        visualizer = CLIVisualizer(args.width, args.height)
-
-    # Créer et lancer la simulation
-    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
-
-    print("🎬 Début de la bataille...\n")
-    sim.run(max_ticks=args.ticks, visualizer=visualizer)
-
-    # Afficher le résultat
-    print_battle_result(bf)
-
-    # Snapshot final (optionnel, pour debug)
-    if args.no_visual:
-        print("\n=== SNAPSHOT FINALE (DEBUG) ===")
-        snapshot = bf.snapshot()
-        print(f"Unités restantes: {len(snapshot['units'])}")
-        for u in snapshot["units"]:
-            if u["hp"] > 0:
-                print(f"  - {u['type']} #{u['id']} (owner={u['owner']}): {u['hp']} HP à {u['position']}")
+    else:
+        print("❌ No command specified. Use --help for usage.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-
-# Commandes de test:
-# python -m src.main --ticks 500 --general0 daft --general1 braindead
-# python -m src.main --ticks 500 --general0 braindead --general1 braindead --units 15
-# python -m src.main --ticks 1000 --general0 daft --general1 daft --no-visual

@@ -10,7 +10,7 @@ class CLIVisualizer:
         self.first_frame = True
         self.lines_printed = 0
 
-    def render(self, battlefield:Battlefield, tick:int):
+    def render(self, battlefield: Battlefield, tick: int):  # noqa: C901
         # Effacer la frame précédente
         if not self.first_frame:
             sys.stdout.write(f"\033[{self.lines_printed}A")
