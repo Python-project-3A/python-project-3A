@@ -93,7 +93,7 @@ class Simulation:
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, max_ticks=2000, visualizer=None):
+    def run(self, max_ticks=20000, visualizer=None):  # noqa: C901
         """Boucle principale."""
         self.is_running = True
         last_render = 0

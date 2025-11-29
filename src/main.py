@@ -32,7 +32,6 @@ Examples:
     run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
     run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
     run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
-    run_parser.add_argument("--ticks", type=int, default=1000, help="Maximum number of ticks")
     run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
     # --- COMMAND: load (TODO) ---
@@ -132,7 +131,7 @@ def command_run(args):
     sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
 
     print("\n🎬 Starting battle...\n")
-    sim.run(max_ticks=args.ticks, visualizer=visualizer)
+    sim.run(visualizer=visualizer)
 
     # Print results
     print_battle_result(bf)
