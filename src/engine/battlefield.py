@@ -99,8 +99,7 @@ class Battlefield:
             if other is unit:
                 continue
 
-            is_alive = other.is_alive()
-            if is_alive:
+            if not other.is_alive():
                 continue
 
             o_w = other.width
