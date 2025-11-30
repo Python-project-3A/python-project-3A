@@ -22,6 +22,7 @@ class Battlefield:
     def __init__(self, width: int, height: int):
         self.width = width
         self.height = height
+        self.next_unit_id = 1
         self.game_map: GameMap = GameMap(width, height)
         self.units: dict[int, Unit] = {}
         self.generals: list[BaseGeneral] = []
@@ -31,6 +32,15 @@ class Battlefield:
     def _tile_index_from_pos(x: float, y: float) -> tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile)."""
         return int(x), int(y)
+
+    def assign_unit_id(self, unit) -> int:
+        if unit.id is not None:
+            if unit.id >= self.next_unit_id:  #  on s'assure que notre compteur est à jour
+                self.next_unit_id = unit.id + 1
+            return unit.id
+        unit.id = self.next_unit_id
+        self.next_unit_id += 1
+        return unit.id
 
     def isalmost(self, n, m, d=1e-2):  # 1e-2 ou 1e-3 ???
         return (abs(n - m)) < d
@@ -46,6 +56,7 @@ class Battlefield:
         unit = unit_factory()
         unit.position = (float(x), float(y))
         unit.owner = owner
+        self.assign_unit_id(unit)
 
         ix, iy = self._tile_index_from_pos(x, y)
         tile = self.game_map.ensure_tile(ix, iy)

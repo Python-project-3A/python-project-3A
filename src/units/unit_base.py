@@ -26,21 +26,15 @@ Order = MoveToOrder | AttackMoveOrder | AttackUnitOrder
 
 # la classe unit est maintenant entièrement des données, elle n'effectue plus d'action comme se déplacer, ces actions sont gérées par un système externe
 class Unit:
-    # static id that is auto-incremented
-    _next_id = 0
-
-    def __init__(self, name: str, owner: int, x: float, y: float, height: float, width: float, hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, speed: float):
+    def __init__(self, name: str, owner: int, x: float, y: float, r: float, hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, speed: float, id: int = None):
         # identity and ownership
-        self.id = Unit._next_id
-        Unit._next_id += 1
+        self.id = id
         self.name = name
         self.owner = owner
 
         # Physical properties
         self.position = (float(x), float(y))
-        self.height = height
-        self.width = width
-        self.radius = max(self.width, self.height) * 0.5
+        self.radius = r
 
         # Combat stats
         self.hp = hp
@@ -94,8 +88,7 @@ class Unit:
             "name": self.name,
             "owner": self.owner,
             "position": self.position,
-            "width": self.width,
-            "height": self.height,
+            "radius": self.radius,
             "hp": self.hp,
             "armor": self.armor,
             "damage": self.damage,
