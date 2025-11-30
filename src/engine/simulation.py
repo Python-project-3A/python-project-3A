@@ -158,7 +158,7 @@ class Simulation:
                     # Évite l'affichage écrasé (limiter à 50 ms soit 50 fps max)
                     time.sleep(0.05)
 
-        # --- 🛠️ Restauration TTY pour l'entrée non bloquante Unix/Linux ---
+        # --- ️ Restauration TTY pour l'entrée non bloquante Unix/Linux ---
         if system_name != "Windows" and old_settings is not None:
             try:
                 # Restaure les paramètres du terminal

@@ -73,7 +73,7 @@ def command_list():
     for scenario_name in scenarios:
         try:
             data = ScenarioLoader.load_scenario(scenario_name)
-            print(f"\n📋 {scenario_name}")
+            print(f"\n {scenario_name}")
             print(f"   {data.get('description', 'No description')}")
             print(f"   Map: {data['map']['width']}x{data['map']['height']}")
 
@@ -82,7 +82,7 @@ def command_list():
                 unit_types = ", ".join(f"{g['count']} {g['type']}" for g in army["units"])
                 print(f"   Player {army['player_id']}: {unit_types} (Total: {total_units})")
         except Exception as e:
-            print(f"\n⚠️  {scenario_name}: Error loading - {e}")
+            print(f"\n  {scenario_name}: Error loading - {e}")
 
     print("\n" + "=" * 60 + "\n")
 
@@ -97,12 +97,12 @@ def command_run(args):
     try:
         scenario_data = ScenarioLoader.load_scenario(args.scenario)
     except FileNotFoundError as e:
-        print(f"\n❌ Error: {e}\n")
+        print(f"\n Error: {e}\n")
         return
 
-    print(f"\n📋 Scenario: {scenario_data['name']}")
-    print(f"📝 {scenario_data.get('description', '')}")
-    print(f"🗺️  Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
+    print(f"\n Scenario: {scenario_data['name']}")
+    print(f" {scenario_data.get('description', '')}")
+    print(f" Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
 
     # Create battlefield
     bf = Battlefield(width=scenario_data["map"]["width"], height=scenario_data["map"]["height"])
@@ -112,7 +112,7 @@ def command_run(args):
     general_1 = create_general(args.general1, player_id=1)
     bf.generals = [general_0, general_1]
 
-    print(f"\n⚔️  Battle: {general_0.name} VS {general_1.name}\n")
+    print(f"\n  Battle: {general_0.name} VS {general_1.name}\n")
 
     # Spawn scenario with general overrides
     general_overrides = {0: args.general0, 1: args.general1}
@@ -121,8 +121,8 @@ def command_run(args):
     # Count spawned units
     units_0 = len(bf.units_by_owner(0))
     units_1 = len(bf.units_by_owner(1))
-    print(f"✅ Spawned {units_0} units for Player 0")
-    print(f"✅ Spawned {units_1} units for Player 1")
+    print(f" Spawned {units_0} units for Player 0")
+    print(f" Spawned {units_1} units for Player 1")
 
     # Create visualizer
     visualizer = CLIVisualizer(bf.width, bf.height)
@@ -130,7 +130,7 @@ def command_run(args):
     # Create and run simulation
     sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
 
-    print("\n🎬 Starting battle...\n")
+    print("\n Starting battle...\n")
     sim.run(visualizer=visualizer)
 
     # Print results
@@ -154,7 +154,7 @@ def print_battle_result(battlefield):
         general = battlefield.generals[owner_id]
         survivors = survivors_by_owner.get(owner_id, [])
 
-        print(f"\n🎖️  {general.name} (Player {owner_id}):")
+        print(f"\n️  {general.name} (Player {owner_id}):")
         print(f"   Survivors: {len(survivors)} units")
 
         if survivors:
@@ -165,16 +165,16 @@ def print_battle_result(battlefield):
 
     print("\n" + "-" * 60)
     if len(survivors_by_owner) == 0:
-        print("⚔️  DRAW - All units eliminated!")
+        print("  DRAW - All units eliminated!")
     elif len(survivors_by_owner) == 1:
         winner_id = list(survivors_by_owner.keys())[0]
         winner_general = battlefield.generals[winner_id]
-        print(f"🏆  VICTORY for {winner_general.name} (Player {winner_id})!")
+        print(f" VICTORY for {winner_general.name} (Player {winner_id})!")
     else:
         counts = {owner: len(units) for owner, units in survivors_by_owner.items()}
         winner_id = max(counts, key=counts.get)
         winner_general = battlefield.generals[winner_id]
-        print(f"🏆  TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
+        print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
 
     print("=" * 60 + "\n")
 
@@ -189,13 +189,13 @@ def main():
         command_run(args)
 
     elif args.command == "load":
-        print("⚠️  'load' command not yet implemented")
+        print("  'load' command not yet implemented")
 
     elif args.command == "tourney":
-        print("⚠️  'tourney' command not yet implemented")
+        print("  'tourney' command not yet implemented")
 
     else:
-        print("❌ No command specified. Use --help for usage.")
+        print(" No command specified. Use --help for usage.")
         sys.exit(1)
 
 
