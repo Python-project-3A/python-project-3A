@@ -29,7 +29,7 @@ class Unit:
     # static id that is auto-incremented
     _next_id = 0
 
-    def __init__(self, name: str, owner: int, x: float, y: float, height: int, width: int, hp: int, armor: int, damage: int, attack_range: int, attack_cooldown: int, speed: int):
+    def __init__(self, name: str, owner: int, x: float, y: float, height: float, width: float, hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, speed: float):
         # identity and ownership
         self.id = Unit._next_id
         Unit._next_id += 1

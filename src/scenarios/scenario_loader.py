@@ -56,30 +56,37 @@ class ScenarioLoader:
     @staticmethod
     def create_unit_from_stats(unit_type: str, owner: int, x: float, y: float):
         """
-        Create a Unit instance from unit_type by loading stats from JSON.
-
-        Args:
-            unit_type: Type of unit (e.g., "Pikeman", "Knight")
-            owner: Player ID (0 or 1)
-            x, y: Position on the map
-
-        Returns:
-            Unit instance with stats loaded from JSON
+        Create a unit instance (Pikeman, Knight, etc.) from JSON stats.
+        Instantiates the right subclass depending on unit_type.
         """
+
+        # Import here to avoid circular imports
+        from src.units.knight import Knight
+        from src.units.pikeman import Pikeman
         from src.units.unit_base import Unit
 
-        # Load all unit stats
+        # Map string names to classes
+        UNIT_CLASSES = {
+            "Pikeman": Pikeman,
+            "Knight": Knight,
+            # Add more later
+            # "Crossbowman": Crossbowman,
+            # "LongSwordsman": LongSwordsman,
+        }
+
+        # Load JSON stats
         all_stats = ScenarioLoader.load_unit_stats()
 
-        # Get stats for this specific unit type
         if unit_type not in all_stats:
             raise ValueError(f"Unknown unit type: {unit_type}. Available: {list(all_stats.keys())}")
 
         stats = all_stats[unit_type]
 
-        # Create Unit with all required parameters
-        return Unit(
-            name=unit_type,
+        # Select correct class (fallback = Unit)
+        cls = UNIT_CLASSES.get(unit_type, Unit)
+
+        # Instantiate unit
+        return cls(
             owner=owner,
             x=x,
             y=y,
@@ -91,6 +98,7 @@ class ScenarioLoader:
             attack_range=stats["attack_range"],
             attack_cooldown=stats["attack_cooldown"],
             speed=stats["speed"],
+            name=unit_type,  # Ignored by Pikeman/Knight since they set their own name
         )
 
     @staticmethod
