@@ -7,6 +7,7 @@ from src.engine.simulation import Simulation
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
 from src.scenarios.scenario_loader import ScenarioLoader
+from src.engine.input_provider import ConsoleInputProvider
 
 
 def parse_args():
@@ -130,8 +131,11 @@ def command_run(args):
     # Create and run simulation
     sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
 
-    print("\n Starting battle...\n")
-    sim.run(visualizer=visualizer)
+    print("\n🎬 Starting battle...\n")
+    # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash
+    with ConsoleInputProvider() as input_sys:
+        # On injecte le système d'input dans la simulation
+        sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
 
     # Print results
     print_battle_result(bf)
