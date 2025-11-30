@@ -5,6 +5,7 @@ import math
 from collections.abc import Callable
 from typing import Any
 
+from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
 from src.units.unit_base import Unit
 
@@ -23,14 +24,14 @@ class Battlefield:
         self.height = height
         self.game_map: GameMap = GameMap(width, height)
         self.units: dict[int, Unit] = {}
-        self.generals: list[Any] = []
+        self.generals: list[BaseGeneral] = []
         logger.info("Battlefield initialized %dx%d", width, height)
 
     @staticmethod
     def _tile_index_from_pos(x: float, y: float) -> tuple[int, int]:
         """Convertit une position continue (float) en coordonnées discrètes (tile)."""
         return int(x), int(y)
-    
+
     def isalmost(self, n, m, d=1e-2):  # 1e-2 ou 1e-3 ???
         return (abs(n - m)) < d
 
