@@ -1,6 +1,6 @@
-# src/cli/cli.py
 import sys
-import time
+
+from src.engine.battlefield import Battlefield
 
 
 class CLIVisualizer:
@@ -10,47 +10,95 @@ class CLIVisualizer:
         self.first_frame = True
         self.lines_printed = 0
 
-    def render(self, battlefield, tick):
-        # Effacer la frame précédente & remonter le curseur dans le terminal
+    def render(self, battlefield: Battlefield, tick: int):  # noqa: C901
+        # Effacer la frame précédente
         if not self.first_frame:
-            sys.stdout.write(f"\033[{self.lines_printed}A")  # "\033[" = caractère d’échappement, A = curseur vers le haut -> pour réécrire sur la frame precedente
+            sys.stdout.write(f"\033[{self.lines_printed}A")
         else:
             self.first_frame = False
 
         # Construire la grille vide
         grille = [["." for _ in range(self.width)] for _ in range(self.height)]
 
-        # récupérer les unités depuis le Battlefield
-        # arrondir leur position flottante
+        # Placer les unités sur la grille
         for unit in battlefield.get_all_units():
             if not unit.is_alive():
                 continue
 
-            x = int(unit.position[0])
-            y = int(unit.position[1])
+            # x = int(unit.position[0])
+            # y = int(unit.position[1])
+            x = min(max(round(unit.position[0]), 0), self.width - 1)
+            y = min(max(round(unit.position[1]), 0), self.height - 1)
 
-            # les afficher avec des symboles :
             if 0 <= x < self.width and 0 <= y < self.height:
-                symbol = unit.type[0].upper()
-                if unit.owner == 0:
-                    symbol = f"\033[34m{symbol}\033[0m"  # bleu joueur 0
-                if unit.owner == 1:
-                    symbol = f"\033[91m{symbol}\033[0m"  # Rouge joueur 1
+                # Symbole de l'unité (première lettre du nom)
+                symbol = unit.name[0].upper()
 
-                if grille[y][x] == ".":
-                    grille[y][x] = symbol
+                # Couleur selon l'équipe
+                if unit.owner == 0:
+                    colored_symbol = f"\033[34m{symbol}\033[0m"  # Bleu
+                elif unit.owner == 1:
+                    colored_symbol = f"\033[91m{symbol}\033[0m"  # Rouge
                 else:
-                    grille[y][x] = "*"
+                    colored_symbol = symbol
+
+                current_tile = grille[y][x]
+                # Placer dans la grille
+
+                if current_tile == ".":
+                    grille[y][x] = colored_symbol
+                else:
+                    # Plusieurs unités sur la même case
+                    # Jaune pour collision
+                    import re
+
+                    existing_clean = re.sub(r"\033\[\d+m", "", current_tile)
+
+                    if existing_clean.isdigit():
+                        count = int(existing_clean) + 1
+                    else:
+                        count = 2  # First collision
+
+                    # Color yellow and show number
+                    grille[y][x] = f"\033[93m{count}\033[0m"
+
+        # Compter les unités vivantes
+        alive_by_owner = {0: 0, 1: 0}
+        hp_by_owner = {0: 0, 1: 0}
+
+        for unit in battlefield.get_all_units():
+            if unit.is_alive():
+                alive_by_owner[unit.owner] += 1
+                hp_by_owner[unit.owner] += unit.hp
 
         # Affichage
-        print(f"=== TICK {tick} ===")
-        for ligne in grille:
-            print(" ".join(ligne))  # .join concatenne une liste de chaînes de caractères en une seule chaîne.
+        header_lines = []
+        header_lines.append("=" * 60)
+        header_lines.append(f"TICK {tick:04d}")
+        header_lines.append("-" * 60)
 
-        sys.stdout.flush()  # flush() = vider le tampon immédiatement => pas de retard => affichage rapide
-        self.lines_printed = 1 + self.height  # Nombre de lignes affichées
+        # Stats des généraux
+        if battlefield.generals:
+            gen0 = battlefield.generals[0]
+            gen1 = battlefield.generals[1]
+
+            header_lines.append(f"\033[34m{gen0.name:20s}\033[0m │ Units: {alive_by_owner[0]:3d} │ HP: {hp_by_owner[0]:5.0f}")
+            header_lines.append(f"\033[91m{gen1.name:20s}\033[0m │ Units: {alive_by_owner[1]:3d} │ HP: {hp_by_owner[1]:5.0f}")
+
+        header_lines.append("=" * 60)
+
+        # Afficher header
+        for line in header_lines:
+            print(line)
+
+        # Afficher la grille
+        for ligne in grille:
+            print(" ".join(ligne))
+
+        sys.stdout.flush()
+        self.lines_printed = len(header_lines) + self.height
 
     def finish(self):
-        # Remonter à la fin proprement
+        # Remonter proprement
         sys.stdout.write(f"\033[{self.lines_printed}B")
         sys.stdout.flush()

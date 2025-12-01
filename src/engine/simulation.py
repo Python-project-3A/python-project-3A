@@ -1,24 +1,8 @@
-# src/engine/simulation.py
 import time
-import msvcrt
-
-FPS = 30
-paused = False
-
-
-def read_key():
-    """
-    Lecture non bloquante d'une touche sous Windows (msvcrt).
-    Retourne un caractère en minuscule, ou None si aucune touche.
-    """
-    if msvcrt.kbhit():
-        key = msvcrt.getch()
-        try:
-            key = key.decode().lower()
-        except UnicodeDecodeError:
-            return None
-        return key
-    return None
+from src.engine.battlefield import Battlefield
+from src.general.general_base import BaseGeneral
+from src.map.game_map import GameMap
+from .system import UnitController
 
 
 class Simulation:
@@ -29,16 +13,16 @@ class Simulation:
     - S'arrête en cas de victoire
     """
 
-    def __init__(self, game_map, generals, battlefield, tick_duration=0.1):
+    def __init__(self, game_map: GameMap, generals: list[BaseGeneral], battlefield: Battlefield, tick_duration=0.1):
         self.map = game_map
         self.generals = generals
         self.battlefield = battlefield
-        self.tick_duration = tick_duration
         self.tick_count = 0
         self.is_running = False
         self.paused = False
 
-    def tick(self):
+    def tick(self, constante_tick_duration):
+        # TODO : utiliser contstante_tick_duration comme vitesse constante pour que les untités avance toujours de la même distance par tick.
         """Exécute un tick unique."""
         self.tick_count += 1
 
@@ -49,49 +33,71 @@ class Simulation:
         # 2. Les unités agissent
         for unit in self.battlefield.get_all_units():
             if unit.is_alive():
-                unit.update(self.battlefield, self.tick_count)
+                UnitController.update(unit, self.battlefield, constante_tick_duration)
 
         # 3. Condition de fin de bataille
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, max_ticks=2000, visualizer=None):
+    def run(self, input_provider, target_tps=30, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
-        last_render = 0
-        render_interval = 1 / FPS  # 30 FPS (modifiable) timer indépendant du tick
-        debut = time.time()
+
+        # CONSTANTE PHYSIQUE : Un tick vaut TOUJOURS 1/30ème de seconde en jeu
+        # Peu importe si l'ordi le calcule en 1ms ou 1h.
+        LOGICAL_DT = 1.0 / 30.0
+
+        # LIMITEUR DE VITESSE (SLEEP)
+        # Si target_tps = 0 (Tournoi), on ne dort jamais (min_frame_duration = 0)
+        # Sinon, on dort pour respecter le rythme (ex: 1/30s)
+        tick_duration = 1.0 / target_tps if target_tps > 0 else 0
+
+        # VARIABLES DE STATS
+        frames_this_second = 0
+        second_timer = time.time()
+        debut = time.time()  # juste pour connaitre le temps d'execution d'une simulation
+        self.real_tick_rate = 0  # Pour une consultation externe
 
         if visualizer:
-            # On affiche le TICK 0, pour voir la position initiale des unités.
-            visualizer.render(self.battlefield, 0)
-            time.sleep(0.05)  # laisser le temps au visualizer de se mettre en place
+            visualizer.render(self.battlefield, 0)  # On affiche le TICK 0, pour voir la position initiale des unités.
+            time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         while self.is_running and self.tick_count < max_ticks:
-            # --- LECTURE CLAVIER ---
-            key = read_key()
+            loop_start = time.time()
+
+            # --- INPUTS ---
+            key = input_provider.get_key()
             if key == "p":
-                self.paused = True
+                self.paused = not self.paused
+            elif key == "q":
+                self.is_running = False
 
-                # -------- MODE PAUSE --------
-                # Aucun tick, aucun render → console figée
-                while True:
-                    key2 = read_key()
-                    if key2 == "p":
-                        self.paused = False
-                        break
-                    time.sleep(0.05)
+            # --- LOGIQUE (TPS) ----
+            if not self.paused:
+                self.tick(LOGICAL_DT)  # TODO : A IMPLETMENER On passe LOGICAL_DT aux updates, pas le temps réel, comme ça, une unité avance toujours de la même distance par tick.
 
-            # -------- MODE NORMAL --------
-            self.tick()
-            now = time.time()  # NB : techniquement c'est utilie que si on a un visualizer -> a changer ?
+                # STATS DE PERFORMANCE
+                frames_this_second += 1
+                if time.time() - second_timer >= 1.0:
+                    self.real_tick_rate = frames_this_second
+                    frames_this_second = 0
+                    second_timer = time.time()
+                    # print(f"TPS Réel: {self.real_tick_rate}")
 
-            if visualizer and (now - last_render) >= render_interval:  # on affiche que si le temps dépasse 1/30
+            # --- RENDU (FPS) ---
+            if visualizer:
                 visualizer.render(self.battlefield, self.tick_count)
-                # print(f"TICK {self.tick_count}")  # pour debug
-                last_render = now
-                # évite l'affichage écrasé (limiter a 50 ms soit 50 fps max)
-                time.sleep(0.05)
+                # Évite l'affichage écrasé (limiter à 50 ms soit 50 fps max)
+                # time.sleep(0.05)  # tester avec des valeurs plus basses comme 0.01 ou 0.001
+
+            # ---  SYNCHRONISATION (limiteur de frame) ---
+            # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s
+            # Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
+            elapsed = time.time() - loop_start
+            wait = tick_duration - elapsed
+
+            if wait > 0:
+                time.sleep(wait)
 
         if visualizer:
             visualizer.finish()  # Remonter à la fin proprement
