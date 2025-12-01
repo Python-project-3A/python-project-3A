@@ -2,6 +2,7 @@ import time
 from src.engine.battlefield import Battlefield
 from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
+from src.visualizer.pygame_visualizer import PygameVisualizer
 from .system import UnitController
 
 

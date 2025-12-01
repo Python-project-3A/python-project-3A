@@ -7,6 +7,7 @@ from src.engine.simulation import Simulation
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
 from src.scenarios.scenario_loader import ScenarioLoader
+from src.visualizer.pygame_visualizer import PygameVisualizer
 from src.engine.input_provider import ConsoleInputProvider
 
 
@@ -32,7 +33,7 @@ Examples:
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
     run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
     run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
-    run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
+    run_parser.add_argument("--gui", action="store_true", help="Use Pygame GUI visualizer instead of terminal.")
     run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
     # --- COMMAND: load (TODO) ---
@@ -126,16 +127,22 @@ def command_run(args):
     print(f" Spawned {units_1} units for Player 1")
 
     # Create visualizer
-    visualizer = CLIVisualizer(bf.width, bf.height)
+    if args.gui:
+        print("\n🚀 Launching Pygame visualizer...")
+        visualizer = PygameVisualizer(bf.width, bf.height, tile_size=20)
+    else:
+        visualizer = CLIVisualizer(bf.width, bf.height)
 
     # Create and run simulation
     sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
 
     print("\n🎬 Starting battle...\n")
-    # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash
-    with ConsoleInputProvider() as input_sys:
-        # On injecte le système d'input dans la simulation
-        sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
+    if args.gui:
+        sim.run(input_provider=visualizer, visualizer=visualizer, target_tps=30)
+    else:
+        # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash
+        with ConsoleInputProvider() as input_sys:
+            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
 
     # Print results
     print_battle_result(bf)
