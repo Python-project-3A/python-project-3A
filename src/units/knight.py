@@ -1,4 +1,4 @@
-from unit_base import Unit
+from .unit_base import Unit
 
 
 class Knight(Unit):
