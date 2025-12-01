@@ -131,7 +131,7 @@ def command_run(args):
         visualizer = CLIVisualizer(bf.width, bf.height)
 
     # Create and run simulation
-    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
+    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf)
 
     print("\n🎬 Starting battle...\n")
     # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash

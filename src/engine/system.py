@@ -147,7 +147,7 @@ class MovementSystem:
         if unit.speed <= 0 or dt <= 0:
             return False
 
-        # calcil de la distance centre à centre
+        # calcul de la distance centre à centre
         dist_center = unit.dist_to(target)
 
         if dist_center < 0.001:
@@ -157,7 +157,7 @@ class MovementSystem:
         current_edge_dist = unit.edge_dist_to(target)
         dist_needed = max(0, current_edge_dist - (unit.attack_range * 0.9))  # la multiplcation par 0.9 c'est pour être à 90% de la portée max pour être sûr d'être à porté d'attaque et pas à la limite
 
-        # Calcul du pas de mouvement, min entre ce qu'on peut faire et ce qu'on doit faire
+        # calcul du pas de mouvement, min entre ce qu'on peut faire et ce qu'on doit faire
         step = min(unit.speed * dt, dist_needed)
 
         # application du Vecteur Normalisé
@@ -264,6 +264,39 @@ class UnitController:
     """Main controller that coordinates unit behavior"""
 
     @staticmethod
+    def _follow_path(unit: "Unit", target_pos: tuple[float, float], order: dict, battlefield: "Battlefield", dt: float):
+        """
+        Logique partagée pour suivre un chemin A*.
+        Gère le calcul initial et le déplacement waypoint par waypoint.
+        """
+        # calcul du chemin si nécessaire
+        if "path" not in order:
+            # si très proche (< 2 tuiles), ligne droite directe
+            if unit.dist_to_point(target_pos) < 2.0:
+                order["path"] = [target_pos]
+            else:
+                order["path"] = PathFinding.search(unit.position, target_pos, battlefield)
+
+        path = order["path"]
+
+        # suivi du chemin
+        if path:
+            next_waypoint = path[0]
+
+            # utilise move_to_position pour aller vers le waypoint
+            MovementSystem.move_to_position(unit, next_waypoint[0], next_waypoint[1], dt, battlefield)
+
+            # Si on est arrivé au waypoint (seuil 0.2 tuile)
+            if unit.dist_to_point(next_waypoint) < 0.2:
+                path.pop(0)  # Waypoint atteint, on passe au suivant
+
+        # 3. Fin de parcours
+        if not path:
+            # On est arrivé au bout
+            return True  # Reached
+        return False  # Not reached yet
+
+    @staticmethod
     def update(unit: "Unit", battlefield: "Battlefield", dt: float):  # noqa: C901
         """Update unit behavior based on its current order"""
         if not unit.is_alive():
@@ -279,36 +312,10 @@ class UnitController:
         if unit.reload_timer > 0:
             unit.reload_timer -= dt  # On décrémente selon le temps du JEU, pas le temps RÉEL
 
-        # ---------------------------------------------------------
-        # GESTION DU MOUVEMENT (MOVE_TO) AVEC PATHFINDING
-        # ---------------------------------------------------------
+        # --- EXECUTION DES ORDRES ---
         if order["type"] == "move_to":
-            target_pos = order["target"]
-
-            # 1. Calcul du chemin si pas encore fait
-            # On stocke le chemin DANS l'ordre pour ne pas polluer l'objet Unit
-            if "path" not in order:
-                # Si la distance est très courte (ex: < 2 tuiles), on ignore A* pour perf
-                if unit.dist_to_point(target_pos) < 2.0:
-                    order["path"] = [target_pos]
-
-                else:
-                    order["path"] = PathFinding.search(unit.position, target_pos, battlefield)
-
-            # 2. Suivi du chemin
-            path = order["path"]
-            if path:
-                next_waypoint = path[0]  # On vise le prochain point
-
-                # On se déplace vers le waypoint
-                moved = MovementSystem.move_to_position(unit, next_waypoint[0], next_waypoint[1], dt, battlefield)
-
-                # Si on est arrivé au waypoint (distance très faible)
-                if unit.dist_to_point(next_waypoint) < 0.2:
-                    path.pop(0)  # On retire ce point, on visera le suivant au prochain tour
-
-            # Si le chemin est vide, on est arrivé
-            if not path:
+            reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
+            if reached:
                 unit.current_order = None
 
         # ---------------------------------------------------------
@@ -318,15 +325,19 @@ class UnitController:
             target_pos = order["target"]
 
             # Recherche d'ennemis
-            enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
+            enemies_around = [u for u in battlefield.get_units_in_radius(unit.position[0], unit.position[1], unit.vision_range) if u.owner != unit.owner and u.is_alive()]
             target = None
+            if enemies_around:
+                # Trouve le plus proche
+                target = min(enemies_around, key=lambda e: unit.dist_to(e))
 
             # Optimisation: ne chercher la cible la plus proche que si on en a (eviter O(N^2) inutile)
-            if enemies:
-                # On ne regarde que ceux dans un certain rayon de vision (ex: 10 cases)
-                visible_enemies = [e for e in enemies if unit.dist_to(e) < 10.0]
-                if visible_enemies:
-                    target = min(visible_enemies, key=lambda e: unit.dist_to(e))
+            # enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
+            # if enemies:
+            # On ne regarde que ceux dans vision_range
+            # visible_enemies = [e for e in enemies if unit.dist_to(e) < unit.vision_range]
+            # if visible_enemies:
+            # target = min(visible_enemies, key=lambda e: unit.dist_to(e))
 
             if target:
                 if unit.can_attack(target):
@@ -335,22 +346,9 @@ class UnitController:
                     # Si on chasse une unité, on utilise move_towards (pas de A* dynamique pour l'instant)
                     MovementSystem.move_towards(unit, target, dt, battlefield)
             else:
-                # Pas d'ennemi, on se déplace comme un "move_to"
-                # (Copie de la logique move_to ci-dessus, factorisable idéalement)
-                if "path" not in order:
-                    if unit.dist_to_point(target_pos) < 2.0:
-                        order["path"] = [target_pos]
-                    else:
-                        order["path"] = PathFinding.search(unit.position, target_pos, battlefield)
-
-                path = order["path"]
-                if path:
-                    next_waypoint = path[0]
-                    MovementSystem.move_to_position(unit, next_waypoint[0], next_waypoint[1], dt, battlefield)
-                    if unit.dist_to_point(next_waypoint) < 0.2:
-                        path.pop(0)
-
-                if not path:
+                # Pas d'ennemi : on continue le mouvement prévu (A*)
+                reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
+                if reached:
                     unit.current_order = None
 
         # ---------------------------------------------------------
@@ -362,6 +360,6 @@ class UnitController:
                 if unit.can_attack(target):
                     CombatSystem.attack(unit, target)
                 else:
-                    MovementSystem.move_towards(unit, target, dt, battlefield)
+                    MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
             else:
                 unit.current_order = None
