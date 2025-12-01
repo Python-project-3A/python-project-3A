@@ -45,7 +45,7 @@ class Unit:
         self.speed = speed
 
         # state
-        self.time_since_last_attack = 0.0
+        self.reload_timer = 0.0
         self.current_target: Unit | None = None
         self.current_order: Order | None = None
 

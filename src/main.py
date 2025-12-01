@@ -126,7 +126,9 @@ def command_run(args):
     print(f" Spawned {units_1} units for Player 1")
 
     # Create visualizer
-    visualizer = CLIVisualizer(bf.width, bf.height)
+    visualizer = None
+    if not args.terminal:
+        visualizer = CLIVisualizer(bf.width, bf.height)
 
     # Create and run simulation
     sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)

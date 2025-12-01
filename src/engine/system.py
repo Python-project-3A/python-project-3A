@@ -1,5 +1,6 @@
 import math
-import time
+
+# import time # NE JAMAIS UTILISER TIME DANS CE FICHIER !!! PAS COMPATIBLE AVEC LE MODE SANS VISUEL (TICKS ACCELERES)
 import heapq
 from typing import List, Tuple, Optional
 
@@ -31,10 +32,14 @@ class PathFinding:
         # Directions: (dx, dy, cost)
         # On privilégie les entiers pour A*
         directions = [
-            (0, 1, MOVE_COST_STRAIGHT), (0, -1, MOVE_COST_STRAIGHT),
-            (1, 0, MOVE_COST_STRAIGHT), (-1, 0, MOVE_COST_STRAIGHT),
-            (1, 1, MOVE_COST_DIAGONAL), (1, -1, MOVE_COST_DIAGONAL),
-            (-1, 1, MOVE_COST_DIAGONAL), (-1, -1, MOVE_COST_DIAGONAL)
+            (0, 1, MOVE_COST_STRAIGHT),
+            (0, -1, MOVE_COST_STRAIGHT),
+            (1, 0, MOVE_COST_STRAIGHT),
+            (-1, 0, MOVE_COST_STRAIGHT),
+            (1, 1, MOVE_COST_DIAGONAL),
+            (1, -1, MOVE_COST_DIAGONAL),
+            (-1, 1, MOVE_COST_DIAGONAL),
+            (-1, -1, MOVE_COST_DIAGONAL),
         ]
 
         for dx, dy, cost in directions:
@@ -46,13 +51,13 @@ class PathFinding:
                 # On accède à la tuile via game_map (supposons qu'elle a une méthode ou attr pour ça)
                 # Note: Dans votre code actuel, game_map.get_tile peut retourner None ou une Tile
                 tile = game_map.get_tile(nx, ny)
-                
+
                 # Si la tuile existe et n'est pas un obstacle (à implémenter dans Tile/GameMap)
                 # Pour l'instant on suppose que tout est walkable sauf si défini autrement
                 is_walkable = True
-                if tile and hasattr(tile, 'is_obstacle') and tile.is_obstacle:
+                if tile and hasattr(tile, "is_obstacle") and tile.is_obstacle:
                     is_walkable = False
-                
+
                 if is_walkable:
                     neighbors.append(((nx, ny), cost))
 
@@ -87,15 +92,15 @@ class PathFinding:
         heapq.heappush(open_set, (0, start_node))
         came_from = {}
         g_score = {start_node: 0}
-        
+
         # Optimisation : limite de recherche pour éviter de geler le jeu si pas de chemin
         iterations = 0
-        max_iterations = 2000 
+        max_iterations = 2000
 
         while open_set:
             iterations += 1
             if iterations > max_iterations:
-                break # Abandon si trop long
+                break  # Abandon si trop long
 
             current = heapq.heappop(open_set)[1]
 
@@ -115,7 +120,7 @@ class PathFinding:
 
             for neighbor, cost in PathFinding.get_neighbors(current, battlefield):
                 tentative_g_score = g_score[current] + cost
-                
+
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
@@ -124,40 +129,50 @@ class PathFinding:
 
         # Si échec, on tente d'aller tout droit (fallback)
         return [end_pos]
-    
+
+
 class MovementSystem:
     """Handles all unit movement logic"""
 
     @staticmethod
     def move_towards(unit: "Unit", target: "Unit", dt: float, battlefield: "Battlefield") -> bool:
         """
-        déplace l'unité d'un pas vers l'unité cible
-        dépend de la vitesse de notre unité et du temps passé (dt)
-        dt: secondes par tick
-        déplace l'unité seulement si l'unité cible est déjà assez proche pour attaquer
-        OU la vitesse de l'unité est supérieure à 0
-        OU dt > 0
+        déplace l'unité vers l'unité cible, s'arrête dès qu'elle est à portée d'attaque.
+        dépend de la vitesse de notre unité et du temps passé : dt (secondes par tick)
         """
-        edge_dist = unit.edge_dist_to(target)
+        # vérifications
+        if unit.can_attack(target):
+            return False
 
-        if not unit.can_attack(target) and unit.speed > 0 and dt > 0:
-            dist = unit.dist_to(target)
-            if dist == 0:
-                return False
+        if unit.speed <= 0 or dt <= 0:
+            return False
 
-            step = min(unit.speed * dt, edge_dist)
+        # calcil de la distance centre à centre
+        dist_center = unit.dist_to(target)
 
-            target_x, target_y = target.position
-            x, y = unit.position
-            dx = target_x - x
-            dy = target_y - y
+        if dist_center < 0.001:
+            return False
 
-            new_x = x + (dx / dist * step)
-            new_y = y + (dy / dist * step)
+        # calcul de la distance qu'il reste à parcourir soit <= attack range
+        current_edge_dist = unit.edge_dist_to(target)
+        dist_needed = max(0, current_edge_dist - (unit.attack_range * 0.9))  # la multiplcation par 0.9 c'est pour être à 90% de la portée max pour être sûr d'être à porté d'attaque et pas à la limite
 
-            return battlefield.move_unit_on_map(unit, new_x, new_y)
+        # Calcul du pas de mouvement, min entre ce qu'on peut faire et ce qu'on doit faire
+        step = min(unit.speed * dt, dist_needed)
 
-        return False
+        # application du Vecteur Normalisé
+        tx, ty = target.position
+        ux, uy = unit.position
+        dx = tx - ux
+        dy = ty - uy
+
+        # ratio soit le pourcentage du chemin total qu'on parcourt ce tick-ci
+        ratio = step / dist_center
+
+        new_x = ux + (dx * ratio)
+        new_y = uy + (dy * ratio)
+
+        return battlefield.move_unit_on_map(unit, new_x, new_y)
 
     @staticmethod
     def move_to_position(unit: "Unit", target_x: float, target_y: float, dt: float, battlefield: "Battlefield") -> bool:
@@ -191,23 +206,19 @@ class CombatSystem:
         Modifie la vie de la cible et met à jour le temps de la dernière attaque.
         """
 
-        current_time = time.time()
+        if attacker.reload_timer > 0:
+            return False
 
         # Check if in range
         if not attacker.can_attack(defender):
             return False
 
-        # Check cooldown
-        if current_time - attacker.time_since_last_attack < attacker.attack_cooldown:
-            return False
-
         # Apply damage
         damage = max(0, attacker.damage - defender.armor)
-        defender.hp -= damage
-        defender.hp = max(0, defender.hp)  # pour ne pas avoir d'hp < 0
+        defender.hp = max(0, defender.hp - damage)  # pour ne pas avoir d'hp < 0
 
-        # Update attacker state
-        attacker.time_since_last_attack = current_time
+        # reset du timer avec la valeur du cooldown
+        attacker.reload_timer = attacker.attack_cooldown
 
         return True
 
@@ -264,18 +275,22 @@ class UnitController:
 
         order = unit.current_order
 
+        # --- GESTION DU TEMPS DE RECHARGEMENT ---
+        if unit.reload_timer > 0:
+            unit.reload_timer -= dt  # On décrémente selon le temps du JEU, pas le temps RÉEL
+
         # ---------------------------------------------------------
         # GESTION DU MOUVEMENT (MOVE_TO) AVEC PATHFINDING
         # ---------------------------------------------------------
         if order["type"] == "move_to":
             target_pos = order["target"]
-            
+
             # 1. Calcul du chemin si pas encore fait
             # On stocke le chemin DANS l'ordre pour ne pas polluer l'objet Unit
             if "path" not in order:
                 # Si la distance est très courte (ex: < 2 tuiles), on ignore A* pour perf
                 if unit.dist_to_point(target_pos) < 2.0:
-                      order["path"] = [target_pos]
+                    order["path"] = [target_pos]
 
                 else:
                     order["path"] = PathFinding.search(unit.position, target_pos, battlefield)
@@ -283,34 +298,33 @@ class UnitController:
             # 2. Suivi du chemin
             path = order["path"]
             if path:
-                next_waypoint = path[0] # On vise le prochain point
-                
+                next_waypoint = path[0]  # On vise le prochain point
+
                 # On se déplace vers le waypoint
                 moved = MovementSystem.move_to_position(unit, next_waypoint[0], next_waypoint[1], dt, battlefield)
-                
+
                 # Si on est arrivé au waypoint (distance très faible)
                 if unit.dist_to_point(next_waypoint) < 0.2:
-                     path.pop(0) # On retire ce point, on visera le suivant au prochain tour
-            
+                    path.pop(0)  # On retire ce point, on visera le suivant au prochain tour
+
             # Si le chemin est vide, on est arrivé
             if not path:
                 unit.current_order = None
-
 
         # ---------------------------------------------------------
         # GESTION ATTACK MOVE (Avancer, taper si ennemi, sinon avancer)
         # ---------------------------------------------------------
         elif order["type"] == "attack_move":
             target_pos = order["target"]
-            
+
             # Recherche d'ennemis
             enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
             target = None
-            
+
             # Optimisation: ne chercher la cible la plus proche que si on en a (eviter O(N^2) inutile)
             if enemies:
                 # On ne regarde que ceux dans un certain rayon de vision (ex: 10 cases)
-                visible_enemies = [e for e in enemies if unit.dist_to(e) < 10.0] 
+                visible_enemies = [e for e in enemies if unit.dist_to(e) < 10.0]
                 if visible_enemies:
                     target = min(visible_enemies, key=lambda e: unit.dist_to(e))
 
@@ -324,18 +338,18 @@ class UnitController:
                 # Pas d'ennemi, on se déplace comme un "move_to"
                 # (Copie de la logique move_to ci-dessus, factorisable idéalement)
                 if "path" not in order:
-                     if unit.dist_to_point(target_pos) < 2.0:
-                         order["path"] = [target_pos]
-                     else:
+                    if unit.dist_to_point(target_pos) < 2.0:
+                        order["path"] = [target_pos]
+                    else:
                         order["path"] = PathFinding.search(unit.position, target_pos, battlefield)
-                
+
                 path = order["path"]
                 if path:
                     next_waypoint = path[0]
                     MovementSystem.move_to_position(unit, next_waypoint[0], next_waypoint[1], dt, battlefield)
                     if unit.dist_to_point(next_waypoint) < 0.2:
                         path.pop(0)
-                
+
                 if not path:
                     unit.current_order = None
 
