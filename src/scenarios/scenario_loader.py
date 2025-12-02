@@ -97,6 +97,7 @@ class ScenarioLoader:
             damage=stats["damage"],
             attack_range=stats["attack_range"],
             attack_cooldown=stats["attack_cooldown"],
+            vision_range=stats["vision_range"],
             speed=stats["speed"],
             name=unit_type,  # Ignored by Pikeman/Knight since they set their own name
         )

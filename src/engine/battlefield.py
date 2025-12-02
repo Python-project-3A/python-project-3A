@@ -245,9 +245,8 @@ class Battlefield:
         return [u for u in self.units.values() if (u.position[0] - x) ** 2 + (u.position[1] - y) ** 2 <= r2]
 
     def units_in_los(self, unit: Unit) -> list[Unit]:
-        vision = getattr(unit, "vision_range", 4.0)
         x, y = unit.position
-        return [u for u in self.units.values() if u is not unit and u.is_alive() and unit.dist_to(u) <= vision]
+        return [u for u in self.units.values() if u is not unit and u.is_alive() and unit.dist_to(u) <= unit.vision_range]
 
     def is_battle_over(self) -> bool:
         """Renvoie True si la bataille est finie."""
