@@ -7,9 +7,24 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.engine.battlefield import Battlefield
 
+from src.units.knight import Knight
+from src.units.pikeman import Pikeman
+from src.units.unit_base import Unit
+
+
+
 
 class ScenarioLoader:
     """Loads and spawns scenarios from JSON files"""
+
+    # Map string names to classes   
+    UNIT_CLASSES = {
+        "Pikeman": Pikeman,
+        "Knight": Knight,
+        # Add more later
+        # "Crossbowman": Crossbowman,
+        # "LongSwordsman": LongSwordsman,
+    }
 
     # Cache for unit stats
     _unit_stats_cache = None
@@ -60,20 +75,6 @@ class ScenarioLoader:
         Instantiates the right subclass depending on unit_type.
         """
 
-        # Import here to avoid circular imports
-        from src.units.knight import Knight
-        from src.units.pikeman import Pikeman
-        from src.units.unit_base import Unit
-
-        # Map string names to classes
-        UNIT_CLASSES = {
-            "Pikeman": Pikeman,
-            "Knight": Knight,
-            # Add more later
-            # "Crossbowman": Crossbowman,
-            # "LongSwordsman": LongSwordsman,
-        }
-
         # Load JSON stats
         all_stats = ScenarioLoader.load_unit_stats()
 
@@ -83,7 +84,7 @@ class ScenarioLoader:
         stats = all_stats[unit_type]
 
         # Select correct class (fallback = Unit)
-        cls = UNIT_CLASSES.get(unit_type, Unit)
+        cls = ScenarioLoader.UNIT_CLASSES.get(unit_type, Unit)
 
         # Instantiate unit
         return cls(
