@@ -75,6 +75,8 @@ class Simulation:
             elif key == "-":
                 # diminuer la vitesse du jeu, minimu de 20%
                 self.game_speed = max(0.2, self.game_speed - 0.2)
+            elif key == "r":
+                self.game_speed = 1
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
