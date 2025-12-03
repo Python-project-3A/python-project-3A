@@ -20,6 +20,7 @@ class Simulation:
         self.tick_count = 0
         self.is_running = False
         self.paused = False
+        self.game_speed = 1
 
     def tick(self, constante_tick_duration):
         # TODO : utiliser contstante_tick_duration comme vitesse constante pour que les untités avance toujours de la même distance par tick.
@@ -68,10 +69,16 @@ class Simulation:
                 self.paused = not self.paused
             elif key == "q":
                 self.is_running = False
+            elif key == "=":
+                # augmenter la vitesse du jeu
+                self.game_speed += 0.2
+            elif key == "-":
+                # diminuer la vitesse du jeu, minimu de 20%
+                self.game_speed = max(0.2, self.game_speed - 0.2)
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
-                self.tick(LOGICAL_DT)
+                self.tick(LOGICAL_DT * self.game_speed)
 
                 # STATS DE PERFORMANCE
                 frames_this_second += 1
