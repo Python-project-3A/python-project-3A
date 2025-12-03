@@ -245,9 +245,24 @@ class Battlefield:
         return [u for u in self.units.values() if (u.position[0] - x) ** 2 + (u.position[1] - y) ** 2 <= r2]
 
     def units_in_los(self, unit: Unit) -> list[Unit]:
-        x, y = unit.position
-        return [u for u in self.units.values() if u is not unit and u.is_alive() and unit.dist_to(u) <= unit.vision_range]
+        """
+        Returns all *living enemy* units within the given unit's vision range.
+        This is typically used by AI to find a target.
+        """
+        # 1. Get all units in the raw circular radius (for efficiency)
+        visible_units = self.units_in_radius(
+            unit.position[0], 
+            unit.position[1], 
+            unit.vision_range
+        )
 
+        # 2. Filter the result to exclude self, dead units, and friendly units
+        enemies_in_los = [
+            u for u in visible_units
+            if u.is_alive() and u.owner != unit.owner
+        ]
+        
+        return enemies_in_los
     def is_battle_over(self) -> bool:
         """Renvoie True si la bataille est finie."""
         teams_alive = {u.owner for u in self.units.values() if u.is_alive()}

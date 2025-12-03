@@ -80,6 +80,13 @@ class Unit:
         """
         return self.edge_dist_to(other) <= self.attack_range
 
+    def enemy_visible(self, other: "Unit") -> bool:
+        """
+        Vérifie si l'autre unité est à portée de vision (vision_range).
+        """
+        # We use edge_dist_to to check if the unit's hitboxes are within the vision range
+        return self.edge_dist_to(other) <= self.vision_range
+
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
