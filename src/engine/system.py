@@ -137,8 +137,8 @@ class MovementSystem:
     @staticmethod
     def move_towards(unit: "Unit", target: "Unit", dt: float, battlefield: "Battlefield") -> bool:
         """
-        déplace l'unité vers l'unité cible, s'arrête dès qu'elle est à portée d'attaque.
-        dépend de la vitesse de notre unité et du temps passé : dt (secondes par tick)
+        Déplace l'unité vers l'unité cible en intégrant la répulsion des alliés (fluidité).
+        S'arrête dès qu'elle est à portée d'attaque.
         """
         # vérifications
         if unit.can_attack(target):
@@ -147,30 +147,31 @@ class MovementSystem:
         if unit.speed <= 0 or dt <= 0:
             return False
 
-        # calcul de la distance centre à centre
+        # distances
         dist_center = unit.dist_to(target)
-
         if dist_center < 0.001:
             return False
 
-        # calcul de la distance qu'il reste à parcourir soit <= attack range
         current_edge_dist = unit.edge_dist_to(target)
-        dist_needed = max(0, current_edge_dist - (unit.attack_range * 0.9))  # la multiplcation par 0.9 c'est pour être à 90% de la portée max pour être sûr d'être à porté d'attaque et pas à la limite
+        # On vise 90% de la portée pour assurer le tir
+        dist_needed = max(0, current_edge_dist - (unit.attack_range * 0.9))
 
-        # calcul du pas de mouvement, min entre ce qu'on peut faire et ce qu'on doit faire
-        step = min(unit.speed * dt, dist_needed)
+        # step physique
+        physics_step = unit.speed * dt
+        actual_step = min(physics_step, dist_needed)
 
-        # application du Vecteur Normalisé
+        if actual_step <= 0:
+            return False
+
+        # calcul du vecteur
         tx, ty = target.position
         ux, uy = unit.position
-        dx = tx - ux
-        dy = ty - uy
+        # normalisation
+        dx = (tx - ux) / dist_center
+        dy = (ty - uy) / dist_center
 
-        # ratio soit le pourcentage du chemin total qu'on parcourt ce tick-ci
-        ratio = step / dist_center
-
-        new_x = ux + (dx * ratio)
-        new_y = uy + (dy * ratio)
+        new_x = ux + (dx * actual_step)
+        new_y = uy + (dy * actual_step)
 
         return battlefield.move_unit_on_map(unit, new_x, new_y)
 
@@ -257,10 +258,8 @@ class CombatSystem:
         Returns:
             List of enemies that are currently visible/detectable by the unit.
         """
-        return [
-            e for e in enemies 
-            if e.is_alive() and unit.dist_to(e) <= unit.vision_range
-        ]
+        return [e for e in enemies if e.is_alive() and unit.dist_to(e) <= unit.vision_range]
+
 
 class UnitController:
     """Main controller that coordinates unit behavior"""
@@ -370,7 +369,7 @@ class UnitController:
             if target and target.is_alive():
                 if unit.can_attack(target):
                     CombatSystem.attack(unit, target)
-                    
+
                     # Clear path data after engaging
                     if "path" in order:
                         order["path"] = []
@@ -378,18 +377,14 @@ class UnitController:
                         del order["path_target_pos"]
                 else:
                     target_pos = target.position
-                    
+
                     # --- DYNAMIC PATH RECALCULATION CHECK (1.0 tile threshold) ---
-                    path_is_stale = (
-                        "path" in order and 
-                        "path_target_pos" in order and 
-                        unit.dist_to_point(order["path_target_pos"]) > 1.0
-                    )
-                    
+                    path_is_stale = "path" in order and "path_target_pos" in order and unit.dist_to_point(order["path_target_pos"]) > 1.0
+
                     if path_is_stale:
                         order["path"] = []
                         del order["path_target_pos"]
-                        
+
                     # Execute pathfinding movement
                     UnitController._follow_path(unit, target_pos, order, battlefield, dt)
 
@@ -397,4 +392,4 @@ class UnitController:
                     if "path" in order and order["path"]:
                         order["path_target_pos"] = target_pos
             else:
-                unit.current_order = None # Target is dead/gone, clear order.
+                unit.current_order = None  # Target is dead/gone, clear order.
