@@ -92,13 +92,13 @@ class Simulation:
             if visualizer:
                 visualizer.render(self.battlefield, self.tick_count)
 
-                # ---  SYNCHRONISATION (limiteur de frame) ---
-                # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s. Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
-                elapsed = time.time() - loop_start
-                wait = tick_duration - elapsed
+            # ---  SYNCHRONISATION (limiteur de frame) ---
+            # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s. Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
+            elapsed = time.time() - loop_start
+            wait = tick_duration - elapsed
 
-                if wait > 0:
-                    time.sleep(wait)
+            if wait > 0:
+                time.sleep(wait)
 
         if visualizer:
             visualizer.finish()  # Remonter à la fin proprement

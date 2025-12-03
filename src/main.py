@@ -137,7 +137,10 @@ def command_run(args):
     # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash
     with ConsoleInputProvider() as input_sys:
         # On injecte le système d'input dans la simulation
-        sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
+        if visualizer:
+            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
+        else:
+            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=0)
 
     # Print results
     print_battle_result(bf)
