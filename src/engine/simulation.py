@@ -65,18 +65,17 @@ class Simulation:
 
             # --- INPUTS ---
             key = input_provider.get_key()
-            if key == "p":
-                self.paused = not self.paused
-            elif key == "q":
-                self.is_running = False
-            elif key == "=":
-                # augmenter la vitesse du jeu
-                self.game_speed += 0.2
-            elif key == "-":
-                # diminuer la vitesse du jeu, minimu de 20%
-                self.game_speed = max(0.2, self.game_speed - 0.2)
-            elif key == "r":
-                self.game_speed = 1
+            match key:
+                case "p":
+                    self.paused = not self.paused
+                case "q":
+                    self.is_running = False
+                case "=":
+                    self.game_speed += 0.2
+                case "-":
+                    self.game_speed = max(0.2, self.game_speed - 0.2)
+                case "r":
+                    self.game_speed = 1
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:

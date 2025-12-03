@@ -127,7 +127,7 @@ def command_run(args):
 
     # Create visualizer
     visualizer = None
-    if not args.terminal:
+    if args.terminal:
         visualizer = CLIVisualizer(bf.width, bf.height)
 
     # Create and run simulation
@@ -140,7 +140,7 @@ def command_run(args):
         if visualizer:
             sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
         else:
-            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=0)
+            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=0)  # target_tps=0 => vitesse maximale
 
     # Print results
     print_battle_result(bf)
