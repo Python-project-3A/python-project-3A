@@ -248,17 +248,19 @@ class CombatSystem:
     @staticmethod
     def get_enemies_in_range(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
         """
-        Filter enemies to only those within attack range.
+        Filter enemies to only those within the unit's vision range
 
         Args:
-            unit: The unit checking range
+            unit: The unit checking range (to use its vision_range)
             enemies: List of potential enemies
 
         Returns:
-            List of enemies that can be attacked right now
+            List of enemies that are currently visible/detectable by the unit.
         """
-        return [e for e in enemies if e.is_alive() and unit.can_attack(e)]
-
+        return [
+            e for e in enemies 
+            if e.is_alive() and unit.dist_to(e) <= unit.vision_range
+        ]
 
 class UnitController:
     """Main controller that coordinates unit behavior"""
@@ -325,7 +327,7 @@ class UnitController:
             target_pos = order["target"]
 
             # Recherche d'ennemis
-            enemies_around = [u for u in battlefield.get_units_in_radius(unit.position[0], unit.position[1], unit.vision_range) if u.owner != unit.owner and u.is_alive()]
+            enemies_around = [u for u in battlefield.units_in_radius(unit.position[0], unit.position[1], unit.vision_range) if u.owner != unit.owner and u.is_alive()]
             target = None
             if enemies_around:
                 # Trouve le plus proche
@@ -363,3 +365,36 @@ class UnitController:
                     MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
             else:
                 unit.current_order = None
+        elif order["type"] == "pathing_attack_unit":
+            target = order["target"]
+            if target and target.is_alive():
+                if unit.can_attack(target):
+                    CombatSystem.attack(unit, target)
+                    
+                    # Clear path data after engaging
+                    if "path" in order:
+                        order["path"] = []
+                    if "path_target_pos" in order:
+                        del order["path_target_pos"]
+                else:
+                    target_pos = target.position
+                    
+                    # --- DYNAMIC PATH RECALCULATION CHECK (1.0 tile threshold) ---
+                    path_is_stale = (
+                        "path" in order and 
+                        "path_target_pos" in order and 
+                        unit.dist_to_point(order["path_target_pos"]) > 1.0
+                    )
+                    
+                    if path_is_stale:
+                        order["path"] = []
+                        del order["path_target_pos"]
+                        
+                    # Execute pathfinding movement
+                    UnitController._follow_path(unit, target_pos, order, battlefield, dt)
+
+                    # Store the position for next tick's staleness check
+                    if "path" in order and order["path"]:
+                        order["path_target_pos"] = target_pos
+            else:
+                unit.current_order = None # Target is dead/gone, clear order.
