@@ -129,7 +129,7 @@ def command_run(args):
     # Create visualizer
     if args.gui:
         print("\n🚀 Launching Pygame visualizer...")
-        visualizer = PygameVisualizer(bf.width, bf.height, tile_size=20)
+        visualizer = PygameVisualizer(battlefield=bf)
     else:
         visualizer = CLIVisualizer(bf.width, bf.height)
 

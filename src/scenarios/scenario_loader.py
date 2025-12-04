@@ -91,7 +91,7 @@ class ScenarioLoader:
             x=x,
             y=y,
             r=stats["r"],
-            hp=stats["hp"],
+            max_hp=stats["max_hp"],
             armor=stats["armor"],
             damage=stats["damage"],
             attack_range=stats["attack_range"],

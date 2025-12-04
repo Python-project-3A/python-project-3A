@@ -7,81 +7,140 @@ from src.map.game_map import GameMap
 from src.units.unit_base import Unit
 
 class PygameVisualizer:
-    def __init__(self, width: int, height: int, tile_size: int = 32):
-        pygame.init()
+    """
+    Renders the battlefield in a 2.5D isometric view using Pygame.
+    Handles user input for pausing and quitting.
+    """
 
-        self.tile_size = tile_size
-        self.screen_width = width * self.tile_size
-        self.screen_height = height * self.tile_size
+    ISO_TILE_WIDTH = 64
+    ISO_TILE_HEIGHT = 32
+
+    def __init__(self, battlefield, screen_width=1280, screen_height=720):
+        """
+        Initializes Pygame, the screen, and visualizer settings.
+        """
+        pygame.init()
+        self.battlefield = battlefield
+        self.screen_width = screen_width
+        self.screen_height = screen_height
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Age of Empires 2 - Simulation")
-        self.clock = pygame.time.Clock()
-        self.running = True
+        
+        self.font = pygame.font.SysFont("Arial", 16)
+        self.colors = {
+            0: (50, 50, 255),  # Blue for Player 0
+            1: (255, 50, 50),  # Red for Player 1
+            "bg": (24, 116, 205),  # A deep blue for the "sea"
+            "ground": (107, 142, 35),  # Olive Drab for the ground
+        }
+
+        # Camera offset to center the map
+        self.camera_offset_x = self.screen_width / 2
+        self.camera_offset_y = 100  # Offset from the top of the screen
     
+    def world_to_screen(self, world_x, world_y):
+        """
+        Converts world (grid) coordinates to isometric screen coordinates.
+        """
+        screen_x = self.camera_offset_x + (world_x - world_y) * (self.ISO_TILE_WIDTH / 2)
+        screen_y = self.camera_offset_y + (world_x + world_y) * (self.ISO_TILE_HEIGHT / 2)
+        return int(screen_x), int(screen_y)
+
     def get_key(self):
         """
-        Gère TOUS les événements Pygame une seule fois par tick.
-        Renvoie 'p' ou 'q' si ces touches sont pressées.
-        Met self.running à False si la fenêtre est fermée.
+        Processes Pygame events to get user input.
+        Returns 'q' to quit, 'p' to pause.
         """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.running = False
-                return None
+                return "q"
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    return "q"
                 if event.key == pygame.K_p:
                     return "p"
-                if event.key == pygame.K_q:
-                    self.running = False # On veut que 'q' quitte immédiatement
-                    return "q"
         return None
+    
+    def _draw_ground(self):
+        """
+        Draws the isometric ground plane.
+        """
+        # Create a diamond shape for the ground
+        points = [
+            self.world_to_screen(0, 0),
+            self.world_to_screen(self.battlefield.width, 0),
+            self.world_to_screen(self.battlefield.width, self.battlefield.height),
+            self.world_to_screen(0, self.battlefield.height),
+        ]
+        pygame.draw.polygon(self.screen, self.colors["ground"], points)
+        pygame.draw.polygon(self.screen, (0, 0, 0), points, 2) # Black border
+
+    def _draw_unit(self, unit):
+        """
+        Draws a single unit on the screen at its isometric position.
+        """
+        world_x, world_y = unit.position
+        screen_x, screen_y = self.world_to_screen(world_x, world_y)
+
+        # Simple representation: a circle as the base
+        radius = int(unit.radius * self.ISO_TILE_WIDTH / 2)
+        color = self.colors.get(unit.owner, (200, 200, 200))
+
+        # Draw an ellipse for a 3D-like base
+        ellipse_rect = pygame.Rect(screen_x - radius, screen_y - radius // 2, radius * 2, radius)
+        pygame.draw.ellipse(self.screen, (0,0,0), ellipse_rect, 2) # Black outline
+        pygame.draw.ellipse(self.screen, color, ellipse_rect.inflate(-4, -4))
+
+        # Draw a vertical line to represent the unit's body
+        body_height = 30
+        pygame.draw.line(self.screen, color, (screen_x, screen_y - body_height), (screen_x, screen_y), 4)
+
+        # Draw HP bar above the unit
+        hp_ratio = unit.hp / unit.max_hp
+        hp_bar_width = 30
+        hp_bar_height = 5
+        hp_bar_x = screen_x - hp_bar_width // 2
+        hp_bar_y = screen_y - body_height - 10
+
+        # Background of HP bar
+        pygame.draw.rect(self.screen, (100, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height))
+        # Foreground of HP bar
+        pygame.draw.rect(self.screen, (0, 200, 0), (hp_bar_x, hp_bar_y, hp_bar_width * hp_ratio, hp_bar_height))
+        # Border of HP bar
+        pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), 1)
 
     def render(self, battlefield: Battlefield, tick_count: int):
         """
-        Dessine l'état actuel du champ de bataille
-        Cette méthode sera appelée à chaque tick de la simulation
+        Renders the entire scene.
+        1. Fills the background.
+        2. Draws the ground.
+        3. Sorts all units by their Y-coordinate (Painter's Algorithm).
+        4. Draws each unit in the sorted order.
+        5. Updates the display.
         """
-        if not self.running:
-            return
-        
-        # 1. Remplir l'arrière-plan
-        self.screen.fill((0, 0, 0)) # Noir
+        self.screen.fill(self.colors["bg"])
 
-        # 2. Dessiner la carte
-        self._draw_map(battlefield.game_map)
+        self._draw_ground()
 
-        # 3. Dessiner les unités
-        self._draw_units(battlefield.get_all_units())
+        # --- Y-SORTING (PAINTER'S ALGORITHM) ---
+        # Get all units and sort them by their world Y-coordinate.
+        # This ensures objects further "back" (smaller Y) are drawn first.
+        all_units = battlefield.get_all_units()
+        sorted_units = sorted(all_units, key=lambda u: u.position[1])
 
-        # 4. Mettre à jour l'affichage
-        pygame.display.flip()
-        self.clock.tick(30)
-
-    def _draw_map(self, game_map: GameMap):
-        """Dessine les tuiles de la carte"""
-        for x in range(game_map.width):
-            for y in range(game_map.height):
-                # Pour l'instant, on dessine juste des carrés de couleur
-                color = (34, 139, 34) # Vert pour l'herbe
-                pygame.draw.rect(self.screen, color, (x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size))
-    
-    def _draw_units(self, units: list[Unit]):
-        """Dessine toutes les unités"""
-        for unit in units:
+        for unit in sorted_units:
             if unit.is_alive():
-                # Dessiner un cercle pour chaque unité
-                center_x = int(unit.position[0] * self.tile_size + self.tile_size / 2)
-                center_y = int(unit.position[1] * self.tile_size + self.tile_size / 2)
+                self._draw_unit(unit)
 
-                # Couleur différente selon le propriétaire de l'unité
-                if unit.owner == 0:
-                    color = (255, 0, 0) # Rouge
-                else:
-                    color = (0, 0, 255) # Bleu
+        # Display tick count
+        tick_text = self.font.render(f"Tick: {tick_count}", True, (255, 255, 255))
+        self.screen.blit(tick_text, (10, 10))
 
-                pygame.draw.circle(self.screen, color, (center_x, center_y), int(self.tile_size / 3))
-    
+        pygame.display.flip()
+
     def finish(self):
-        """Nettoie Pygame à la fin de la simulation"""
+        """
+        Cleans up and quits Pygame.
+        """
+        print("Visualizer shutting down.")
         pygame.quit()
-        # sys.exit() est un peu brutal, on le retire pour laisser le programme se terminer proprement.
