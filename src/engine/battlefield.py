@@ -24,6 +24,7 @@ class Battlefield:
         self.height = height
         self.next_unit_id = 1
         self.game_map: GameMap = GameMap(width, height)
+        self.game_map.init_map()
         self.units: dict[int, Unit] = {}
         self.generals: list[BaseGeneral] = []
         logger.info("Battlefield initialized %dx%d", width, height)
@@ -334,5 +335,5 @@ class Battlefield:
         """Renvoie un snapshot du Battlefield."""
         units_ser = []
         for u in self.units.values():
-            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "width": u.width, "height": u.height, "hibtox": u.radius})
-        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
+            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "radius":u.radius, "hibtox": u.radius})
+        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals],"number_of_tiles": len(self.game_map.tiles)}
