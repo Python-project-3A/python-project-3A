@@ -12,8 +12,8 @@ class PygameVisualizer:
     Handles user input for pausing and quitting.
     """
 
-    ISO_TILE_WIDTH = 64
-    ISO_TILE_HEIGHT = 32
+    ISO_BASE_TILE_WIDTH = 64
+    ISO_BASE_TILE_HEIGHT = 32
 
     def __init__(self, battlefield, screen_width=1280, screen_height=720):
         """
@@ -35,15 +35,50 @@ class PygameVisualizer:
         }
 
         # Camera offset to center the map
-        self.camera_offset_x = self.screen_width / 2
-        self.camera_offset_y = 100  # Offset from the top of the screen
+        # Calculate initial projected map dimensions without scaling
+        # The isometric projection of (0,0) is (0,0) relative to an unshifted origin.
+        # The isometric projection of (width,0) is (width * TILE_W/2, width * TILE_H/2)
+        # The isometric projection of (0,height) is (-height * TILE_W/2, height * TILE_H/2)
+        # The isometric projection of (width,height) is ((width-height)*TILE_W/2, (width+height)*TILE_H/2)
+
+        projected_min_x_raw = -self.battlefield.height * (self.ISO_BASE_TILE_WIDTH / 2)
+        projected_max_x_raw = self.battlefield.width * (self.ISO_BASE_TILE_WIDTH / 2)
+        total_projected_width_raw = projected_max_x_raw - projected_min_x_raw
+
+        projected_min_y_raw = 0 # The top-most point is (0,0) or (width,0) or (0,height)
+        projected_max_y_raw = (self.battlefield.width + self.battlefield.height) * (self.ISO_BASE_TILE_HEIGHT / 2)
+        total_projected_height_raw = projected_max_y_raw - projected_min_y_raw
+
+        # Determine scaling factor if map is too large for the screen
+        self.scale_factor = 1.0
+        padding_ratio = 0.9  # Use 90% of screen for map to leave some margin
+        if total_projected_width_raw > self.screen_width * padding_ratio or total_projected_height_raw > self.screen_height * padding_ratio:
+            scale_x = (self.screen_width * padding_ratio) / total_projected_width_raw
+            scale_y = (self.screen_height * padding_ratio) / total_projected_height_raw
+            self.scale_factor = min(scale_x, scale_y)
+
+        self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
+        self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
+
+        # Recalculate projected dimensions with scaling applied
+        projected_min_x = -self.battlefield.height * (self._tile_width / 2)
+        projected_max_x = self.battlefield.width * (self._tile_width / 2)
+        total_projected_width = projected_max_x - projected_min_x
+
+        projected_min_y = 0
+        projected_max_y = (self.battlefield.width + self.battlefield.height) * (self._tile_height / 2)
+        total_projected_height = projected_max_y - projected_min_y
+
+        # Calculate camera offset to center the entire projected map
+        self.camera_offset_x = (self.screen_width / 2) - (projected_min_x + total_projected_width / 2)
+        self.camera_offset_y = (self.screen_height / 2) - (projected_min_y + total_projected_height / 2)
     
     def world_to_screen(self, world_x, world_y):
         """
         Converts world (grid) coordinates to isometric screen coordinates.
         """
-        screen_x = self.camera_offset_x + (world_x - world_y) * (self.ISO_TILE_WIDTH / 2)
-        screen_y = self.camera_offset_y + (world_x + world_y) * (self.ISO_TILE_HEIGHT / 2)
+        screen_x = self.camera_offset_x + (world_x - world_y) * (self._tile_width / 2)
+        screen_y = self.camera_offset_y + (world_x + world_y) * (self._tile_height / 2)
         return int(screen_x), int(screen_y)
 
     def get_key(self):
@@ -83,31 +118,32 @@ class PygameVisualizer:
         screen_x, screen_y = self.world_to_screen(world_x, world_y)
 
         # Simple representation: a circle as the base
-        radius = int(unit.radius * self.ISO_TILE_WIDTH / 2)
+        radius = int(unit.radius * self._tile_width / 2)
         color = self.colors.get(unit.owner, (200, 200, 200))
 
         # Draw an ellipse for a 3D-like base
         ellipse_rect = pygame.Rect(screen_x - radius, screen_y - radius // 2, radius * 2, radius)
         pygame.draw.ellipse(self.screen, (0,0,0), ellipse_rect, 2) # Black outline
-        pygame.draw.ellipse(self.screen, color, ellipse_rect.inflate(-4, -4))
+        pygame.draw.ellipse(self.screen, color, ellipse_rect.inflate(int(-4 * self.scale_factor), int(-4 * self.scale_factor)))
 
         # Draw a vertical line to represent the unit's body
-        body_height = 30
-        pygame.draw.line(self.screen, color, (screen_x, screen_y - body_height), (screen_x, screen_y), 4)
+        body_height = int(30 * self.scale_factor)
+        line_width = int(4 * self.scale_factor) or 1 # Ensure line width is at least 1
+        pygame.draw.line(self.screen, color, (screen_x, screen_y - body_height), (screen_x, screen_y), line_width)
 
         # Draw HP bar above the unit
         hp_ratio = unit.hp / unit.max_hp
-        hp_bar_width = 30
-        hp_bar_height = 5
+        hp_bar_width = int(30 * self.scale_factor)
+        hp_bar_height = int(5 * self.scale_factor) or 1 # Ensure hp bar height is at least 1
         hp_bar_x = screen_x - hp_bar_width // 2
-        hp_bar_y = screen_y - body_height - 10
+        hp_bar_y = screen_y - body_height - int(10 * self.scale_factor)
 
         # Background of HP bar
         pygame.draw.rect(self.screen, (100, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height))
         # Foreground of HP bar
         pygame.draw.rect(self.screen, (0, 200, 0), (hp_bar_x, hp_bar_y, hp_bar_width * hp_ratio, hp_bar_height))
         # Border of HP bar
-        pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), 1)
+        pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
     def render(self, battlefield: Battlefield, tick_count: int):
         """
