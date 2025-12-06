@@ -88,12 +88,20 @@ class PygameVisualizer:
         """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return "q"
+                return "escape"
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return "escape"
                 if event.key == pygame.K_q:
                     return "q"
                 if event.key == pygame.K_p:
                     return "p"
+                if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
+                    return "="
+                if event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
+                    return "-"
+                if event.key == pygame.K_r:
+                    return "r"
         return None
 
     def __enter__(self):
@@ -153,7 +161,7 @@ class PygameVisualizer:
         # Border of HP bar
         pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
-    def render(self, battlefield: Battlefield, tick_count: int):
+    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False):
         """
         Renders the entire scene.
         1. Fills the background.
@@ -176,8 +184,12 @@ class PygameVisualizer:
             if unit.is_alive():
                 self._draw_unit(unit)
 
-        # Display tick count
-        tick_text = self.font.render(f"Tick: {tick_count}", True, (255, 255, 255))
+        # Display status text
+        status_str = f"Tick: {tick_count} | Speed: x{speed:.1f}"
+        if paused:
+            status_str += " [PAUSED]"
+
+        tick_text = self.font.render(status_str, True, (255, 255, 255))
         self.screen.blit(tick_text, (10, 10))
 
         pygame.display.flip()

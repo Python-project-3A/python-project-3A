@@ -41,9 +41,12 @@ class ConsoleInputProvider:
         """Renvoie la touche pressée ou None."""
         if self.os_type == "nt":
             if msvcrt.kbhit():
+                char = msvcrt.getch()
+                if char == b'\x1b':  # Escape key
+                    return "escape"
                 try:
-                    return msvcrt.getch().decode().lower()
-                except UnicodeDecodeError:
+                    return char.decode().lower()
+                except (UnicodeDecodeError, AttributeError):
                     return None
         else:
             # Linux / Mac
@@ -51,5 +54,8 @@ class ConsoleInputProvider:
             # Un timeout de 0 signifie une vérification non bloquante
             dr, dw, de = select.select([sys.stdin], [], [], 0)
             if dr:
-                return sys.stdin.read(1).lower()
+                char = sys.stdin.read(1)
+                if char == '\x1b': # Escape key
+                    return "escape"
+                return char.lower()
         return None

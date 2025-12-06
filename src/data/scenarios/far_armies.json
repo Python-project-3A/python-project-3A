@@ -1,0 +1,38 @@
+{
+  "name": "far armies",
+  "description": "Move test",
+  "map": {
+    "width": 60,
+    "height": 40
+  },
+  "armies": [
+    {
+      "player_id": 0,
+      "general": null,
+      "units": [
+        {
+          "type": "Knight",
+          "count": 20,
+          "formation": "block",
+          "start_x": 2,
+          "start_y": 2,
+          "spacing": 1.5
+        }
+      ]
+    },
+    {
+      "player_id": 1,
+      "general": null,
+      "units": [
+        {
+          "type": "Pikeman",
+          "count": 20,
+          "formation": "block",
+          "start_x": 50,
+          "start_y": 30,
+          "spacing": 1
+        }
+      ]
+    }
+  ]
+}
