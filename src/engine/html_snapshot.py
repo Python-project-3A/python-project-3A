@@ -64,8 +64,7 @@ class HTMLSnapshot:
             """)
         ai_section = "".join(ai_status)
 
-        html_content = f"""
-    <!DOCTYPE html>
+        html_content = f"""<!DOCTYPE html>
     <html>
     <head>
         <title>Battlefield Snapshot - Tick {tick_count}</title>
@@ -139,6 +138,7 @@ class HTMLSnapshot:
       td {{
         padding: 0.6rem;
         text-align: left;
+        text-wrap: nowrap;
       }}
 
       thead {{
@@ -146,16 +146,17 @@ class HTMLSnapshot:
         height: 2.5rem;
         text-align: left;
         vertical-align: middle;
+        text-wrap: nowrap;
       }}
 
       table {{
         width: 100%;
         border-collapse: collapse;
-        place-self: center;
       }}
 
       .table-wrapper {{
         width: 90%;
+        overflow-x: scroll;
       }}
 
       .stats-section {{
@@ -191,6 +192,11 @@ class HTMLSnapshot:
         grid-template-columns: repeat(2, 1fr);
         width: 90%;
         gap: 1rem;
+
+        @media (width <= 40rem) {{
+            grid-template-columns: repeat(1, 1fr);
+        }}
+
       }}
 
       .general-section-content-item {{
@@ -220,6 +226,24 @@ class HTMLSnapshot:
       h3 {{
         margin: 0;
       }}
+      ::-webkit-scrollbar {{
+        width: 0.5rem;
+        height: 0.5rem;
+        }}
+
+        ::-webkit-scrollbar-track {{
+         background: transparent;
+        }}
+
+        ::-webkit-scrollbar-thumb {{
+        background: rgb(163 163 163 / var(--tw-bg-opacity, 1));
+         border-radius: 0.25rem;
+        }}
+
+        ::-webkit-scrollbar-thumb:hover {{
+          background: rgb(212 212 212 / var(--tw-bg-opacity, 1));
+        }}
+
         </style>
     <script>
       const getThemePreference = () => {{
