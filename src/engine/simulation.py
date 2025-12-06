@@ -3,6 +3,7 @@ from src.engine.battlefield import Battlefield
 from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
 from .system import UnitController
+from .html_snapshot import HTMLSnapshot
 
 
 class Simulation:
@@ -21,6 +22,7 @@ class Simulation:
         self.is_running = False
         self.paused = False
         self.game_speed = 1
+        self.snapshot_utility = HTMLSnapshot(battlefield)
 
     def tick(self, constante_tick_duration):
         # TODO : utiliser contstante_tick_duration comme vitesse constante pour que les untités avance toujours de la même distance par tick.
@@ -76,6 +78,9 @@ class Simulation:
                     self.game_speed = max(0.2, self.game_speed - 0.2)
                 case "r":
                     self.game_speed = 1
+                case "\t":
+                    self.snapshot_utility.save_and_open_html_file(self.tick_count)
+
             if visualizer and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
                 step = 2  # vitesse de déplacement de la cam, on met ce qu'on veut
                 match key:
