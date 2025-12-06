@@ -334,5 +334,46 @@ class Battlefield:
         """Renvoie un snapshot du Battlefield."""
         units_ser = []
         for u in self.units.values():
-            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "width": u.width, "height": u.height, "hibtox": u.radius})
+            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "radius": u.radius, "hibtox": u.radius})
         return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
+
+    def print_battle_result(self):
+        """Print battle results"""
+        print("\n" + "=" * 60)
+        print("=== BATTLE RESULT ===")
+        print("=" * 60)
+
+        survivors_by_owner = {}
+        for unit in self.get_all_units():
+            if unit.is_alive():
+                if unit.owner not in survivors_by_owner:
+                    survivors_by_owner[unit.owner] = []
+                survivors_by_owner[unit.owner].append(unit)
+
+        for owner_id in [0, 1]:
+            general = self.generals[owner_id]
+            survivors = survivors_by_owner.get(owner_id, [])
+
+            print(f"\n️  {general.name} (Player {owner_id}):")
+            print(f"   Survivors: {len(survivors)} units")
+
+            if survivors:
+                total_hp = sum(u.hp for u in survivors)
+                avg_hp = total_hp / len(survivors)
+                print(f"   Total HP: {total_hp:.1f}")
+                print(f"   Avg HP: {avg_hp:.1f}")
+
+        print("\n" + "-" * 60)
+        if len(survivors_by_owner) == 0:
+            print("  DRAW - All units eliminated!")
+        elif len(survivors_by_owner) == 1:
+            winner_id = list(survivors_by_owner.keys())[0]
+            winner_general = self.generals[winner_id]
+            print(f" VICTORY for {winner_general.name} (Player {winner_id})!")
+        else:
+            # counts = {owner: len(units) for owner, units in survivors_by_owner.items()}
+            # winner_id = max(counts, key=counts.get)
+            # winner_general = self.generals[winner_id]
+            # print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
+            print(f" PARTIE STOP : BOTH TEAMS ARE ALIVE")
+        print("=" * 60 + "\n")

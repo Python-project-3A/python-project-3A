@@ -143,49 +143,51 @@ def command_run(args):
             sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=0)  # target_tps=0 => vitesse maximale
 
     # Print results
-    print_battle_result(bf)
+    bf.print_battle_result()
 
 
-def print_battle_result(battlefield):
-    """Print battle results"""
-    print("\n" + "=" * 60)
-    print("=== BATTLE RESULT ===")
+def run_battle(args):
+    """Run a battle scenario"""
     print("=" * 60)
+    print("=== LOADING SCENARIO ===")
+    print("=" * 60)
+    # 1. Load Data
+    try:
+        scenario_data = ScenarioLoader.load_scenario(args.scenario)
+    except FileNotFoundError:
+        print(f"Scenario {args.scenario} not found.")
+        return
 
-    survivors_by_owner = {}
-    for unit in battlefield.get_all_units():
-        if unit.is_alive():
-            if unit.owner not in survivors_by_owner:
-                survivors_by_owner[unit.owner] = []
-            survivors_by_owner[unit.owner].append(unit)
+    # 2. Setup Battlefield
+    width, height = scenario_data["map"]["width"], scenario_data["map"]["height"]
+    bf = Battlefield(width, height)
 
-    for owner_id in [0, 1]:
-        general = battlefield.generals[owner_id]
-        survivors = survivors_by_owner.get(owner_id, [])
+    # 3. Setup Generals & Units
+    bf.generals = [create_general(args.general0, 0), create_general(args.general1, 1)]
+    ScenarioLoader.spawn_scenario(scenario_data, bf, {0: args.general0, 1: args.general1})
 
-        print(f"\n️  {general.name} (Player {owner_id}):")
-        print(f"   Survivors: {len(survivors)} units")
+    # 4. Setup View
+    visualizer = CLIVisualizer(width, height) if args.terminal else None
 
-        if survivors:
-            total_hp = sum(u.hp for u in survivors)
-            avg_hp = total_hp / len(survivors)
-            print(f"   Total HP: {total_hp:.1f}")
-            print(f"   Avg HP: {avg_hp:.1f}")
+    # 5. Run Simulation
+    sim = Simulation(bf.game_map, bf.generals, bf)  # tick_duration is logic only now
 
-    print("\n" + "-" * 60)
-    if len(survivors_by_owner) == 0:
-        print("  DRAW - All units eliminated!")
-    elif len(survivors_by_owner) == 1:
-        winner_id = list(survivors_by_owner.keys())[0]
-        winner_general = battlefield.generals[winner_id]
-        print(f" VICTORY for {winner_general.name} (Player {winner_id})!")
-    else:
-        counts = {owner: len(units) for owner, units in survivors_by_owner.items()}
-        winner_id = max(counts, key=counts.get)
-        winner_general = battlefield.generals[winner_id]
-        print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
+    # Mode Chooser: Visual (30 TPS) vs Headless (Max Speed)
+    target_tps = 30 if visualizer else 0
 
-    print("=" * 60 + "\n")
+    # 6. Affichage des headers statiques
+    print(f"\n Scenario: {scenario_data['name']}")
+    print(f"\n{scenario_data.get('description', '')}")
+    print(f" Map: {width}x{height}")
+    print(f" Spawned {len(bf.units_by_owner(0))} units for Player 0")
+    print(f" Spawned {len(bf.units_by_owner(1))} units for Player 1")
+    print("\nStarting battle...\n")
+
+    with ConsoleInputProvider() as inp:
+        sim.run(inp, visualizer=visualizer, target_tps=target_tps)
+
+    # 7. Results
+    bf.print_battle_result()
 
 
 def main():
@@ -195,8 +197,8 @@ def main():
         command_list()
 
     elif args.command == "run":
-        command_run(args)
-
+        # command_run(args)
+        run_battle(args)
     elif args.command == "load":
         print("  'load' command not yet implemented")
 

@@ -2,101 +2,93 @@ import sys
 
 from src.engine.battlefield import Battlefield
 
+# Codes ANSI
+RESET = "\033[0m"
+BLUE = "\033[34m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CLEAR_LINE = "\033[K"
+UP = "\033[A"
+
 
 class CLIVisualizer:
     def __init__(self, width, height):
         self.width = width
         self.height = height
         self.first_frame = True
-        self.lines_printed = 0
+        self.lines_printed = 5 + self.height  # 5 c'est le nb de lignes de headers
 
-    def render(self, battlefield: Battlefield, tick: int):  # noqa: C901
-        # Effacer la frame précédente
+    def render_opti(self, bf: Battlefield, tick: int, speed: float = 1.0, paused: bool = False):
+        # 1. Remonter le curseur (Double Buffering simulation)
         if not self.first_frame:
+            # On remonte de N lignes
             sys.stdout.write(f"\033[{self.lines_printed}A")
-        else:
-            self.first_frame = False
+        self.first_frame = False
 
-        # Construire la grille vide
-        grille = [["." for _ in range(self.width)] for _ in range(self.height)]
+        # 2. Préparer le buffer d'affichage (Dictionnaire spars)
+        # Clé = (x, y), Valeur = (char, color_code)
+        display_buffer = {}
+        counts = {}  # Pour gérer les collisions
+        alive_counts = {0: 0, 1: 0}  # 3. Remplir avec les unités, optimisation : On ne fait qu'une passe
+        hp_counts = {0: 0, 1: 0}
 
-        # Placer les unités sur la grille
-        for unit in battlefield.get_all_units():
+        for unit in bf.get_all_units():
             if not unit.is_alive():
                 continue
 
-            # x = int(unit.position[0])
-            # y = int(unit.position[1])
-            x = min(max(round(unit.position[0]), 0), self.width - 1)
-            y = min(max(round(unit.position[1]), 0), self.height - 1)
+            # Stats globales
+            alive_counts[unit.owner] += 1
+            hp_counts[unit.owner] += unit.hp
+
+            x, y = int(unit.position[0]), int(unit.position[1])
 
             if 0 <= x < self.width and 0 <= y < self.height:
-                # Symbole de l'unité (première lettre du nom)
-                symbol = unit.name[0].upper()
-
-                # Couleur selon l'équipe
-                if unit.owner == 0:
-                    colored_symbol = f"\033[34m{symbol}\033[0m"  # Bleu
-                elif unit.owner == 1:
-                    colored_symbol = f"\033[91m{symbol}\033[0m"  # Rouge
+                key = (x, y)
+                if key in counts:
+                    counts[key] += 1
+                    display_buffer[key] = (str(counts[key]), YELLOW)
                 else:
-                    colored_symbol = symbol
+                    counts[key] = 1
+                    symbol = unit.name[0].upper()
+                    color = BLUE if unit.owner == 0 else RED
+                    display_buffer[key] = (symbol, color)
 
-                current_tile = grille[y][x]
-                # Placer dans la grille
+        # 4. Construire le buffer de texte
+        lines = []
 
-                if current_tile == ".":
-                    grille[y][x] = colored_symbol
+        # Header (5 lignes)
+        lines.append(f"\n{'=' * 60}")
+        status_str = f"{f'TICK {tick:05d}':15} Speed: x{speed:<4.1f}"
+        if paused:
+            status_str += f" {YELLOW}[PAUSED]{RESET}"
+        status_str += CLEAR_LINE
+        lines.append(status_str)
+
+        g0 = bf.generals[0].name if bf.generals else "P0"
+        g1 = bf.generals[1].name if bf.generals else "P1"
+
+        lines.append(f"{BLUE}{g0:15}{RESET} Units: {alive_counts[0]:3} | HP: {hp_counts[0]:5.0f}")
+        lines.append(f"{RED}{g1:15}{RESET} Units: {alive_counts[1]:3} | HP: {hp_counts[1]:5.0f}")
+        lines.append(f"{'=' * 60}")
+
+        # Grille
+        # On construit ligne par ligne
+        for y in range(self.height):
+            row_chars = []
+            for x in range(self.width):
+                if (x, y) in display_buffer:
+                    char, color = display_buffer[(x, y)]
+                    row_chars.append(f"{color}{char}{RESET}")
                 else:
-                    # Plusieurs unités sur la même case
-                    # Jaune pour collision
-                    import re
+                    row_chars.append(".")  # Fond vide
+            lines.append(" ".join(row_chars))  # Espace pour aérer horizontalement
 
-                    existing_clean = re.sub(r"\033\[\d+m", "", current_tile)
-
-                    if existing_clean.isdigit():
-                        count = int(existing_clean) + 1
-                    else:
-                        count = 2  # First collision
-
-                    # Color yellow and show number
-                    grille[y][x] = f"\033[93m{count}\033[0m"
-
-        # Compter les unités vivantes
-        alive_by_owner = {0: 0, 1: 0}
-        hp_by_owner = {0: 0, 1: 0}
-
-        for unit in battlefield.get_all_units():
-            if unit.is_alive():
-                alive_by_owner[unit.owner] += 1
-                hp_by_owner[unit.owner] += unit.hp
-
-        # Affichage
-        header_lines = []
-        header_lines.append("=" * 60)
-        header_lines.append(f"TICK {tick:04d}")
-        header_lines.append("-" * 60)
-
-        # Stats des généraux
-        if battlefield.generals:
-            gen0 = battlefield.generals[0]
-            gen1 = battlefield.generals[1]
-
-            header_lines.append(f"\033[34m{gen0.name:20s}\033[0m │ Units: {alive_by_owner[0]:3d} │ HP: {hp_by_owner[0]:5.0f}")
-            header_lines.append(f"\033[91m{gen1.name:20s}\033[0m │ Units: {alive_by_owner[1]:3d} │ HP: {hp_by_owner[1]:5.0f}")
-
-        header_lines.append("=" * 60)
-
-        # Afficher header
-        for line in header_lines:
-            print(line)
-
-        # Afficher la grille
-        for ligne in grille:
-            print(" ".join(ligne))
-
+        # 5. Affichage final (Flush unique pour éviter le scintillement)
+        full_output = "\n".join(lines) + "\n"
+        sys.stdout.write(full_output)
         sys.stdout.flush()
-        self.lines_printed = len(header_lines) + self.height
+
+        self.lines_printed = len(lines) + 1  # +1 pour le dernier \n
 
     def finish(self):
         # Remonter proprement

@@ -57,7 +57,7 @@ class Simulation:
         self.real_tick_rate = 0  # Pour une consultation externe
 
         if visualizer:
-            visualizer.render(self.battlefield, 0)  # On affiche le TICK 0, pour voir la position initiale des unités.
+            visualizer.render_opti(self.battlefield, 0, speed=self.game_speed, paused=self.paused)  # On affiche le TICK 0, pour voir la position initiale des unités.
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         while self.is_running and self.tick_count < max_ticks:
@@ -91,7 +91,7 @@ class Simulation:
 
             # --- RENDU (FPS) ---
             if visualizer:
-                visualizer.render(self.battlefield, self.tick_count)
+                visualizer.render_opti(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused)
 
             # ---  SYNCHRONISATION (limiteur de frame) ---
             # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s. Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
