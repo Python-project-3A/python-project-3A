@@ -88,64 +88,6 @@ def command_list():
     print("\n" + "=" * 60 + "\n")
 
 
-def command_run(args):
-    """Run a battle scenario"""
-    print("=" * 60)
-    print("=== LOADING SCENARIO ===")
-    print("=" * 60)
-
-    # Load scenario
-    try:
-        scenario_data = ScenarioLoader.load_scenario(args.scenario)
-    except FileNotFoundError as e:
-        print(f"\n Error: {e}\n")
-        return
-
-    print(f"\n Scenario: {scenario_data['name']}")
-    print(f" {scenario_data.get('description', '')}")
-    print(f" Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
-
-    # Create battlefield
-    bf = Battlefield(width=scenario_data["map"]["width"], height=scenario_data["map"]["height"])
-
-    # Create generals
-    general_0 = create_general(args.general0, player_id=0)
-    general_1 = create_general(args.general1, player_id=1)
-    bf.generals = [general_0, general_1]
-
-    print(f"\n  Battle: {general_0.name} VS {general_1.name}\n")
-
-    # Spawn scenario with general overrides
-    general_overrides = {0: args.general0, 1: args.general1}
-    ScenarioLoader.spawn_scenario(scenario_data, bf, general_overrides)
-
-    # Count spawned units
-    units_0 = len(bf.units_by_owner(0))
-    units_1 = len(bf.units_by_owner(1))
-    print(f" Spawned {units_0} units for Player 0")
-    print(f" Spawned {units_1} units for Player 1")
-
-    # Create visualizer
-    visualizer = None
-    if args.terminal:
-        visualizer = CLIVisualizer(bf.width, bf.height)
-
-    # Create and run simulation
-    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf)
-
-    print("\n🎬 Starting battle...\n")
-    # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash
-    with ConsoleInputProvider() as input_sys:
-        # On injecte le système d'input dans la simulation
-        if visualizer:
-            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
-        else:
-            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=0)  # target_tps=0 => vitesse maximale
-
-    # Print results
-    bf.print_battle_result()
-
-
 def run_battle(args):
     """Run a battle scenario"""
     print("=" * 60)
@@ -177,11 +119,11 @@ def run_battle(args):
 
     # 6. Affichage des headers statiques
     print(f"\n Scenario: {scenario_data['name']}")
-    print(f"\n{scenario_data.get('description', '')}")
+    print(f"\n {scenario_data.get('description', '')}")
     print(f" Map: {width}x{height}")
     print(f" Spawned {len(bf.units_by_owner(0))} units for Player 0")
     print(f" Spawned {len(bf.units_by_owner(1))} units for Player 1")
-    print("\nStarting battle...\n")
+    print("\n Starting battle...\n")
 
     with ConsoleInputProvider() as inp:
         sim.run(inp, visualizer=visualizer, target_tps=target_tps)
