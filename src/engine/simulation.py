@@ -57,7 +57,7 @@ class Simulation:
         self.real_tick_rate = 0  # Pour une consultation externe
 
         if visualizer:
-            visualizer.render(self.battlefield, 0)  # On affiche le TICK 0, pour voir la position initiale des unités.
+            visualizer.render(self.battlefield, 0, speed=self.game_speed, paused=self.paused)  # On affiche le TICK 0, pour voir la position initiale des unités.
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         while self.is_running and self.tick_count < max_ticks:
@@ -68,7 +68,7 @@ class Simulation:
             match key:
                 case "p":
                     self.paused = not self.paused
-                case "q":
+                case "w":
                     self.is_running = False
                 case "=":
                     self.game_speed += 0.2
@@ -76,6 +76,21 @@ class Simulation:
                     self.game_speed = max(0.2, self.game_speed - 0.2)
                 case "r":
                     self.game_speed = 1
+            if visualizer and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
+                step = 2  # vitesse de déplacement de la cam, on met ce qu'on veut
+                match key:
+                    case "z":
+                        visualizer.move_camera(0, -step)  # haut
+                    case "w":
+                        visualizer.move_camera(0, -step)  # haut
+                    case "s":
+                        visualizer.move_camera(0, step)  # bas
+                    case "q":
+                        visualizer.move_camera(-step, 0)  # gauche
+                    case "a":
+                        visualizer.move_camera(-step, 0)  # gauche
+                    case "d":
+                        visualizer.move_camera(step, 0)  # droite
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
@@ -91,7 +106,7 @@ class Simulation:
 
             # --- RENDU (FPS) ---
             if visualizer:
-                visualizer.render(self.battlefield, self.tick_count)
+                visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused)
 
             # ---  SYNCHRONISATION (limiteur de frame) ---
             # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s. Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
@@ -101,7 +116,4 @@ class Simulation:
             if wait > 0:
                 time.sleep(wait)
 
-        if visualizer:
-            visualizer.finish()  # Remonter à la fin proprement
-
-        print(f"Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s")
+        print(f" Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s")
