@@ -33,7 +33,12 @@ Examples:
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
     run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
     run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
-    run_parser.add_argument("--gui", action="store_true", help="Use Pygame GUI visualizer instead of terminal.")
+
+    # Visualizer choice
+    viz_group = run_parser.add_mutually_exclusive_group()
+    viz_group.add_argument("-gui", action="store_true", help="Use Pygame GUI visualizer.")
+    viz_group.add_argument("-t", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
+
     run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
     # --- COMMAND: load (TODO) ---
@@ -127,10 +132,10 @@ def command_run(args):
     print(f" Spawned {units_1} units for Player 1")
 
     # Create visualizer
-    if args.gui:
+    if args.gui:  # If -gui is specified
         print("\n🚀 Launching Pygame visualizer...")
         visualizer = PygameVisualizer(battlefield=bf)
-    else:
+    else:  # If -t is specified or no visualizer flag is given
         visualizer = CLIVisualizer(bf.width, bf.height)
 
     # Create and run simulation
