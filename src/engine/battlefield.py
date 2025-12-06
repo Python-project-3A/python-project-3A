@@ -24,6 +24,7 @@ class Battlefield:
         self.height = height
         self.next_unit_id = 1
         self.game_map: GameMap = GameMap(width, height)
+        self.game_map.init_map()
         self.units: dict[int, Unit] = {}
         self.generals: list[BaseGeneral] = []
         logger.info("Battlefield initialized %dx%d", width, height)
@@ -99,7 +100,10 @@ class Battlefield:
         """
         Checks circular hitbox collision based on unit.radius.
         """
-        for other in self.units.values():
+        # On cherche les voisins dans un rayon de 2 tuiles
+        potential_colliders = self.get_potential_neighbors(new_x, new_y, range_tiles=2)
+
+        for other in potential_colliders:
             # Skip the unit itself and also the dead units
             if other is unit or not other.is_alive():
                 continue
@@ -112,76 +116,117 @@ class Battlefield:
             if math.hypot(dx, dy) < (unit.radius + other.radius):
                 return True
 
+            # Optimisation
+            # if (dx * dx + dy * dy) < ((unit.radius + other.radius) * (unit.radius + other.radius)):
+            #     return True
         return False
 
-    def attempt_sliding_move(self, unit: Unit, new_x: float, new_y: float):
+    def attempt_sliding_move(self, unit: Unit, target_x: float, target_y: float) -> tuple[float, float]:
         """
-        Attempts old sliding movement:
-        - try direct
-        - try horizontal
-        - try vertical
-        - try small orthogonal offsets
+        Gestion physique du glissement pour des cercles (Tangent Sliding).
+        Si le mouvement direct est bloqué, on essaie de glisser le long de l'obstacle.
         """
-        if not self.check_position(unit, new_x, new_y):
-            return new_x, new_y
+        if not self.check_position(unit, target_x, target_y):
+            return target_x, target_y
 
         ux, uy = unit.position
 
-        # horizontal
-        if not self.check_position(unit, new_x, uy):
-            return new_x, uy
+        # vecteur de mouvement
+        move_dx = target_x - ux
+        move_dy = target_y - uy
 
-        # vertical
-        if not self.check_position(unit, ux, new_y):
-            return ux, new_y
+        # identification  de l'obstacle principal
+        neighbors = self.get_potential_neighbors(target_x, target_y, range_tiles=2)  # On cherche le voisin le plus proche qui cause la collision (opti spatiale)
+        collider = None
+        min_dist_sq = float("inf")
 
-        # tiny orthogonal offsets
-        eps = 0.3
-        if not self.check_position(unit, new_x, new_y + eps):
-            return new_x, new_y + eps
-        if not self.check_position(unit, new_x, new_y - eps):
-            return new_x, new_y - eps
+        for other in neighbors:
+            if other is unit or not other.is_alive():
+                continue
 
-        return unit.position
+            # Distance future estimée
+            dx = target_x - other.position[0]
+            dy = target_y - other.position[1]
+            dist_sq = dx * dx + dy * dy
+            radius_sum = unit.radius + other.radius
+
+            # Si collision détectée
+            if dist_sq < radius_sum * radius_sum:
+                # On garde le plus proche (celui qui nous bloque le plus)
+                if dist_sq < min_dist_sq:
+                    min_dist_sq = dist_sq
+                    collider = other
+
+        # Si on ne trouve pas de collider (fin de map), on annule le mouvement
+        if not collider:
+            return ux, uy
+
+        # Calcul du vecteur normal
+        ox, oy = collider.position
+        normal_x = ox - ux
+        normal_y = oy - uy
+
+        # normalisation
+        norm_len = math.hypot(normal_x, normal_y)
+        if norm_len == 0:
+            return ux, uy
+        normal_x /= norm_len
+        normal_y /= norm_len
+
+        # vecteur tangent
+        tangent_x = -normal_y
+        tangent_y = normal_x
+
+        # projection du mouvement sur la tangente (produit scalaire)
+        dot = move_dx * tangent_x + move_dy * tangent_y  # Direction of tangent =  V . T
+
+        # nouveau mouvement glissé
+        slide_dx = tangent_x * dot
+        slide_dy = tangent_y * dot
+
+        # application du glissement
+        slide_target_x = ux + slide_dx
+        slide_target_y = uy + slide_dy
+
+        # Vérification finale : Est-ce que ce mouvement glissé est libre ?
+        if not self.check_position(unit, slide_target_x, slide_target_y):
+            return slide_target_x, slide_target_y
+
+        # Si glisser est bloqué on annumle
+        return ux, uy
 
     def apply_soft_push(self, unit: Unit):
         ux, uy = unit.position
 
-        for other in self.units.values():
+        neighbors = self.get_potential_neighbors(ux, uy, range_tiles=1)
+
+        for other in neighbors:
             if other is unit or not other.is_alive():
                 continue
 
             ox, oy = other.position
             dx = ux - ox
             dy = uy - oy
-            dist = math.hypot(dx, dy)
 
+            dist = math.hypot(dx, dy)
             min_dist = unit.radius + other.radius
+
             if dist <= 0 or dist >= min_dist:
                 continue
 
-            # overlap amount
             overlap = min_dist - dist
 
-            # orthogonal push
-            ortho_x = dy
-            ortho_y = -dx
-            length = math.hypot(ortho_x, ortho_y)
+            # Normalisation du vecteur de collision (normal)
+            nx = dx / dist
+            ny = dy / dist
 
-            if length == 0:
-                continue
+            correction_strength = 0.5  # force de répulsion : on fait 50% de l'overlap (l'autre unité fera l'autre moitié)
+            push_x = nx * overlap * correction_strength
+            push_y = ny * overlap * correction_strength
 
-            ortho_x /= length
-            ortho_y /= length
-
-            push_x = ortho_x * overlap * 0.5
-            push_y = ortho_y * overlap * 0.5
-
-            # Apply push directly to UNIT
             ux += push_x
             uy += push_y
 
-        # Update unit position
         unit.position = (ux, uy)
 
     # -----------------------------------------------------
@@ -244,10 +289,42 @@ class Battlefield:
         r2 = radius * radius
         return [u for u in self.units.values() if (u.position[0] - x) ** 2 + (u.position[1] - y) ** 2 <= r2]
 
+    def units_in_radius_opti(self, x: float, y: float, radius: float) -> list[Unit]:
+        """Spatial optimisation version of units_in_radius()"""
+        r2 = radius * radius
+        range_tiles = int(math.ceil(radius)) + 1  # on calcule combien de tuiles couvre le rayon
+        candidates = self.get_potential_neighbors(x, y, range_tiles)
+        return [u for u in candidates if (u.position[0] - x) ** 2 + (u.position[1] - y) ** 2 <= r2]
+
     def units_in_los(self, unit: Unit) -> list[Unit]:
-        vision = getattr(unit, "vision_range", 4.0)
-        x, y = unit.position
-        return [u for u in self.units.values() if u is not unit and u.is_alive() and unit.dist_to(u) <= vision]
+        """
+        Returns all *living enemy* units within the given unit's vision range.
+        This is typically used by AI to find a target.
+        """
+        # 1. Get all units in the raw circular radius (for efficiency)
+        # visible_units = self.units_in_radius(unit.position[0], unit.position[1], unit.vision_range)
+        visible_units = self.units_in_radius_opti(unit.position[0], unit.position[1], unit.vision_range)
+        # 2. Filter the result to exclude self, dead units, and friendly units
+        enemies_in_los = [u for u in visible_units if u.is_alive() and u.owner != unit.owner]
+
+        return enemies_in_los
+
+    def get_potential_neighbors(self, x: float, y: float, range_tiles: int = 1) -> list[Unit]:
+        """
+        Optimisation : récupère les unités présentes sur la tuile (x,y) et ses voisines.
+        C'est beaucoup plus rapide que de scanner tt les unités
+        """
+        cx, cy = self._tile_index_from_pos(x, y)
+        neighbors = []
+
+        # On scanne un carré autour de la tuile centrale
+        for dx in range(-range_tiles, range_tiles + 1):
+            for dy in range(-range_tiles, range_tiles + 1):
+                nx, ny = cx + dx, cy + dy
+                tile = self.game_map.get_tile(nx, ny)
+                if tile:
+                    neighbors.extend(tile.occupants)
+        return neighbors
 
     def is_battle_over(self) -> bool:
         """Renvoie True si la bataille est finie."""
@@ -258,5 +335,5 @@ class Battlefield:
         """Renvoie un snapshot du Battlefield."""
         units_ser = []
         for u in self.units.values():
-            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "width": u.width, "height": u.height, "hibtox": u.radius})
-        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
+            units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "radius":u.radius, "hibtox": u.radius})
+        return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals],"number_of_tiles": len(self.game_map.tiles)}

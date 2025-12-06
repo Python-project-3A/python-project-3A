@@ -26,7 +26,7 @@ Order = MoveToOrder | AttackMoveOrder | AttackUnitOrder
 
 # la classe unit est maintenant entièrement des données, elle n'effectue plus d'action comme se déplacer, ces actions sont gérées par un système externe
 class Unit:
-    def __init__(self, name: str, owner: int, x: float, y: float, r: float, max_hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, speed: float, id: int = None):
+    def __init__(self, name: str, owner: int, x: float, y: float, r: float, max_hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, vision_range:float,speed: float, id: int = None):
         # identity and ownership
         self.id = id
         self.name = name
@@ -43,10 +43,11 @@ class Unit:
         self.damage = damage
         self.attack_range = attack_range
         self.attack_cooldown = attack_cooldown
+        self.vision_range = vision_range
         self.speed = speed
 
         # state
-        self.time_since_last_attack = 0.0
+        self.reload_timer = 0.0
         self.current_target: Unit | None = None
         self.current_order: Order | None = None
 
@@ -80,6 +81,13 @@ class Unit:
         """
         return self.edge_dist_to(other) <= self.attack_range
 
+    def enemy_visible(self, other: "Unit") -> bool:
+        """
+        Vérifie si l'autre unité est à portée de vision (vision_range).
+        """
+        # We use edge_dist_to to check if the unit's hitboxes are within the vision range
+        return self.edge_dist_to(other) <= self.vision_range
+
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
@@ -96,6 +104,7 @@ class Unit:
             "damage": self.damage,
             "attack_range": self.attack_range,
             "attack_cooldown": self.attack_cooldown,
+            "vision_range": self.vision_range,
             "speed": self.speed,
         }
 

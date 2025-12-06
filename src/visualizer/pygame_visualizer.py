@@ -95,6 +95,14 @@ class PygameVisualizer:
                 if event.key == pygame.K_p:
                     return "p"
         return None
+
+    def __enter__(self):
+        """Allows the visualizer to be used as a context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Ensures Pygame is shut down cleanly on exit."""
+        self.finish()
     
     def _draw_ground(self):
         """

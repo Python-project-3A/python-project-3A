@@ -57,3 +57,6 @@ class GameMap:
         tile = self.get_tile(ix, iy)
         if tile:
             tile.remove_occupant(unit)
+
+    def init_map(self):
+        self.tiles = {(i, j): Tile() for i in range(self.width) for j in range(self.height)}

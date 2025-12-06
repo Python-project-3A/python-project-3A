@@ -33,13 +33,13 @@ Examples:
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
     run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
     run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
-
+    
     # Visualizer choice
     viz_group = run_parser.add_mutually_exclusive_group()
     viz_group.add_argument("-gui", action="store_true", help="Use Pygame GUI visualizer.")
     viz_group.add_argument("-t", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
 
-    run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
+    run_parser.add_argument("--speed", type=int, default=30, help="Target ticks per second (TPS). 0 for max speed in headless mode.")
 
     # --- COMMAND: load (TODO) ---
     load_parser = subparsers.add_parser("load", help="Load a saved game (TODO)")
@@ -132,22 +132,29 @@ def command_run(args):
     print(f" Spawned {units_1} units for Player 1")
 
     # Create visualizer
+    input_provider = None
+    visualizer = None
+    target_tps = args.speed
+
     if args.gui:  # If -gui is specified
         print("\n🚀 Launching Pygame visualizer...")
         visualizer = PygameVisualizer(battlefield=bf)
-    else:  # If -t is specified or no visualizer flag is given
+        input_provider = visualizer  # Pygame visualizer handles its own input
+    elif args.t:  # If -t is specified or no visualizer flag is given
+        print("\n🖥️  Launching terminal visualizer...")
         visualizer = CLIVisualizer(bf.width, bf.height)
+        input_provider = ConsoleInputProvider()
+    else: # Headless mode
+        target_tps = 0 # Set to 0 for max speed
+        print("\n⚡ Running simulation without visualization (headless mode)...")
+        input_provider = ConsoleInputProvider()
 
     # Create and run simulation
-    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf, tick_duration=args.speed)
+    sim = Simulation(game_map=bf.game_map, generals=bf.generals, battlefield=bf)
 
     print("\n🎬 Starting battle...\n")
-    if args.gui:
-        sim.run(input_provider=visualizer, visualizer=visualizer, target_tps=30)
-    else:
-        # Le 'with' garantit que le terminal Linux sera réparé même en cas de crash
-        with ConsoleInputProvider() as input_sys:
-            sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=30)
+    with input_provider:
+        sim.run(input_provider=input_provider, visualizer=visualizer, target_tps=target_tps)
 
     # Print results
     print_battle_result(bf)
