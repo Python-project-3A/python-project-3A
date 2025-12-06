@@ -78,22 +78,38 @@ class Simulation:
                     self.game_speed = max(0.2, self.game_speed - 0.2)
                 case "r":
                     self.game_speed = 1
-            # Only move camera if we are in terminal view
-            if isinstance(visualizer, CLIVisualizer) and key in ["w", "a", "s", "d", "z", "q"]:
-                step = 2  # vitesse de déplacement de la cam, on met ce qu'on veut
+            
+            # --- ZOOM CONTROLS (GUI only) ---
+            if isinstance(visualizer, PygameVisualizer) and key in ["zoom_in", "zoom_out"]:
+                direction = 1 if key == "zoom_in" else -1
+                visualizer.zoom(direction)
+
+            # --- CAMERA CONTROLS ---
+            if hasattr(visualizer, 'move_camera') and key in ["w", "a", "s", "d", "z", "q"]:
+                # GUI camera moves the offset, so directions are inverted vs CLI
+                is_gui = isinstance(visualizer, PygameVisualizer)
+                step = 20 if is_gui else 2
+                
+                dx, dy = 0, 0
                 match key:
                     case "z":
-                        visualizer.move_camera(0, -step)  # haut
+                        dy = -step  # haut
                     case "w":
-                        visualizer.move_camera(0, -step)  # haut
+                        dy = -step  # haut
                     case "s":
-                        visualizer.move_camera(0, step)  # bas
+                        dy = step   # bas
                     case "q":
-                        visualizer.move_camera(-step, 0)  # gauche
+                        dx = -step  # gauche
                     case "a":
-                        visualizer.move_camera(-step, 0)  # gauche
+                        dx = -step  # gauche
                     case "d":
-                        visualizer.move_camera(step, 0)  # droite
+                        dx = step   # droite
+                
+                # Invert for GUI
+                if is_gui:
+                    visualizer.move_camera(-dx, -dy)
+                else:
+                    visualizer.move_camera(dx, dy)
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:

@@ -20,6 +20,10 @@ class PygameVisualizer:
         Initializes Pygame, the screen, and visualizer settings.
         """
         pygame.init()
+
+        # Enable key repeat: (delay_ms, interval_ms)
+        pygame.key.set_repeat(500, 50)
+
         self.battlefield = battlefield
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -52,6 +56,7 @@ class PygameVisualizer:
         # Determine scaling factor if map is too large for the screen
         self.scale_factor = 1.0
         padding_ratio = 0.9  # Use 90% of screen for map to leave some margin
+        self.base_scale_factor = 1.0 # To keep the initial fit-to-screen scale
         if total_projected_width_raw > self.screen_width * padding_ratio or total_projected_height_raw > self.screen_height * padding_ratio:
             scale_x = (self.screen_width * padding_ratio) / total_projected_width_raw
             scale_y = (self.screen_height * padding_ratio) / total_projected_height_raw
@@ -73,6 +78,27 @@ class PygameVisualizer:
         self.camera_offset_x = (self.screen_width / 2) - (projected_min_x + total_projected_width / 2)
         self.camera_offset_y = (self.screen_height / 2) - (projected_min_y + total_projected_height / 2)
     
+    def zoom(self, direction: int):
+        """
+        Adjusts the zoom level.
+        `direction` > 0 for zoom in, < 0 for zoom out.
+        """
+        zoom_step = 0.1
+        if direction > 0:
+            self.scale_factor *= (1 + zoom_step)
+        else:
+            self.scale_factor *= (1 - zoom_step)
+        
+        self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
+        self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
+
+    def move_camera(self, dx: int, dy: int):
+        """
+        Moves the camera by a given pixel offset.
+        """
+        self.camera_offset_x += dx
+        self.camera_offset_y += dy
+
     def world_to_screen(self, world_x, world_y):
         """
         Converts world (grid) coordinates to isometric screen coordinates.
@@ -89,11 +115,21 @@ class PygameVisualizer:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "escape"
+            if event.type == pygame.MOUSEWHEEL:
+                if event.y > 0:
+                    return "zoom_in"
+                elif event.y < 0:
+                    return "zoom_out"
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     return "escape"
-                if event.key == pygame.K_q:
-                    return "q"
+                # Camera Movement Keys
+                if event.key in (pygame.K_w, pygame.K_z): return "w" # z for AZERTY
+                if event.key == pygame.K_s: return "s"
+                if event.key in (pygame.K_a, pygame.K_q): return "a" # q for AZERTY
+                if event.key == pygame.K_d: return "d"
+
+                # Simulation Control Keys
                 if event.key == pygame.K_p:
                     return "p"
                 if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
