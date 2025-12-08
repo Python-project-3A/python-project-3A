@@ -201,28 +201,81 @@ class CombatSystem:
     """Handles all combat logic"""
 
     @staticmethod
-    def attack(attacker: "Unit", defender: "Unit") -> bool:
+    def attack(attacker: "Unit", defender: "Unit", battlefield: "Battlefield") -> bool:
         """
-        Attaque une unité si elle est à portée et que le cooldown est terminé.
-        Modifie la vie de la cible et met à jour le temps de la dernière attaque.
+        Gère l'attaque avec la formule complète :
+        Damage = Max(1, k_elev * (Max(0, Base_Atk - Base_Arm) + Bonuses))
         """
-
         if attacker.reload_timer > 0:
             return False
 
-        # Check if in range
+        # Vérification de la portée
         if not attacker.can_attack(defender):
             return False
 
-        # Apply damage
-        damage = max(0, attacker.damage - defender.armor)
-        defender.hp = max(0, defender.hp - damage)  # pour ne pas avoir d'hp < 0
+        # --- 1. DÉTERMINATION DU TYPE D'ATTAQUE (Mêlée vs Percée) ---
+        # Si l'unité a des dégâts de percée (archer), on utilise l'armure de percée
+        if getattr(attacker, "damage_pierce", 0) > 0:
+            base_attack = attacker.damage_pierce
+            target_armor = getattr(defender, "armor_pierce", 0)
+        else:
+            base_attack = getattr(attacker, "damage_melee", 0)
+            target_armor = getattr(defender, "armor_melee", 0)
 
-        # reset du timer avec la valeur du cooldown
+        # Calcul des dégâts de base (ne peut pas être négatif)
+        base_damage = max(0, base_attack - target_armor)
+
+        # --- 2. CALCUL DES BONUS (Contres) ---
+        # On parcourt tous les attributs de l'attaquant pour trouver les "damage_XYZ"
+        # Et on regarde si le défenseur a l'armure correspondante "armor_XYZ"
+        bonus_damage = 0
+        
+        # Liste des classes possibles basées sur ton JSON (à compléter si besoin)
+        # Le fait d'avoir "armor_cavalry": 0 dans le JSON du Knight signifie qu'il EST de la cavalerie
+        unit_classes = ["cavalry", "spearmen"]
+
+        for unit_class in unit_classes:
+            bonus_attr = f"damage_{unit_class}"
+            armor_attr = f"armor_{unit_class}"
+
+            # Si l'attaquant a un bonus contre ce type ET que le défenseur EST de ce type
+            if hasattr(attacker, bonus_attr) and hasattr(defender, armor_attr):
+                bonus_val = getattr(attacker, bonus_attr)
+                # Note: Dans AOE2, il y a aussi une "armure de classe" qui réduit le bonus
+                # Ici on simplifie : si defender.armor_cavalry existe, on prend le bonus complet
+                # Sauf si tu veux soustraire la valeur de defender.armor_cavalry
+                class_armor = getattr(defender, armor_attr, 0)
+                bonus_damage += max(0, bonus_val - class_armor)
+
+        # --- 3. GESTION DE L'ÉLÉVATION (High Ground) ---
+        #[cite: 270]: x1.25 damage si plus haut, x0.75 si plus bas
+        k_elev = 1.0
+        
+        # On récupère la hauteur des tuiles via la GameMap
+        # (Supposons que game_map.get_tile(x, y) renvoie un objet avec un attribut 'elevation')
+        # A DECOMMENTER QUAND TA GAMEMAP GÉRERA L'ELEVATION
+        """
+        attacker_tile = battlefield.game_map.get_tile(*attacker.position)
+        defender_tile = battlefield.game_map.get_tile(*defender.position)
+        if attacker_tile and defender_tile:
+            if attacker_tile.elevation > defender_tile.elevation:
+                k_elev = 1.25
+            elif attacker_tile.elevation < defender_tile.elevation:
+                k_elev = 0.75
+        """
+
+        # --- 4. FORMULE FINALE ---
+        # [cite: 116] Damage = max(1, ...)
+        total_damage = (base_damage + bonus_damage) * k_elev
+        final_damage = int(max(1, total_damage))
+
+        # Application des dégâts
+        defender.hp = max(0, defender.hp - final_damage)
+
+        # Reset du cooldown
         attacker.reload_timer = attacker.attack_cooldown
 
         return True
-
     @staticmethod
     def choose_nearest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
         """Choose nearest living enemy"""
@@ -342,7 +395,7 @@ class UnitController:
 
             if target:
                 if unit.can_attack(target):
-                    CombatSystem.attack(unit, target)
+                    CombatSystem.attack(unit, target, battlefield)
                 else:
                     # Si on chasse une unité, on utilise move_towards (pas de A* dynamique pour l'instant)
                     MovementSystem.move_towards(unit, target, dt, battlefield)
@@ -359,7 +412,7 @@ class UnitController:
             target = order["target"]
             if target and target.is_alive():
                 if unit.can_attack(target):
-                    CombatSystem.attack(unit, target)
+                    CombatSystem.attack(unit, target, battlefield)
                 else:
                     MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
             else:
@@ -368,7 +421,7 @@ class UnitController:
             target = order["target"]
             if target and target.is_alive():
                 if unit.can_attack(target):
-                    CombatSystem.attack(unit, target)
+                    CombatSystem.attack(unit, target, battlefield)
 
                     # Clear path data after engaging
                     if "path" in order:
