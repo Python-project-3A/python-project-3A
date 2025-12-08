@@ -1,4 +1,5 @@
 import time
+import random
 from src.engine.battlefield import Battlefield
 from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
@@ -25,16 +26,18 @@ class Simulation:
         self.snapshot_utility = HTMLSnapshot(battlefield)
 
     def tick(self, constante_tick_duration):
-        # TODO : utiliser contstante_tick_duration comme vitesse constante pour que les untités avance toujours de la même distance par tick.
         """Exécute un tick unique."""
         self.tick_count += 1
 
-        # 1. Les généraux réfléchissent et donnent des ordres
+        # 1. Les généraux réfléchissent
         for general in self.generals:
             general.update(self.battlefield, self.tick_count)
 
         # 2. Les unités agissent
-        for unit in self.battlefield.get_all_units():
+        all_units=self.battlefield.get_all_units()
+        random.shuffle(all_units)
+
+        for unit in all_units:
             if unit.is_alive():
                 UnitController.update(unit, self.battlefield, constante_tick_duration)
 
@@ -42,7 +45,7 @@ class Simulation:
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, input_provider, target_tps=30, max_ticks=20000, visualizer=None):
+    def run(self, input_provider, target_tps=30, max_ticks=20000,visualizer=None):
         """Boucle principale."""
         self.is_running = True
 

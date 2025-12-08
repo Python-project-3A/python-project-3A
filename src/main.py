@@ -1,5 +1,6 @@
 import argparse
 import sys
+import random
 
 from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
