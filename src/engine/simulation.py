@@ -73,62 +73,17 @@ class Simulation:
             # --- TERMINAL INPUTS ---
             if not is_gui:
                 terminal_key = input_provider.get_key()
-                match terminal_key:
-                    case "p":
-                        self.paused = not self.paused
-                    case "escape":
-                        self.is_running = False
-                    case "=":
-                        self.game_speed += 0.2
-                    case "-":
-                        self.game_speed = max(0.2, self.game_speed - 0.2)
-                    case "r":
-                        self.game_speed = 1
-                    case "tab":
-                        self.snapshot_utility.save_and_open_html_file(self.tick_count)
+                self.base_key_matching(terminal_key)
 
                 if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
-                    match terminal_key:
-                        case "z":
-                            visualizer.move_camera(0, -step)  # haut
-                        case "w":
-                            visualizer.move_camera(0, -step)  # haut
-                        case "s":
-                            visualizer.move_camera(0, step)  # bas
-                        case "q":
-                            visualizer.move_camera(-step, 0)  # gauche
-                        case "a":
-                            visualizer.move_camera(-step, 0)  # gauche
-                        case "d":
-                            visualizer.move_camera(step, 0)  # droite
+                    self.direction_key_matching(terminal_key, step, visualizer=visualizer)
+            
             # --- GUI INPUTS ---
             if is_gui:
                 pygame_key = visualizer.get_key()
+                self.base_key_matching(pygame_key)
+                self.direction_key_matching(pygame_key, step, visualizer=visualizer)
                 match pygame_key:
-                    case "p":
-                        self.paused = not self.paused
-                    case "escape":
-                        self.is_running = False
-                    case "=":
-                        self.game_speed += 0.2
-                    case "-":
-                        self.game_speed = max(0.2, self.game_speed - 0.2)
-                    case "r":
-                        self.game_speed = 1
-                    case "tab":
-                        self.snapshot_utility.save_and_open_html_file(self.tick_count)                
-                    case "z":
-                        visualizer.move_camera(0, -step)  # haut
-                    case "w":
-                        visualizer.move_camera(0, -step)  # haut
-                    case "s":
-                        visualizer.move_camera(0, step)  # bas
-                    case "q":
-                        visualizer.move_camera(-step, 0)  # gauche
-                    case "a":
-                        visualizer.move_camera(-step, 0)  # gauche
-                    case "d":
-                        visualizer.move_camera(step, 0)  # droite
                     case "zoom_in":
                         zoom_direction = visualizer.get_zoom()
                         visualizer.zoom(zoom_direction)
@@ -163,3 +118,34 @@ class Simulation:
                 time.sleep(wait)
 
         print(f" Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s")
+
+    def base_key_matching(self, key:str):
+        match key:
+            case "p":
+                self.paused = not self.paused
+            case "escape":
+                self.is_running = False
+            case "=":
+                self.game_speed += 0.2
+            case "-":
+                self.game_speed = max(0.2, self.game_speed - 0.2)
+            case "r":
+                self.game_speed = 1
+            case "tab":
+                self.snapshot_utility.save_and_open_html_file(self.tick_count)
+
+    @staticmethod
+    def direction_key_matching(key:str, step:int, visualizer):
+        match key:
+            case "z":
+                visualizer.move_camera(0, -step)  # haut
+            case "w":
+                visualizer.move_camera(0, -step)  # haut
+            case "s":
+                visualizer.move_camera(0, step)  # bas
+            case "q":
+                visualizer.move_camera(-step, 0)  # gauche
+            case "a":
+                visualizer.move_camera(-step, 0)  # gauche
+            case "d":
+                visualizer.move_camera(step, 0)  # droite
