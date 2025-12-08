@@ -70,28 +70,54 @@ class Simulation:
         while self.is_running and self.tick_count < max_ticks:
             loop_start = time.time()
 
-            # --- INPUTS ---
-            key = input_provider.get_key()
-            match key:
-                case "p":
-                    print(f"{key} detectee")
-                    self.paused = not self.paused
-                case "escape":
-                    self.is_running = False
-                case "=":
-                    self.game_speed += 0.2
-                case "-":
-                    self.game_speed = max(0.2, self.game_speed - 0.2)
-                case "r":
-                    self.game_speed = 1
-                case "\t":
-                    self.snapshot_utility.save_and_open_html_file(self.tick_count)
+            # --- TERMINAL INPUTS ---
+            if not is_gui:
+                terminal_key = input_provider.get_key()
+                match terminal_key:
+                    case "p":
+                        self.paused = not self.paused
+                    case "escape":
+                        self.is_running = False
+                    case "=":
+                        self.game_speed += 0.2
+                    case "-":
+                        self.game_speed = max(0.2, self.game_speed - 0.2)
+                    case "r":
+                        self.game_speed = 1
+                    case "tab":
+                        self.snapshot_utility.save_and_open_html_file(self.tick_count)
 
-            if visualizer :#and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
-
-                match key:
+                if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
+                    match terminal_key:
+                        case "z":
+                            visualizer.move_camera(0, -step)  # haut
+                        case "w":
+                            visualizer.move_camera(0, -step)  # haut
+                        case "s":
+                            visualizer.move_camera(0, step)  # bas
+                        case "q":
+                            visualizer.move_camera(-step, 0)  # gauche
+                        case "a":
+                            visualizer.move_camera(-step, 0)  # gauche
+                        case "d":
+                            visualizer.move_camera(step, 0)  # droite
+            # --- GUI INPUTS ---
+            if is_gui:
+                pygame_key = visualizer.get_key()
+                match pygame_key:
+                    case "p":
+                        self.paused = not self.paused
+                    case "escape":
+                        self.is_running = False
+                    case "=":
+                        self.game_speed += 0.2
+                    case "-":
+                        self.game_speed = max(0.2, self.game_speed - 0.2)
+                    case "r":
+                        self.game_speed = 1
+                    case "tab":
+                        self.snapshot_utility.save_and_open_html_file(self.tick_count)                
                     case "z":
-                        print(f"{key} detectee")
                         visualizer.move_camera(0, -step)  # haut
                     case "w":
                         visualizer.move_camera(0, -step)  # haut
@@ -103,13 +129,14 @@ class Simulation:
                         visualizer.move_camera(-step, 0)  # gauche
                     case "d":
                         visualizer.move_camera(step, 0)  # droite
+                    case "zoom_in":
+                        zoom_direction = visualizer.get_zoom()
+                        visualizer.zoom(zoom_direction)
+                    case "zoom_out":
+                        zoom_direction = visualizer.get_zoom()
+                        visualizer.zoom(zoom_direction)
 
-                # if is_gui:
-                #     zoom_direction = visualizer.get_zoom()
-                #     if not zoom_direction:
-                #         continue
-                #     else:
-                #         visualizer.zoom(zoom_direction)
+
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:

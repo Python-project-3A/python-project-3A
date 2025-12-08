@@ -46,6 +46,8 @@ class ConsoleInputProvider:
                 char = msvcrt.getch()
                 if char == b'\x1b':  # Escape key
                     return "escape"
+                if char == "\t":
+                    return "tab"
                 try:
                     return char.decode().lower()
                 except (UnicodeDecodeError, AttributeError):
@@ -59,5 +61,7 @@ class ConsoleInputProvider:
                 char = sys.stdin.read(1)
                 if char == '\x1b': # Escape key
                     return "escape"
+                if char == "\t":
+                    return "tab"
                 return char.lower()
         return None

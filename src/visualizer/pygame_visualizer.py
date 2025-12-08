@@ -134,10 +134,13 @@ class PygameVisualizer:
                     return "p"
                 if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
                     return "="
-                if event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
+                if event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS or event.key == pygame.K_6:
                     return "-"
                 if event.key == pygame.K_r:
                     return "r"
+                if event.key == pygame.K_TAB:
+                    return "tab"
+
         return None
 
     def get_zoom(self):
