@@ -6,6 +6,7 @@ from src.engine.battlefield import Battlefield
 from src.engine.simulation import Simulation
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
+from src.general.focus_fire import GeneralFocusFire
 from src.scenarios.scenario_loader import ScenarioLoader
 from src.engine.input_provider import ConsoleInputProvider
 
@@ -17,7 +18,8 @@ def parse_args():
         epilog="""
 Examples:
   python -m src.main run small_battle daft braindead
-  python -m src.main run knights_vs_pikemen smart daft -t
+  python -m src.main run small_battle focus_fire braindead
+  python -m src.main run knights_vs_pikemen focus_fire daft -t
   python -m src.main list
         """,
     )
@@ -30,8 +32,8 @@ Examples:
     # --- COMMAND: run ---
     run_parser = subparsers.add_parser("run", help="Run a battle scenario")
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
-    run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
-    run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
+    run_parser.add_argument("general0", type=str, choices=["braindead", "daft", "focus_fire"], help="General for player 0")
+    run_parser.add_argument("general1", type=str, choices=["braindead", "daft", "focus_fire"], help="General for player 1")
     run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
     run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
@@ -41,7 +43,7 @@ Examples:
 
     # --- COMMAND: tourney (TODO) ---
     tourney_parser = subparsers.add_parser("tourney", help="Run tournament (TODO)")
-    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft"], help="Generals to include in tournament")
+    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft", "focus_fire"], help="Generals to include in tournament")
     tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
     tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
     tourney_parser.add_argument("--no-alternate", action="store_true", help="Don't alternate player positions")
@@ -55,6 +57,8 @@ def create_general(general_type: str, player_id: int):
         return GeneralBraindead(player_id)
     elif general_type == "daft":
         return GeneralDaft(player_id)
+    elif general_type == "focus_fire":
+        return GeneralFocusFire(player_id)
     else:
         raise ValueError(f"Unknown general type: {general_type}")
 
