@@ -75,7 +75,7 @@ class Simulation:
             match key:
                 case "p":
                     self.paused = not self.paused
-                case "w":
+                case "escape":
                     self.is_running = False
                 case "=":
                     self.game_speed += 0.2

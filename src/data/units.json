@@ -1,6 +1,6 @@
 {
   "Pikeman": {
-    "max_hp": 55,
+    "hp": 55,
     "armor": 0,
     "damage": 4,
     "attack_range": 0.5,
@@ -12,7 +12,7 @@
     "r": 0.3
   },
   "Knight": {
-    "max_hp": 100,
+    "hp": 100,
     "armor": 2,
     "damage": 10,
     "attack_range": 0.5,
@@ -24,7 +24,7 @@
     "r": 0.7
   },
   "Crossbowman": {
-    "max_hp": 35,
+    "hp": 35,
     "armor": 0,
     "damage": 5,
     "attack_range": 5.0,
@@ -36,7 +36,7 @@
     "r": 0.4
   },
   "LongSwordsman": {
-    "max_hp": 60,
+    "hp": 60,
     "armor": 0,
     "damage": 9,
     "attack_range": 0.5,
