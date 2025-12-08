@@ -74,6 +74,7 @@ class Simulation:
             key = input_provider.get_key()
             match key:
                 case "p":
+                    print(f"{key} detectee")
                     self.paused = not self.paused
                 case "escape":
                     self.is_running = False
@@ -86,9 +87,11 @@ class Simulation:
                 case "\t":
                     self.snapshot_utility.save_and_open_html_file(self.tick_count)
 
-            if visualizer and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
+            if visualizer :#and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
+
                 match key:
                     case "z":
+                        print(f"{key} detectee")
                         visualizer.move_camera(0, -step)  # haut
                     case "w":
                         visualizer.move_camera(0, -step)  # haut
@@ -100,6 +103,13 @@ class Simulation:
                         visualizer.move_camera(-step, 0)  # gauche
                     case "d":
                         visualizer.move_camera(step, 0)  # droite
+
+                # if is_gui:
+                #     zoom_direction = visualizer.get_zoom()
+                #     if not zoom_direction:
+                #         continue
+                #     else:
+                #         visualizer.zoom(zoom_direction)
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:

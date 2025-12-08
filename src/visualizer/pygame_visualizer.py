@@ -140,11 +140,17 @@ class PygameVisualizer:
                     return "r"
         return None
 
+    def get_zoom(self):
+        event = pygame.event.poll()
+        if event == pygame.MOUSEWHEEL:
+            return event.y
+        
+
     def __enter__(self):
         """Allows the visualizer to be used as a context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self):
         """Ensures Pygame is shut down cleanly on exit."""
         self.finish()
     
