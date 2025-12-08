@@ -300,7 +300,7 @@ class CombatSystem:
         return min(living_enemies, key=lambda e: e.hp)
 
     @staticmethod
-    def get_enemies_in_range(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
+    def get_visible_enemies(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
         """
         Filter enemies to only those within the unit's vision range
 

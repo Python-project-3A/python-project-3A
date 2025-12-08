@@ -21,25 +21,45 @@ class GeneralDaft(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="Major DAFT")
 
-    def update(self, battlefield: Battlefield, tick: int) -> None:
+    def update(self, battlefield: "Battlefield", tick: int) -> None:
         """
-        Simple strategy: every unit attacks the nearest enemy.
+        DAFT: Agressivité totale.
+        - Utilise la vision globale du Général.
+        - Ignore la vision_range locale.
+        - Chasse l'ennemi le plus proche sur toute la carte.
         """
         my_units = self.get_my_units(battlefield)
         enemies = self.get_enemy_units(battlefield)
-        if not enemies:
+
+        # Filtre ennemis vivants
+        alive_enemies = [e for e in enemies if e.is_alive()]
+        if not alive_enemies:
             return
+
+        # Gestion anti-embouteillage (Conga Line)
+        target_counts = {e.id: 0 for e in alive_enemies}
+        CROWDING_PENALTY = 3.0 # Ajoute virtuellement 3m de distance par attaquant déjà dessus
 
         for unit in my_units:
             if not unit.is_alive():
                 continue
 
-            # --- CORRECTION : PERSISTENCE ---
-            # Si on a déjà une cible vivante, on continue de la focus (sauf si daft doit être plus intelligent et changer de cible, mais a priori non)
-            if unit.current_order and unit.current_order["type"] == "attack_unit" and unit.current_order["target"].is_alive():
-                continue
-            # -------------------------------
+            # 1. Trouver la cible optimale sur TOUTE la carte
+            best_target = None
+            best_score = float('inf')
 
-            target = CombatSystem.choose_nearest_target(unit, enemies)
-            if target:
-                unit.current_order = {"type": "attack_unit", "target": target}
+            for enemy in alive_enemies:
+                dist = unit.dist_to(enemy)
+                # On choisit le plus proche, mais on évite ceux qui sont déjà submergés
+                score = dist + (target_counts[enemy.id] * CROWDING_PENALTY)
+                
+                if score < best_score:
+                    best_score = score
+                    best_target = enemy
+
+            # 2. Donner l'ordre de chasse
+            if best_target:
+                # L'ordre 'attack_unit' va déclencher le mouvement via UnitController
+                # jusqu'à ce que l'unité soit à portée d'attaque.
+                unit.current_order = {"type": "attack_unit", "target": best_target}
+                target_counts[best_target.id] += 1
