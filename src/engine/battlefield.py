@@ -376,5 +376,5 @@ class Battlefield:
             # winner_id = max(counts, key=counts.get)
             # winner_general = self.generals[winner_id]
             # print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
-            print(f" PARTIE STOP : BOTH TEAMS ARE ALIVE")
+            print(" PARTIE STOP : BOTH TEAMS ARE ALIVE")
         print("=" * 60 + "\n")

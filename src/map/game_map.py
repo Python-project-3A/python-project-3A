@@ -60,3 +60,4 @@ class GameMap:
 
     def init_map(self):
         self.tiles = {(i, j): Tile() for i in range(self.width) for j in range(self.height)}
+        

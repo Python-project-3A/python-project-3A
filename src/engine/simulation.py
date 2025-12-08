@@ -5,6 +5,7 @@ from src.cli.cli import CLIVisualizer
 from src.map.game_map import GameMap
 from src.visualizer.pygame_visualizer import PygameVisualizer
 from .system import UnitController
+from .html_snapshot import HTMLSnapshot
 
 
 class Simulation:
@@ -23,6 +24,7 @@ class Simulation:
         self.is_running = False
         self.paused = False
         self.game_speed = 1
+        self.snapshot_utility = HTMLSnapshot(battlefield)
 
     def tick(self, constante_tick_duration):
         # TODO : utiliser contstante_tick_duration comme vitesse constante pour que les untités avance toujours de la même distance par tick.
@@ -61,6 +63,9 @@ class Simulation:
         if visualizer:
             visualizer.render(self.battlefield, 0, speed=self.game_speed, paused=self.paused)  # On affiche le TICK 0, pour voir la position initiale des unités.
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
+        
+        is_gui = isinstance(visualizer, PygameVisualizer)
+        step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
 
         while self.is_running and self.tick_count < max_ticks:
             loop_start = time.time()
@@ -70,7 +75,7 @@ class Simulation:
             match key:
                 case "p":
                     self.paused = not self.paused
-                case "escape":
+                case "w":
                     self.is_running = False
                 case "=":
                     self.game_speed += 0.2
@@ -78,38 +83,23 @@ class Simulation:
                     self.game_speed = max(0.2, self.game_speed - 0.2)
                 case "r":
                     self.game_speed = 1
-            
-            # --- ZOOM CONTROLS (GUI only) ---
-            if isinstance(visualizer, PygameVisualizer) and key in ["zoom_in", "zoom_out"]:
-                direction = 1 if key == "zoom_in" else -1
-                visualizer.zoom(direction)
+                case "\t":
+                    self.snapshot_utility.save_and_open_html_file(self.tick_count)
 
-            # --- CAMERA CONTROLS ---
-            if hasattr(visualizer, 'move_camera') and key in ["w", "a", "s", "d", "z", "q"]:
-                # GUI camera moves the offset, so directions are inverted vs CLI
-                is_gui = isinstance(visualizer, PygameVisualizer)
-                step = 20 if is_gui else 2
-                
-                dx, dy = 0, 0
+            if visualizer and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
                 match key:
                     case "z":
-                        dy = -step  # haut
+                        visualizer.move_camera(0, -step)  # haut
                     case "w":
-                        dy = -step  # haut
+                        visualizer.move_camera(0, -step)  # haut
                     case "s":
-                        dy = step   # bas
+                        visualizer.move_camera(0, step)  # bas
                     case "q":
-                        dx = -step  # gauche
+                        visualizer.move_camera(-step, 0)  # gauche
                     case "a":
-                        dx = -step  # gauche
+                        visualizer.move_camera(-step, 0)  # gauche
                     case "d":
-                        dx = step   # droite
-                
-                # Invert for GUI
-                if is_gui:
-                    visualizer.move_camera(-dx, -dy)
-                else:
-                    visualizer.move_camera(dx, dy)
+                        visualizer.move_camera(step, 0)  # droite
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:

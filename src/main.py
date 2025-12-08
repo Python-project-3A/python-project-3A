@@ -116,38 +116,32 @@ def run_battle(args):
 
     # 4. Setup View & Input Provider
     visualizer = None
-    input_provider = None
-    target_tps = args.speed
 
     if args.gui:
-        print("\n🚀 Launching Pygame visualizer...")
         visualizer = PygameVisualizer(battlefield=bf)
-        input_provider = visualizer  # The visualizer itself handles input
     elif args.t:
-        print("\n🖥️  Launching terminal visualizer...")
         visualizer = CLIVisualizer(width, height)
-        input_provider = ConsoleInputProvider()
-    else:  # Headless mode
-        target_tps = 0  # Set to 0 for max speed
-        print("\n⚡ Running simulation without visualization (headless mode)...")
-        input_provider = ConsoleInputProvider()
 
     # 5. Run Simulation
     sim = Simulation(bf.game_map, bf.generals, bf)
+    target_tps = 30 if visualizer else 0
 
     # 6. Affichage des headers statiques
+
     print(f"\n Scenario: {scenario_data['name']}")
     print(f"\n {scenario_data.get('description', '')}")
     print(f" Map: {width}x{height}")
     print(f" Spawned {len(bf.units_by_owner(0))} units for Player 0")
     print(f" Spawned {len(bf.units_by_owner(1))} units for Player 1")
-    print("\n🎬 Starting battle...\n")
+    print("\n Starting battle...\n")
 
-    with input_provider:
-        sim.run(input_provider, visualizer=visualizer, target_tps=target_tps)
+    with ConsoleInputProvider() as input_sys:
+        # On injecte le système d'input dans la simulation
+        sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=target_tps)
 
-    # 7. Results
+    # Print results
     bf.print_battle_result()
+
 
 
 def main():
