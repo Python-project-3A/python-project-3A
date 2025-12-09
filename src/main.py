@@ -127,7 +127,7 @@ def run_tournament(args):
         return
 
     start_time = time.time()
-    played_rounds = 0  # Compteur de matchs réellement joués
+    played_rounds = 0
 
     # --- BLOC TRY / EXCEPT POUR CAPTURER L'INTERRUPTION ---
     try:
@@ -137,7 +137,7 @@ def run_tournament(args):
                 sys.stdout.write(".")
                 sys.stdout.flush()
 
-            # 1. Setup Battlefield
+            # Setup Battlefield
             bf = Battlefield(scenario_data["map"]["width"], scenario_data["map"]["height"])
 
             current_g0_type = gen_type_1
@@ -148,11 +148,11 @@ def run_tournament(args):
             overrides = {0: current_g0_type, 1: current_g1_type}
             ScenarioLoader.spawn_scenario(scenario_data, bf, overrides)
 
-            # 2. Simulation Headless
+            # Simulation Headless
             sim = Simulation(bf.game_map, bf.generals, bf)
             sim.run(None, visualizer=None, target_tps=0)
 
-            # 3. Résultat
+            # Résultat
             survivors = {}
             for u in bf.get_all_units():
                 if u.is_alive():
@@ -169,9 +169,6 @@ def run_tournament(args):
             if winner == "draw":
                 wins["draw"] += 1
             else:
-                # Comme on ne swap plus, c'est simple :
-                # winner 0 = Gen 1
-                # winner 1 = Gen 2
                 wins[winner] += 1
 
             played_rounds += 1
@@ -190,19 +187,21 @@ def run_tournament(args):
     print(f"\n{'=' * 60}")
     print(f"RESULTS ({played_rounds} rounds played in {total_time:.2f}s)")
     print(f"{'=' * 60}")
-    print(f"General 1 ({gen_type_1}): {wins[0]} wins ({wins[0] / played_rounds * 100:.1f}%)")
-    print(f"General 2 ({gen_type_2}): {wins[1]} wins ({wins[1] / played_rounds * 100:.1f}%)")
+    win_rate_0 = wins[0] / played_rounds * 100
+    win_rate_1 = wins[1] / played_rounds * 100
+    print(f"General 1 ({gen_type_1}): {wins[0]} wins ({win_rate_0:.1f}%)")
+    print(f"General 2 ({gen_type_2}): {wins[1]} wins ({win_rate_1:.1f}%)")
     print(f"Draws: {wins['draw']} ({((wins['draw'] / played_rounds) * 100):.1f}%)")
     print(f"{'=' * 60}")
 
     # Analyse de Biais
     if gen_type_1 == gen_type_2:
-        diff = abs(wins[0] - wins[1])
-        print(f"Vérification d'équité : L'écart est de {diff}.")
-        if diff > (rounds * 0.1):  # Plus de 10% d'écart
-            print(f" WARNING: Significant biais detecte ! Le jeu favorise un camp : au moins 10% de diff.")
+        diff = abs(win_rate_0 - win_rate_1)
+        print(f"Vérification d'équité : L'écart est de {diff:.0f}%.")
+        if diff > 10.0:  # 10% d'écart
+            print(f" WARNING: Significant biais detecte (>10%) ! Le jeu favorise un camp.")
         else:
-            print(f" Le jeu semble équilibré, pas de biais detecte : <= 10% diff")
+            print(f" Le jeu semble équilibré.")
 
 
 def run_battle(args):
