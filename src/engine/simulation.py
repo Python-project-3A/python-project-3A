@@ -34,7 +34,7 @@ class Simulation:
             general.update(self.battlefield, self.tick_count)
 
         # 2. Les unités agissent
-        all_units=self.battlefield.get_all_units()
+        all_units = list(self.battlefield.get_all_units())
         random.shuffle(all_units)
 
         for unit in all_units:
@@ -45,7 +45,7 @@ class Simulation:
         if self.battlefield.is_battle_over():
             self.is_running = False
 
-    def run(self, input_provider, target_tps=30, max_ticks=20000,visualizer=None):
+    def run(self, input_provider, target_tps=30, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
 
