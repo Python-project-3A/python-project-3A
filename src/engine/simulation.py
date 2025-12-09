@@ -23,7 +23,6 @@ class Simulation:
         self.game_speed = 1
 
     def tick(self, constante_tick_duration):
-        # TODO : utiliser contstante_tick_duration comme vitesse constante pour que les untités avance toujours de la même distance par tick.
         """Exécute un tick unique."""
         self.tick_count += 1
 
@@ -44,8 +43,10 @@ class Simulation:
         """Boucle principale."""
         self.is_running = True
 
-        # CONSTANTE PHYSIQUE : Un tick vaut TOUJOURS 1/30ème de seconde en jeu. Peu importe si l'ordi le calcule en 1ms ou 1h.
-        LOGICAL_DT = 1.0 / 30.0
+        if visualizer:
+            LOGICAL_DT = 1.0 / 30.0
+        else:
+            LOGICAL_DT = 0.1
 
         # LIMITEUR DE VITESSE (SLEEP)
         tick_duration = 1.0 / target_tps if target_tps > 0 else 0  # Si target_tps = 0 (Tournoi), on ne dort jamais (min_frame_duration = 0).Sinon, on dort pour respecter le rythme (ex: 1/30s)
@@ -116,4 +117,4 @@ class Simulation:
             if wait > 0:
                 time.sleep(wait)
 
-        print(f" Simulation terminée après {self.tick_count} ticks. Durée : {time.time() - debut}s")
+        print(f" Simulation terminée après {self.tick_count} ticks. Durée : {(time.time() - debut):.4f}s. Environ : {self.tick_count / (time.time() - debut):.0f} TPS.")
