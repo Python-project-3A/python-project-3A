@@ -96,31 +96,6 @@ class Battlefield:
     # (circle checks, sliding, soft pushes)
     # -----------------------------------------------------
 
-    # def check_position(self, unit: Unit, new_x: float, new_y: float) -> bool:
-    #     """
-    #     Checks circular hitbox collision based on unit.radius.
-    #     """
-    #     # On cherche les voisins dans un rayon de 2 tuiles
-    #     potential_colliders = self.get_potential_neighbors(new_x, new_y, range_tiles=2)
-
-    #     for other in potential_colliders:
-    #         # Skip the unit itself and also the dead units
-    #         if other is unit or not other.is_alive():
-    #             continue
-
-    #         ox, oy = other.position
-    #         dx = new_x - ox
-    #         dy = new_y - oy
-
-    #         # circle collision using derived radius from width/height
-    #         if math.hypot(dx, dy) < (unit.radius + other.radius):
-    #             return True
-
-    #         # Optimisation
-    #         # if (dx * dx + dy * dy) < ((unit.radius + other.radius) * (unit.radius + other.radius)):
-    #         #     return True
-    #     return False
-
     def check_position(self, unit: Unit, new_x: float, new_y: float) -> bool:
         """
         Checks circular hitbox collision based on unit.radius.
