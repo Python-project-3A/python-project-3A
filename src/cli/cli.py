@@ -140,4 +140,4 @@ class CLIVisualizer:
         sys.stdout.write(full_output)
         sys.stdout.flush()
 
-        self.lines_printed = len(lines) + 1  # +1 pour le dernier \n
+        self.lines_printed = len(lines)

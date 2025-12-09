@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Iterator
 
 from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
@@ -99,26 +99,33 @@ class Battlefield:
     def check_position(self, unit: Unit, new_x: float, new_y: float) -> bool:
         """
         Checks circular hitbox collision based on unit.radius.
+        Optimisation : Inlining de la recherche de voisins + Distance au carré.
         """
-        # On cherche les voisins dans un rayon de 2 tuiles
-        potential_colliders = self.get_potential_neighbors(new_x, new_y, range_tiles=2)
+        # 1. On calcule la tuile centrale cible
+        cx, cy = int(new_x), int(new_y)
 
-        for other in potential_colliders:
-            # Skip the unit itself and also the dead units
-            if other is unit or not other.is_alive():
-                continue
+        # 2. On itère manuellement sur les 25 tuiles autour (rayon 2), c'est moche mais c'est sensé être + perfformant
+        for dy in range(-2, 3):
+            for dx in range(-2, 3):
+                tile = self.game_map.get_tile(cx + dx, cy + dy)
 
-            ox, oy = other.position
-            dx = new_x - ox
-            dy = new_y - oy
+                if not tile or not tile.occupants:
+                    continue
 
-            # circle collision using derived radius from width/height
-            if math.hypot(dx, dy) < (unit.radius + other.radius):
-                return True
+                for other in tile.occupants:
+                    if other is unit or not other.is_alive():
+                        continue
 
-            # Optimisation
-            # if (dx * dx + dy * dy) < ((unit.radius + other.radius) * (unit.radius + other.radius)):
-            #     return True
+                    # 3. Optimisation Mathématique (Distance Carrée)  évite math.hypot (qui fait une racine carrée)
+                    d_x = new_x - other.position[0]
+                    d_y = new_y - other.position[1]
+                    dist_sq = d_x * d_x + d_y * d_y
+
+                    # On compare avec (r1 + r2)^2
+                    min_dist = unit.radius + other.radius
+                    if dist_sq < min_dist * min_dist:
+                        return True
+
         return False
 
     def attempt_sliding_move(self, unit: Unit, target_x: float, target_y: float) -> tuple[float, float]:
@@ -273,9 +280,13 @@ class Battlefield:
     # -----------------------------------------------------
     # UTILITIES
     # -----------------------------------------------------
-    def get_all_units(self) -> list[Unit]:
-        """Renvoie une liste des unités du Battlefield."""
-        return list(self.units.values())
+    # def get_all_units(self) -> list[Unit]:
+    #     """Renvoie une liste des unités du Battlefield."""
+    #     return list(self.units.values())
+
+    def get_all_units(self) -> Iterator[Unit]:
+        """Renvoie un itérateur sur les unités (beaucoup plus rapide que créer une liste)."""
+        return self.units.values()
 
     def units_by_owner(self, owner: int) -> list[Unit]:
         """Renvoie une liste des unités appartenant au owner."""
@@ -376,5 +387,5 @@ class Battlefield:
             # winner_id = max(counts, key=counts.get)
             # winner_general = self.generals[winner_id]
             # print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
-            print(f" PARTIE STOP : BOTH TEAMS ARE ALIVE")
+            print(f" GAME STOPPED : BOTH TEAMS ARE ALIVE")
         print("=" * 60 + "\n")
