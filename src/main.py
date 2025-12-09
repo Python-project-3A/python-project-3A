@@ -1,6 +1,6 @@
 import argparse
 import sys
-import random
+import time
 
 from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
@@ -40,8 +40,8 @@ Examples:
     load_parser = subparsers.add_parser("load", help="Load a saved game (TODO)")
     load_parser.add_argument("savefile", type=str, help="Save file path")
 
-    # --- COMMAND: tourney (TODO) ---
-    tourney_parser = subparsers.add_parser("tourney", help="Run tournament (TODO)")
+    # --- COMMAND: tourney ---
+    tourney_parser = subparsers.add_parser("tourney", help="Run tournament")
     tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft"], help="Generals to include in tournament")
     tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
     tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
@@ -87,6 +87,122 @@ def command_list():
             print(f"\n  {scenario_name}: Error loading - {e}")
 
     print("\n" + "=" * 60 + "\n")
+
+
+def run_tournament(args):
+    """
+    Exécute N simulations ultra-rapides et sort des stats.
+    Gère l'interruption par Ctrl+C pour afficher les résultats partiels.
+    """
+    # print("=" * 60)
+    # print("=== LOADING SCENARIO ===")
+    # print("=" * 60)
+
+    scenario_name = args.scenarios[0]
+    gen_type_1 = args.generals[0]
+    gen_type_2 = args.generals[1]  # si il y a un seul général on le met aussi en général 2
+    rounds = args.N
+    wins = {0: 0, 1: 0, "draw": 0}
+
+    # 1. Load Data
+    try:
+        scenario_data = ScenarioLoader.load_scenario(scenario_name)
+    except FileNotFoundError:
+        print("Scenario not found.")
+        return
+
+    print("=" * 60)
+    print(f"\n STARTING TOURNAMENT: {rounds} Rounds")
+    print(f" {gen_type_1.upper()} (General 0) vs {gen_type_2.upper()} (General 1)")
+    print(f"\n Scenario: {scenario_data['name']}")
+    print(f" {scenario_data.get('description', '')}")
+    print(f"\n Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
+    print(f"\n Ctrl+C pour interrompre le tournoi et voir les résultats partiels.")
+    print("=" * 60)
+
+    try:
+        scenario_data = ScenarioLoader.load_scenario(scenario_name)
+    except FileNotFoundError:
+        print("Scenario not found.")
+        return
+
+    start_time = time.time()
+    played_rounds = 0  # Compteur de matchs réellement joués
+
+    # --- BLOC TRY / EXCEPT POUR CAPTURER L'INTERRUPTION ---
+    try:
+        for i in range(rounds):
+            # Barre de progression
+            if i % 10 == 0:
+                sys.stdout.write(".")
+                sys.stdout.flush()
+
+            # 1. Setup Battlefield
+            bf = Battlefield(scenario_data["map"]["width"], scenario_data["map"]["height"])
+
+            current_g0_type = gen_type_1
+            current_g1_type = gen_type_2
+            bf.generals = [create_general(current_g0_type, 0), create_general(current_g1_type, 1)]
+
+            # Spawn
+            overrides = {0: current_g0_type, 1: current_g1_type}
+            ScenarioLoader.spawn_scenario(scenario_data, bf, overrides)
+
+            # 2. Simulation Headless
+            sim = Simulation(bf.game_map, bf.generals, bf)
+            sim.run(None, visualizer=None, target_tps=0)
+
+            # 3. Résultat
+            survivors = {}
+            for u in bf.get_all_units():
+                if u.is_alive():
+                    survivors[u.owner] = True
+
+            winner = -1
+            if 0 in survivors and 1 not in survivors:
+                winner = 0
+            elif 1 in survivors and 0 not in survivors:
+                winner = 1
+            else:
+                winner = "draw"
+
+            if winner == "draw":
+                wins["draw"] += 1
+            else:
+                # Comme on ne swap plus, c'est simple :
+                # winner 0 = Gen 1
+                # winner 1 = Gen 2
+                wins[winner] += 1
+
+            played_rounds += 1
+
+    except KeyboardInterrupt:
+        print("\n\n INTERRUPTION UTILISATEUR (Ctrl+C)")
+        print(" Finalisation des résultats partiels...")
+
+    # --- AFFICHAGE DES RÉSULTATS ---
+    total_time = time.time() - start_time
+
+    if played_rounds == 0:  # Sécurité pour éviter la division par zéro si on arrête instantanément
+        print("\n Aucun match n'a été terminé.")
+        return
+
+    print(f"\n{'=' * 60}")
+    print(f"RESULTS ({played_rounds} rounds played in {total_time:.2f}s)")
+    print(f"{'=' * 60}")
+    print(f"General 1 ({gen_type_1}): {wins[0]} wins ({wins[0] / played_rounds * 100:.1f}%)")
+    print(f"General 2 ({gen_type_2}): {wins[1]} wins ({wins[1] / played_rounds * 100:.1f}%)")
+    print(f"Draws: {wins['draw']} ({((wins['draw'] / played_rounds) * 100):.1f}%)")
+    print(f"{'=' * 60}")
+
+    # Analyse de Biais
+    if gen_type_1 == gen_type_2:
+        diff = abs(wins[0] - wins[1])
+        print(f"Vérification d'équité : L'écart est de {diff}.")
+        if diff > (rounds * 0.1):  # Plus de 10% d'écart
+            print(f" WARNING: Significant biais detecte ! Le jeu favorise un camp : au moins 10% de diff.")
+        else:
+            print(f" Le jeu semble équilibré, pas de biais detecte : <= 10% diff")
 
 
 def run_battle(args):
@@ -140,13 +256,12 @@ def main():
         command_list()
 
     elif args.command == "run":
-        # command_run(args)
         run_battle(args)
     elif args.command == "load":
         print("  'load' command not yet implemented")
 
     elif args.command == "tourney":
-        print("  'tourney' command not yet implemented")
+        run_tournament(args)
 
     else:
         print(" No command specified. Use --help for usage.")

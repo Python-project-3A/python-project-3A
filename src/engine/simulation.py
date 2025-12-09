@@ -71,7 +71,9 @@ class Simulation:
             loop_start = time.time()
 
             # --- INPUTS ---
-            key = input_provider.get_key()
+            key = None
+            if input_provider:
+                key = input_provider.get_key()
             match key:
                 case "p":
                     self.paused = not self.paused
