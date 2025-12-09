@@ -14,9 +14,9 @@
           "type": "Pikeman",
           "count": 20,
           "formation": "block",
-          "start_x": 10,
+          "start_x": 20,
           "start_y": 15,
-          "spacing": 1
+          "spacing": 1.5
         }
       ]
     },
@@ -30,7 +30,7 @@
           "formation": "block",
           "start_x": 45,
           "start_y": 15,
-          "spacing": 1
+          "spacing": -1.5
         }
       ]
     }
