@@ -28,7 +28,7 @@ class GameMap:
     def ensure_tile(self, ix: int, iy: int) -> Tile:
         if self.in_bounds(ix, iy):
             return self.tiles.setdefault((ix, iy), Tile())
-        raise ValueError("Out of bounds: {ix}, {iy}")
+        raise ValueError(f"Out of bounds: {ix}, {iy}")
 
     # --------------------------
     # Terrain / Walkability

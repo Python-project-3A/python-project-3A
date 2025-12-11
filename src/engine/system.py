@@ -229,7 +229,7 @@ class CombatSystem:
         # On parcourt tous les attributs de l'attaquant pour trouver les "damage_XYZ"
         # Et on regarde si le défenseur a l'armure correspondante "armor_XYZ"
         bonus_damage = 0
-        
+
         # Liste des classes possibles basées sur ton JSON (à compléter si besoin)
         # Le fait d'avoir "armor_cavalry": 0 dans le JSON du Knight signifie qu'il EST de la cavalerie
         unit_classes = ["cavalry", "spearmen"]
@@ -248,9 +248,9 @@ class CombatSystem:
                 bonus_damage += max(0, bonus_val - class_armor)
 
         # --- 3. GESTION DE L'ÉLÉVATION (High Ground) ---
-        #[cite: 270]: x1.25 damage si plus haut, x0.75 si plus bas
+        # [cite: 270]: x1.25 damage si plus haut, x0.75 si plus bas
         k_elev = 1.0
-        
+
         # On récupère la hauteur des tuiles via la GameMap
         # (Supposons que game_map.get_tile(x, y) renvoie un objet avec un attribut 'elevation')
         # A DECOMMENTER QUAND TA GAMEMAP GÉRERA L'ELEVATION
@@ -276,28 +276,60 @@ class CombatSystem:
         attacker.reload_timer = attacker.attack_cooldown
 
         return True
+
     @staticmethod
-    def choose_nearest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
-        """Choose nearest living enemy"""
+    def choose_nearest_target(unit: "Unit", enemies: list["Unit"], battlefield: "Battlefield") -> "Unit | None":
+        """
+        Stratégie Hybride :
+        1. Fast Path : Regarde dans le champ de vision (O(1)).
+        2. Slow Path : Regarde toute la carte (O(N)).
+        """
+
+        # --- 1. FAST PATH (Local) ---
+        # On utilise ta vision_range comme limite de recherche optimisée
+        local_candidates = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], unit.vision_range)
+
+        # On filtre : Ennemis vivants uniquement
+        # (Note: local_candidates contient peut-être des alliés ou l'unité elle-même)
+        valid_local_targets = [u for u in local_candidates if u.owner != unit.owner and u.is_alive()]
+
+        if valid_local_targets:
+            # BINGO : On a trouvé une cible proche.
+            # On trie seulement cette petite liste (ex: 5 unités) -> Ultra rapide
+            return min(valid_local_targets, key=lambda e: unit.dist_to(e))
+
+        # --- 2. SLOW PATH (Global / Fallback) ---
+        # Si personne n'est à vue, on scanne la liste complète fournie par le général
         living_enemies = [e for e in enemies if e.is_alive()]
 
         if not living_enemies:
             return None
 
+        # Scan global (plus lent, mais nécessaire si la cible est loin)
         return min(living_enemies, key=lambda e: unit.dist_to(e))
 
     @staticmethod
-    def choose_weakest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
+    def choose_weakest_target(unit: "Unit", enemies: list["Unit"], battlefield: "Battlefield") -> "Unit | None":
         """
-        Choose the weakest (lowest HP) living enemy.
-        Useful for focus-fire strategies (for other generals than braindead and daft)
+        Choisit l'ennemi le plus faible (HP bas).
+        PRIORITÉ : Les ennemis à portée de vue (Optimisation Spatiale).
+        FALLBACK : Si personne à vue, on cherche globalement (optionnel, mais cohérent).
         """
-        living_enemies = [e for e in enemies if e.is_alive()]
 
+        # --- 1. FAST PATH (Local - Stratégique) ---
+        local_candidates = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], unit.vision_range)
+        valid_local_targets = [u for u in local_candidates if u.owner != unit.owner and u.is_alive()]
+
+        if valid_local_targets:
+            return min(valid_local_targets, key=lambda e: (e.hp, unit.dist_to(e)))
+
+        # --- 2. SLOW PATH (Global - Chasseur de prime) ---
+        # Si personne n'est visible, est-ce qu'on veut vraiment chasser le plus faible de la map ? oui pour un général agressif, donc je laisse cette option :
+        living_enemies = [e for e in enemies if e.is_alive()]
         if not living_enemies:
             return None
 
-        return min(living_enemies, key=lambda e: e.hp)
+        return min(living_enemies, key=lambda e: (e.hp, unit.dist_to(e)))  # Moins de HP, puis le plus proche
 
     @staticmethod
     def get_visible_enemies(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:

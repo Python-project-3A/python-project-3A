@@ -292,6 +292,12 @@ class Battlefield:
         """Renvoie une liste des unités appartenant au owner."""
         return [u for u in self.units.values() if u.owner == owner]
 
+    def get_my_units(self, owner: int) -> list[Unit]:
+        return [u for u in self.get_all_units() if u.owner == owner]
+
+    def get_enemy_units(self, owner: int) -> list[Unit]:
+        return [u for u in self.get_all_units() if u.owner != owner]
+
     def find_unit(self, unit_id: int) -> Unit | None:
         """Renvoie l'unité ayant l'id unit_id."""
         return self.units.get(unit_id)

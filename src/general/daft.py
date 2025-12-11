@@ -38,7 +38,7 @@ class GeneralDaft(BaseGeneral):
 
         # Gestion anti-embouteillage (Conga Line)
         target_counts = {e.id: 0 for e in alive_enemies}
-        CROWDING_PENALTY = 3.0 # Ajoute virtuellement 3m de distance par attaquant déjà dessus
+        CROWDING_PENALTY = 3.0  # Ajoute virtuellement 3m de distance par attaquant déjà dessus
 
         for unit in my_units:
             if not unit.is_alive():
@@ -46,13 +46,13 @@ class GeneralDaft(BaseGeneral):
 
             # 1. Trouver la cible optimale sur TOUTE la carte
             best_target = None
-            best_score = float('inf')
+            best_score = float("inf")
 
             for enemy in alive_enemies:
                 dist = unit.dist_to(enemy)
                 # On choisit le plus proche, mais on évite ceux qui sont déjà submergés
                 score = dist + (target_counts[enemy.id] * CROWDING_PENALTY)
-                
+
                 if score < best_score:
                     best_score = score
                     best_target = enemy
