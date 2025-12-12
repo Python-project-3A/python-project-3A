@@ -116,14 +116,7 @@ def deserialize_unit(data: dict, battlefield: Battlefield) -> Unit:
 
 def serialize_general(general: BaseGeneral) -> dict:
     """Sérialise un général."""
-    data = {
-        "class": general.__class__.__name__,
-        "player_id": general.player_id,
-        "name": general.name,
-        # TODO: Ajouter la sérialisation de l'état interne du général (plan_d_attaque, etc.)
-        # Exemple: "internal_state": general.to_serializable_state()
-    }
-    return data
+    return general.to_dict()
 
 
 def deserialize_general(data: dict) -> BaseGeneral:
@@ -144,13 +137,9 @@ def deserialize_general(data: dict) -> BaseGeneral:
 def serialize_simulation(simulation: Simulation) -> dict:
     """Sérialise l'état complet du jeu."""
 
-    # 1. Battlefield (unités, taille, next_unit_id)
     battlefield_data = {"width": simulation.battlefield.width, "height": simulation.battlefield.height, "next_unit_id": simulation.battlefield.next_unit_id, "units": [serialize_unit(u) for u in simulation.battlefield.get_all_units()]}
 
-    # 2. Simulation (tick_count, généraux)
-    simulation_data = {"tick_count": simulation.tick_count, "generals": [serialize_general(g) for g in simulation.generals]}
-
-    return {"battlefield": battlefield_data, "simulation": simulation_data, "format_version": 1}
+    return {"battlefield": battlefield_data, "simulation": simulation.to_dict(), "format_version": 1}
 
 
 def deserialize_simulation(data: dict) -> Simulation:

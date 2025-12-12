@@ -148,3 +148,12 @@ class Simulation:
                 time.sleep(wait)
 
         print(f" Simulation terminée après {self.tick_count} ticks. Durée : {(time.time() - debut):.4f}s. Environ : {self.tick_count / (time.time() - debut):.0f} TPS.")
+
+    def to_dict(self):
+        """
+        retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
+        utile pour le save/load
+        """
+        data = {"tick_count": self.tick_count, "generals": [g.to_dict() for g in self.generals]}
+
+        return data

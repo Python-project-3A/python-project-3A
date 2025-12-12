@@ -26,7 +26,7 @@ Order = MoveToOrder | AttackMoveOrder | AttackUnitOrder
 
 # la classe unit est maintenant entièrement des données, elle n'effectue plus d'action comme se déplacer, ces actions sont gérées par un système externe
 class Unit:
-    def __init__(self, name: str, owner: int, x: float, y: float, r: float, hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, vision_range:float,speed: float, id: int = None):
+    def __init__(self, name: str, owner: int, x: float, y: float, r: float, hp: int, armor: int, damage: int, attack_range: float, attack_cooldown: float, vision_range: float, speed: float, id: int = None):
         # identity and ownership
         self.id = id
         self.name = name
@@ -90,7 +90,7 @@ class Unit:
     def to_dict(self):
         """
         retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
-        utile pour le save/load et la partie statistique plus tard
+        utile pour le save/load
         """
         return {
             "name": self.name,
