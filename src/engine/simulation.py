@@ -102,7 +102,6 @@ class Simulation:
                         self.tick_count = loaded_sim.tick_count
                         self.paused = True
                         self.snapshot_utility = loaded_sim.snapshot_utility  # Mise à jour de l'utilitaire
-                        print("Jeu rechargé. Simulation en pause.")
                     except FileNotFoundError:
                         print("\n Erreur: Pas de Quick Save trouvée.")
                     except Exception as e:

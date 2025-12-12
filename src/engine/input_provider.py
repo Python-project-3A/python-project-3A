@@ -16,10 +16,10 @@ else:
 
 # Codes des touches F11 et F12 pour différents environnements
 # MSVCRT (Windows)
-WINDOWS_F11_CODE = b"\x85"  # 133
-WINDOWS_F12_CODE = b"\x86"  # 134
+WINDOWS_F11_CODE = b"\x85"
+WINDOWS_F12_CODE = b"\x86"
 
-# Séquences XTERM/Linux (les plus courantes)
+# Séquences XTERM/Linux
 UNIX_F11_SEQUENCE = "\x1b[23~"
 UNIX_F12_SEQUENCE = "\x1b[24~"
 
@@ -49,8 +49,6 @@ class ConsoleInputProvider:
         """Appelé automatiquement à la fin, même en cas de crash."""
         if self.os_type != "nt" and self.old_settings:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
-
-    # src/utils/input_provider.py (Mise à jour de la méthode get_key)
 
     def get_key(self):
         """Renvoie la touche pressée ou None."""
@@ -82,26 +80,27 @@ class ConsoleInputProvider:
             return None
         else:
             # Linux / Mac
-            # Vérifie si des données sont prêtes à être lues sur l'entrée standard (fd 0)
-            # Un timeout de 0 signifie une vérification non bloquante
+            # Vérifie si des données sont prêtes à être lues sur l'entrée standard (fd 0), un timeout de 0 signifie une vérification non bloquante
             r, _, _ = select.select([sys.stdin], [], [], 0)
             if r:
                 char = sys.stdin.read(1)
 
                 if char == "\x1b":  # Début d'une séquence
-                    # Logique pour lire la séquence complète SANS bloquer le terminal.
                     fd = sys.stdin.fileno()
                     old_fl = fcntl.fcntl(fd, fcntl.F_GETFL)
                     fcntl.fcntl(fd, fcntl.F_SETFL, old_fl | os.O_NONBLOCK)
 
-                    # Lecture des octets restants (max 5)
+                    # Petit délai pour recevoir la séquence complète
+                    import time
+
+                    time.sleep(0.02)
+
                     rest = ""
                     try:
-                        rest = sys.stdin.read(5)
+                        rest = sys.stdin.read(10)  # Buffer augmenté
                     except BlockingIOError:
                         pass
 
-                    # Rétablit le mode bloquant par défaut
                     fcntl.fcntl(fd, fcntl.F_SETFL, old_fl)
 
                     sequence = char + rest
@@ -110,14 +109,10 @@ class ConsoleInputProvider:
                         return "F11"
                     elif sequence == UNIX_F12_SEQUENCE:
                         return "F12"
-
-                    # NOUVELLE LOGIQUE POUR GÉRER L'ESCAPE SIMPLE :
-                    # Si la séquence est uniquement '\x1b', cela signifie que l'utilisateur
-                    # a appuyé sur ESC et que ce n'était pas le début d'une séquence F-key.
-                    if sequence == "\x1b":
+                    elif sequence == "\x1b":
                         return "esc"
 
-                    # Si c'est une autre séquence (Flèches, F-keys non mappés), on retourne simplement None
+                    # Autres séquences ignorées
                     return None
 
                 # Caractère simple
