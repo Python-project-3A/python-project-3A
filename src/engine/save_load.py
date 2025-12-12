@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -181,12 +182,23 @@ def deserialize_simulation(data: dict) -> Simulation:
 # --- fonctions de sauvegarde et chargement ---
 
 
-def save_game(simulation: Simulation, filename: str = "save"):
-    """Sauvegarde l'état actuel de la simulation dans un fichier JSON."""
-    print("here")
+def save_game(simulation: Simulation):
+    """
+    Sauvegarde l'état actuel de la simulation dans un fichier JSON.
+    Le nom du fichier est généré avec un horodatage (save_YYYYMMDD_HHMMSS.json).
+    """
+
+    # Générer l'horodatage
+    now = datetime.datetime.now()
+    # Format: YYYYMMDD_HHMMSS
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+    filename = f"save_{timestamp}.json"
+
     save_dir = get_save_dir()
     save_dir.mkdir(parents=True, exist_ok=True)  # Créer le dossier s'il n'existe pas
-    save_file = save_dir / f"{filename}.json"
+
+    save_file = save_dir / filename
 
     data = serialize_simulation(simulation)
 
@@ -194,10 +206,8 @@ def save_game(simulation: Simulation, filename: str = "save"):
         # Indent pour la lisibilité
         json.dump(data, f, indent=4)
 
-    print(f"\n Jeu sauvegardé : {save_file}")
 
-
-def load_game(filename: str = "save") -> Simulation:
+def load_game(filename: str) -> Simulation:
     """Charge l'état du jeu à partir d'un fichier JSON et retourne un nouvel objet Simulation."""
     save_dir = get_save_dir()
     save_file = save_dir / f"{filename}.json"
@@ -209,6 +219,5 @@ def load_game(filename: str = "save") -> Simulation:
         data = json.load(f)
 
     simulation = deserialize_simulation(data)
-    print(f"\n Jeu chargé : {save_file}")
 
     return simulation
