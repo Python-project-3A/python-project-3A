@@ -101,12 +101,10 @@ class GeneralSmart(BaseGeneral):
                 self._micro_archer(unit, all_enemies, target_pos, bf)
 
             elif squad.role == "TANK":
-                # Les piquiers doivent protéger les archers s'ils existent
-                # Sinon ils attaquent
                 my_archers = [s for s in self.squads if s.role == "DPS"]
-                if my_archers:
-                    protect_target = self._get_centroid(my_archers[0].units)
-                    self._micro_pikeman_protector(unit, all_enemies, protect_target, target_pos)
+                if my_archers and my_archers[0].units:
+                    protect_position = self._get_centroid(my_archers[0].units)
+                    self._micro_pikeman_protector(unit, all_enemies, protect_position, target_pos, bf)
                 else:
                     self._micro_generic_attack(unit, all_enemies)
 
@@ -156,13 +154,89 @@ class GeneralSmart(BaseGeneral):
     def _micro_knight_flanker(self, unit: Unit, enemies: list[Unit], target_pos: tuple):
         pass
 
-    def _micro_pikeman_protector(self, unit: Unit, enemies: list[Unit], protect_pos: tuple, threat_pos: tuple):
-        pass
+    def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
+        """
+        Logique : S'interposer entre la menace et les protégés.
+        """
+        # Identification de la menace la plus dangereuse (pour nos archers)
+        # On cherche un ennemi (surtout Cavalier) qui est proche de nos archers
+        knights = [e for e in enemies if e.name.lower() == "knight" and e.is_alive()]
+        threats = knights if knights else [e for e in enemies if e.is_alive()]
 
-    def _micro_generic_attack(self, unit: Unit, all_enemies: list[Unit]):
-        pass
+        if not threats:  # Pas de menace spécifique ? On avance vers l'objectif global (Attack Move)
+            unit.current_order = {"type": "attack_move", "target": default_target_pos}
+            return
+
+        # On prend la menace la plus proche du GROUPE D'ARCHERS (protect_target_pos), pas du piquier
+
+        nearest_threat = min(threats, key=lambda e: (e.position[0] - protect_target_pos[0]) ** 2 + (e.position[1] - protect_target_pos[1]) ** 2)
+
+        # Calcul de la position d'interception -> on veut être sur la ligne entre [Menace] et [Archers]
+        tx, ty = nearest_threat.position
+        ax, ay = protect_target_pos
+
+        # Vecteur Menace -> Archers
+        dx = ax - tx
+        dy = ay - ty
+
+        # Point d'interception : Archers - (Vecteur vers menace * petite distance)
+        # Position = Archers * 0.8 + Menace * 0.2 (On reste collé aux archers)
+        inter_x = ax * 0.8 + tx * 0.2  # Valeurs arbitraire qu'on peut ajuster au besoin
+        inter_y = ay * 0.8 + ty * 0.2
+
+        dist_to_threat = unit.dist_to(nearest_threat)
+
+        if dist_to_threat < unit.attack_range + 2:  # +2 pour élargir la portée de détection => plus aggressif
+            unit.current_order = {"type": "attack_unit", "target": nearest_threat}
+        else:
+            unit.current_order = {"type": "attack_move", "target": (inter_x, inter_y)}
+
+    def _micro_generic_attack(self, unit: Unit, enemies: list["Unit"], bf: Battlefield):
+        """
+        Attaque intelligente : Garde sa cible actuelle si possible,
+        sinon cherche la plus faible à proximité.
+        """
+        # PERSISTANCE
+        if unit.current_order and unit.current_order["type"] == "attack_unit":
+            current_target = unit.current_order["target"]
+            # Si la cible est toujours vivante et visible, on continue le focus
+            if current_target.is_alive() and unit.dist_to(current_target) <= unit.vision_range:
+                return
+
+        # SÉLECTION DE CIBLE
+        target = CombatSystem.choose_weakest_target(unit, enemies, bf)
+
+        if not target:
+            target = CombatSystem.choose_nearest_target(unit, enemies, bf)
+        if target:
+            unit.current_order = {"type": "attack_unit", "target": target}
+        else:
+            unit.current_order = None
 
     # --- HELPERS --- TODO : ( _order_flee, etc.)
+
+    def _order_regroup(self, unit: Unit, bf: Battlefield):
+        """
+        Ordre de repli stratégique : L'unité rejoint le gros de l'armée.
+        """
+        my_army = [u for u in self.get_my_units(bf) if u.is_alive()]
+
+        if not my_army:
+            return
+
+        sum_x = sum(u.position[0] for u in my_army)
+        sum_y = sum(u.position[1] for u in my_army)
+        count = len(my_army)
+
+        center_x = sum_x / count
+        center_y = sum_y / count
+
+        # Optimisation, si on est déjà quasi collé on fait rien
+        dist_sq = (unit.position[0] - center_x) ** 2 + (unit.position[1] - center_y) ** 2
+        if dist_sq < 16.0:  # distance² (éviter les racines carrés innutiles)
+            return
+
+        unit.current_order = {"type": "attack_move", "target": (center_x, center_y)}  # attaque_move pour ne pas être passif sur le trajet
 
     def _fuite_strategique(self, unit: "Unit", enemies: list["Unit"], bf: "Battlefield"):
         """

@@ -1,0 +1,47 @@
+{
+  "name": "Knights vs Pikemen and Crossbowmen",
+  "description": "Pikemen and Crossbowmen trying to survive against a Knights charge",
+  "map": {
+    "width": 60,
+    "height": 40
+  },
+  "armies": [
+    {
+      "player_id": 0,
+      "general": null,
+      "units": [
+        {
+          "type": "Knight",
+          "count": 20,
+          "formation": "block",
+          "start_x": 10,
+          "start_y": 20,
+          "spacing": 1.5
+        }
+      ]
+    },
+    {
+      "player_id": 1,
+      "general": null,
+      "units": [
+        {
+          "type": "Pikeman",
+          "count": 20,
+          "formation": "block",
+          "start_x": 44,
+          "start_y": 10,
+          "spacing": 1
+        },
+        {
+          "type": "Crossbowman",
+          "count": 20,
+          "formation": "block",
+          "start_x": 45,
+          "start_y": 20,
+          "spacing": 1
+
+        }
+      ]
+    }
+  ]
+}
