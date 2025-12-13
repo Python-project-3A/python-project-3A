@@ -5,6 +5,7 @@ from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
 from .system import UnitController
 from .html_snapshot import HTMLSnapshot
+from .save_load import save_game, load_game
 
 
 class Simulation:
@@ -77,7 +78,7 @@ class Simulation:
             match key:
                 case "p":
                     self.paused = not self.paused
-                case "\x1b":
+                case "esc":
                     self.is_running = False
                 case "=":
                     self.game_speed += 0.2
@@ -87,6 +88,24 @@ class Simulation:
                     self.game_speed = 1
                 case "\t":
                     self.snapshot_utility.save_and_open_html_file(self.tick_count)
+                case "F11":
+                    # autoriser d'autres noms de fichier de sauvegarde plus tard
+                    save_game(self)
+                case "F12":
+                    # Quick Load
+                    try:
+                        # Remplacer la simulation actuelle par la version chargée
+                        loaded_sim = load_game()
+                        self.map = loaded_sim.map
+                        self.generals = loaded_sim.generals
+                        self.battlefield = loaded_sim.battlefield
+                        self.tick_count = loaded_sim.tick_count
+                        self.paused = True
+                        self.snapshot_utility = loaded_sim.snapshot_utility  # Mise à jour de l'utilitaire
+                    except FileNotFoundError:
+                        print("\n Erreur: Pas de Quick Save trouvée.")
+                    except Exception as e:
+                        print(f"\n Erreur pendant le rechargement: {e}")
 
             if visualizer and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
                 step = 2  # vitesse de déplacement de la cam, on met ce qu'on veut
@@ -129,3 +148,12 @@ class Simulation:
                 time.sleep(wait)
 
         print(f" Simulation terminée après {self.tick_count} ticks. Durée : {(time.time() - debut):.4f}s. Environ : {self.tick_count / (time.time() - debut):.0f} TPS.")
+
+    def to_dict(self):
+        """
+        retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
+        utile pour le save/load
+        """
+        data = {"tick_count": self.tick_count, "generals": [g.to_dict() for g in self.generals]}
+
+        return data

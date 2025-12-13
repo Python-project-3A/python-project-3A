@@ -41,3 +41,11 @@ class BaseGeneral(ABC):
 
     def __repr__(self):
         return f"<{self.__class__.__name__} player={self.player_id} name={self.name}>"
+
+    def to_dict(self):
+        """
+        retourne un dictionnaire qui associe chaque nom d'attribut à sa valeur actuelle
+        utile pour le save/load
+        """
+        data = {"class": self.__class__.__name__, "player_id": self.player_id, "name": self.name}
+        return data

@@ -9,6 +9,7 @@ from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
 from src.scenarios.scenario_loader import ScenarioLoader
 from src.engine.input_provider import ConsoleInputProvider
+from src.engine.save_load import save_game, load_game, get_save_dir
 
 
 def parse_args():
@@ -36,8 +37,8 @@ Examples:
     run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
     run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
-    # --- COMMAND: load (TODO) ---
-    load_parser = subparsers.add_parser("load", help="Load a saved game (TODO)")
+    # --- COMMAND: load ---
+    load_parser = subparsers.add_parser("load", help="Load a saved game")
     load_parser.add_argument("savefile", type=str, help="Save file path")
 
     # --- COMMAND: tourney ---
@@ -204,6 +205,32 @@ def run_tournament(args):
             print(f" Le jeu semble équilibré.")
 
 
+def command_load(args):
+    """Charge une sauvegarde et lance la simulation."""
+    try:
+        # La fonction load_game retourne un nouvel objet Simulation
+        simulation = load_game(args.savefile)
+    except FileNotFoundError:
+        print(f"Error: Save file '{args.savefile}.json' not found in {get_save_dir()}.")
+        return
+    except Exception as e:
+        print(f"Error loading game: {e}")
+        return
+
+    # Setup View (même logique que run_battle)
+    width, height = simulation.battlefield.width, simulation.battlefield.height
+    visualizer = CLIVisualizer(width, height)  # Le chargement impose la vue Terminale (pour l'instant)
+    target_tps = 30  # Taux de rafraîchissement visuel standard
+
+    print("\n Loading battle...\n")
+
+    with ConsoleInputProvider() as inp:
+        simulation.run(inp, visualizer=visualizer, target_tps=target_tps)
+
+    # 7. Results
+    simulation.battlefield.print_battle_result()
+
+
 def run_battle(args):
     """Run a battle scenario"""
     print("=" * 60)
@@ -256,8 +283,9 @@ def main():
 
     elif args.command == "run":
         run_battle(args)
+
     elif args.command == "load":
-        print("  'load' command not yet implemented")
+        command_load(args)
 
     elif args.command == "tourney":
         run_tournament(args)
