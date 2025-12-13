@@ -207,10 +207,30 @@ def save_game(simulation: Simulation):
         json.dump(data, f, indent=4)
 
 
-def load_game(filename: str) -> Simulation:
-    """Charge l'état du jeu à partir d'un fichier JSON et retourne un nouvel objet Simulation."""
+def load_game(filename: str | None  = None) -> Simulation:
+    """Charge l'état du jeu à partir d'un fichier JSON
+    Si 'filename' est None (non spécifié), charge la sauvegarde la plus récente
+    dans le répertoire de sauvegarde.
+    """
     save_dir = get_save_dir()
-    save_file = save_dir / f"{filename}.json"
+
+    if filename is None:
+        # 1. Lister tous les fichiers .json dans le répertoire de sauvegarde
+        save_files = list(save_dir.glob("*.json"))
+
+        if not save_files:
+            raise FileNotFoundError(f"Aucune sauvegarde trouvée dans le repertoire de sauvegarde {save_dir}")
+        
+        # 2. Trier les fichiers par nom (le timestamp YYYYMMDD_HHMMSS assure le tri chronologique)
+        latest_save_path = max(save_files)
+        save_file = latest_save_path
+
+    else:
+        #charger le fichier de sauvegarde spécifié
+        if not filename.lower().endswith(".json"):
+            filename += ".json"
+
+        save_file = save_dir / filename
 
     if not save_file.exists():
         raise FileNotFoundError(f"Fichier de sauvegarde non trouvé: {save_file}")
