@@ -109,7 +109,7 @@ class GeneralSmart(BaseGeneral):
                     self._micro_generic_attack(unit, all_enemies)
 
             elif squad.role == "FLANKER":
-                self._micro_knight_flanker(unit, all_enemies, target_pos)
+                self._micro_knight_flanker(unit, all_enemies, target_pos, bf)
 
     # --- MICRO-GESTION UNITAIRE ---
 
@@ -151,8 +151,85 @@ class GeneralSmart(BaseGeneral):
 
             unit.current_order = {"type": "attack_unit", "target": target}
 
-    def _micro_knight_flanker(self, unit: Unit, enemies: list[Unit], target_pos: tuple):
-        pass
+    def _micro_knight_flanker(self, unit: Unit, enemies: list["Unit"], target_pos: tuple, bf: Battlefield):
+        # 1. Identifier les Cibles et les Menaces
+        priority_targets = [e for e in enemies if e.name.lower() in ["crossbowman", "skirmisher"] and e.is_alive()]
+        if not priority_targets:
+            self._micro_generic_attack(unit, enemies, bf)
+            return
+
+        ennemies_threats = [e for e in enemies if e.name.lower() in ["pikeman", "halberdier"] and e.is_alive()]
+
+        # 2. Trouver la cible la plus proche
+        primary_target = min(priority_targets, key=lambda e: unit.dist_to(e))
+        dist_to_target = unit.dist_to(primary_target)
+
+        # 3. Décision : CHARGE ou MANOEUVRE ?
+        if dist_to_target < 2.0:  # si on est assez proche de la cible on attaque
+            # Optimisation : Ne pas spammer l'ordre si c'est deja la meme cible
+            if unit.current_order and unit.current_order.get("type") == "attack_unit" and unit.current_order.get("target") == primary_target:
+                return
+            unit.current_order = {"type": "attack_unit", "target": primary_target}
+            return
+
+        # 4. Calcul du Vecteur de Mouvement (Champs de Potentiel)
+
+        # A. Vecteur d'Attraction (Vers la cible)
+        dx = primary_target.position[0] - unit.position[0]
+        dy = primary_target.position[1] - unit.position[1]
+        dist = math.hypot(dx, dy)
+
+        # Normalisation
+        vx, vy = 0, 0
+        if dist > 0:
+            vx = (dx / dist) * 2.0  # On normalise et on applique un POIDS D'ATTRACTION FORT (2.0) pour se mieux se diriger vers la cible
+            vy = (dy / dist) * 2.0
+
+        # B. Vecteur de Répulsion (Éviter les Piquiers)
+        # On ne regarde que les piquiers sur le chemin (moins de xm, valeur arbitraire qu'on peut changer)
+        avoid_radius = 6.0
+        repulsion_x, repulsion_y = 0.0, 0.0
+
+        for threat in ennemies_threats:
+            d_threat = unit.dist_to(threat)
+            if d_threat < avoid_radius:
+                # Vecteur : De la menace vers le kngiht (pour s'éloigner)
+                rx = unit.position[0] - threat.position[0]
+                ry = unit.position[1] - threat.position[1]
+
+                r_len = math.hypot(rx, ry)
+                if r_len > 0:
+                    rx /= r_len
+                    ry /= r_len
+
+                # Force inversement proportionnelle à la distance (linéaire et pas exponentielle)
+                force = 3.0 * (1.0 - (d_threat / avoid_radius))
+
+                repulsion_x += rx * force
+                repulsion_y += ry * force
+
+        # 5. Combinaison des vecteurs
+        # Mouvement Final = Attraction + Répulsion
+        final_vx = vx + repulsion_x
+        final_vy = vy + repulsion_y
+
+        # Normalisation finale
+        final_len = math.hypot(final_vx, final_vy)
+        if final_len > 0.01:
+            final_vx /= final_len
+            final_vy /= final_len
+
+            # Projection vers l'avant
+            move_target_x = unit.position[0] + final_vx * 4.0
+            move_target_y = unit.position[1] + final_vy * 4.0
+
+            # Clamp bordures de map
+            move_target_x = max(0, min(move_target_x, bf.width - 1))
+            move_target_y = max(0, min(move_target_y, bf.height - 1))
+
+            unit.current_order = {"type": "move_to", "target": (move_target_x, move_target_y)}  # move to pour pas attaqer les ennemis sur le chemin
+        else:
+            unit.current_order = {"type": "attack_unit", "target": primary_target}
 
     def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
         """
