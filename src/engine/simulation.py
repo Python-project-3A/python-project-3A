@@ -85,11 +85,9 @@ class Simulation:
                 self.direction_key_matching(pygame_key, step, visualizer=visualizer)
                 match pygame_key:
                     case "zoom_in":
-                        zoom_direction = visualizer.get_zoom()
-                        visualizer.zoom(zoom_direction)
+                        visualizer.zoom(1)
                     case "zoom_out":
-                        zoom_direction = visualizer.get_zoom()
-                        visualizer.zoom(zoom_direction)
+                        visualizer.zoom(-1)
 
 
 

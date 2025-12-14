@@ -96,8 +96,8 @@ class PygameVisualizer:
         """
         Moves the camera by a given pixel offset.
         """
-        self.camera_offset_x += dx
-        self.camera_offset_y += dy
+        self.camera_offset_x -= dx
+        self.camera_offset_y -= dy
 
     def world_to_screen(self, world_x, world_y):
         """
@@ -142,12 +142,6 @@ class PygameVisualizer:
                     return "tab"
 
         return None
-
-    def get_zoom(self):
-        event = pygame.event.poll()
-        if event == pygame.MOUSEWHEEL:
-            return event.y
-        
 
     def __enter__(self):
         """Allows the visualizer to be used as a context manager."""
