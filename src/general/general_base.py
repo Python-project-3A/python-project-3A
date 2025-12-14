@@ -194,7 +194,7 @@ class BaseGeneral(ABC):
     def _filter_enemies(self, enemies, types: list[str] | None = None):
         """Renvoie les ennemis filtrés par type."""
         if not types:
-            return enemies
+            return []
         return [e for e in enemies if e.name.lower() in types and e.is_alive()]
 
     # --- COMPORTEMENTS GENERIQUES ---
@@ -251,3 +251,15 @@ class BaseGeneral(ABC):
         clamp_x, clamp_y = self._clamp_position((target_x, target_y), bf)
 
         unit.current_order = {"type": "move_to", "target": (clamp_x, clamp_y)}
+
+    def _order_attack_opti(self, unit: Unit, target: Unit) -> None:
+        """
+        Donne l'ordre d'attaquer une cible spécifique.
+        Optimisation : Ne réinitialise pas l'ordre s'il est déjà actif (évite le spam).
+        """
+        # Vérification anti-spam
+        if unit.current_order and unit.current_order["type"] == "attack_unit" and unit.current_order["target"] == target:
+            return
+
+        # Application de l'ordre
+        unit.current_order = {"type": "attack_unit", "target": target}

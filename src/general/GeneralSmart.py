@@ -134,15 +134,12 @@ class GeneralSmart(BaseGeneral):
             target = nearest
 
         if target:
-            # Optimisation : Ne pas spammer l'ordre si c'est déjà la même cible
-            if unit.current_order and unit.current_order.get("type") == "attack_unit" and unit.current_order.get("target") == target:
-                return
-
-            unit.current_order = {"type": "attack_unit", "target": target}
+            self._order_attack_opti(unit, target)
+            return
 
     def _micro_knight_flanker(self, unit: Unit, enemies: list["Unit"], target_pos: tuple, bf: Battlefield):
         # 1. Identifier les Cibles et les Menaces
-        priority_targets = self._filter_enemies(enemies, ["crossbowman", "skirmisher"])
+        priority_targets = self._filter_enemies(enemies, ["crossbowman"])  # , "skirmisher"
         if not priority_targets:
             self._micro_generic_attack(unit, enemies, bf)
             return
@@ -153,12 +150,20 @@ class GeneralSmart(BaseGeneral):
         primary_target = CombatSystem.choose_nearest_target(unit, priority_targets, bf)
         dist_to_target = unit.dist_to(primary_target)
 
-        # 3. Décision : CHARGE ou MANOEUVRE ?
-        if dist_to_target < 2.0:  # si on est assez proche de la cible on attaque
-            # Optimisation : Ne pas spammer l'ordre si c'est deja la meme cible
-            if unit.current_order and unit.current_order.get("type") == "attack_unit" and unit.current_order.get("target") == primary_target:
+        # --- GESTION DU DOGFIGHT (Knights vs Knights) ---
+        enemy_knights = self._filter_enemies(enemies, ["knight"])
+        if enemy_knights:
+            nearest_knight = min(enemy_knights, key=lambda e: self.get_dist(unit.position, e.position))
+            dist_knight = self.get_dist(unit.position, nearest_knight.position)
+
+            # SEUIL D'INTERCEPTION (5 mètres)
+            if dist_knight < 5.0:
+                self._order_attack_opti(unit, nearest_knight)
                 return
-            unit.current_order = {"type": "attack_unit", "target": primary_target}
+
+        # 3. Si pas de duel : ATTAQUE ou MANOEUVRE ?
+        if dist_to_target < 3.0:  # si on est assez proche de la cible on attaque
+            self._order_attack_opti(unit, primary_target)
             return
 
         # 4. Calcul du Vecteur de Mouvement (Champs de Potentiel)
@@ -167,7 +172,7 @@ class GeneralSmart(BaseGeneral):
         dx, dy = self.soustract_vec(primary_target.position, unit.position)
 
         # Normalisation
-        ndx, ndy = self.normalize_vec(dx, dy)
+        ndx, ndy = self.normalize_vec((dx, dy))
         if (ndx, ndy) != (0, 0):
             ndx, ndy = self.scale_vec((ndx, ndy), 2.0)  # POIDS D'ATTRACTION FORT (2.0) pour se mieux se diriger vers la cible
 
@@ -181,7 +186,7 @@ class GeneralSmart(BaseGeneral):
             if d_threat < avoid_radius:
                 # Vecteur : De la menace vers le kngiht (pour s'éloigner)
                 rx, ry = self.soustract_vec(unit.position, threat.position)
-                rx, ry = self.normalize_vec(rx, ry)
+                rx, ry = self.normalize_vec((rx, ry))
 
                 # Force inversement proportionnelle à la distance (linéaire et pas exponentielle)
                 force = 3.0 * (1.0 - (d_threat / avoid_radius))
@@ -193,7 +198,7 @@ class GeneralSmart(BaseGeneral):
         final_vx, final_vy = self.add_vec((ndx, ndy), (repulsion_x, repulsion_y))
 
         # Normalisation finale
-        final_vx, final_vy = self.normalize_vec(final_vx, final_vy)
+        final_vx, final_vy = self.normalize_vec((final_vx, final_vy))
         if (final_vx, final_vy) != (0, 0):
             # Projection vers l'avant
             move_target_x, move_target_y = self._projection_vector(unit.position, (final_vx, final_vy), 4.0)
@@ -208,7 +213,7 @@ class GeneralSmart(BaseGeneral):
     def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
         """Logique : S'interposer entre la menace et les protégés."""
         # 1. CIBLAGE
-        knights = [e for e in enemies if e.name.lower() == "knight" and e.is_alive()]
+        knights = self._filter_enemies(enemies, ["knight"])
         threats = knights if knights else [e for e in enemies if e.is_alive()]
 
         if not threats:
@@ -217,26 +222,32 @@ class GeneralSmart(BaseGeneral):
 
         # 2. PROJECTION DU MOUVEMENT
         dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
-        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 6.0)  # On projette x mètres devant le groupe
+        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 10.0)  # On projette x mètres devant le groupe
 
         # 3. INTERCEPTION DE LA MENACE
         nearest_threat = min(threats, key=lambda e: (e.position[0] - proj_ax) ** 2 + (e.position[1] - proj_ay) ** 2)
+        is_fast_threat = nearest_threat.name.lower() in ["knight"]
 
         # Calcul du point de blocage
         dx, dy = self.soustract_vec(nearest_threat.position, (proj_ax, proj_ay))
         dist_threat = (dx**2 + dy**2) ** 0.5
 
-        # Ratio dynamique :
-        if dist_threat > 15.0:
-            ratio = 0.2  # On reste à 20% du chemin vers l'ennemi (défensif)
+        # --- LOGIQUE D'INTERCEPTION ---
+        if is_fast_threat:
+            # CAS 1 : CONTRE CAVALERIE
+            if dist_threat > 15.0:
+                ratio = 0.2
+            else:
+                ratio = 0.6  # On va chercher l'ennemi à 60% du chemin (Agressif)
         else:
-            ratio = 0.5  # On va au contact (50%)
+            # CAS 2 : CONTRE INFANTERIE
+            ratio = 0.1  # On ne s'avance que de 10% vers l'ennemi (Défensif)
 
         block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), ratio)
 
         # --- ACTION ---
         if unit.dist_to(nearest_threat) < unit.attack_range + 0.5:
-            unit.current_order = {"type": "attack_unit", "target": nearest_threat}
+            self._order_attack_opti(unit, nearest_threat)
         else:
             if dist_threat < 8.0:
                 unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
@@ -261,6 +272,7 @@ class GeneralSmart(BaseGeneral):
         if not target:
             target = CombatSystem.choose_nearest_target(unit, enemies, bf)
         if target:
-            unit.current_order = {"type": "attack_unit", "target": target}
+            self._order_attack_opti(unit, target)
+            return
         else:
             self._order_regroup(unit, bf)
