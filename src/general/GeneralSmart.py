@@ -104,7 +104,7 @@ class GeneralSmart(BaseGeneral):
                 my_archers = [s for s in self.squads if s.role == "DPS"]
                 if my_archers and my_archers[0].units:
                     protect_position = self._get_centroid(my_archers[0].units)
-                    self._micro_pikeman_protector_V2(unit, all_enemies, protect_position, target_pos, bf)
+                    self._micro_pikeman_protector(unit, all_enemies, protect_position, target_pos, bf)
                 else:
                     self._micro_generic_attack(unit, all_enemies)
 
@@ -217,46 +217,7 @@ class GeneralSmart(BaseGeneral):
             unit.current_order = {"type": "attack_unit", "target": primary_target}
 
     def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
-        """
-        Logique : S'interposer entre la menace et les protégés.
-        """
-        # Identification de la menace la plus dangereuse (pour nos archers)
-        # On cherche un ennemi (surtout Cavalier) qui est proche de nos archers
-        threats = self._filter_enemies(enemies, ["knight"])
-
-        if not threats:  # Si pas de menace spécifique on avance vers l'objectif global (Attack Move)
-            unit.current_order = {"type": "attack_move", "target": default_target_pos}
-            return
-
-        # On prend la menace la plus proche du GROUPE D'ARCHERS (protect_target_pos), pas du piquier
-        nearest_threat = min(threats, key=lambda e: (e.position[0] - protect_target_pos[0]) ** 2 + (e.position[1] - protect_target_pos[1]) ** 2)
-
-        # Calcul de la position d'interception -> on veut être sur la ligne entre [Menace] et [Archers]
-        tx, ty = nearest_threat.position
-        ax, ay = protect_target_pos
-
-        # Point d'interception : Archers - (Vecteur vers menace * petite distance)
-        ratio_defense = 0.4  # Valeur arbitraire qu'on peut ajuster au besoin
-        inter_x = ax * (1 - ratio_defense) + tx * ratio_defense
-        inter_y = ay * (1 - ratio_defense) + ty * ratio_defense
-
-        # --- AJOUT D'UNE DISTANCE MINIMALE ---
-        dist_to_protected = (unit.position[0] - ax) ** 2 + (unit.position[1] - ay) ** 2
-        min_spacing_sq = 4.0**2  # 4 mètres de sécurité
-
-        if dist_to_protected < min_spacing_sq:  # si pikemen trop proche des archers
-            inter_x = (inter_x + tx) / 2  # On pousse artificiellement le point cible vers la menace pour dégager la voie.
-            inter_y = (inter_y + ty) / 2
-
-        # --- ACTION ---
-        dist_to_threat = unit.dist_to(nearest_threat)
-
-        if dist_to_threat < unit.attack_range + 2:  # +2 pour élargir la portée de détection => plus aggressif
-            unit.current_order = {"type": "attack_unit", "target": nearest_threat}
-        else:
-            unit.current_order = {"type": "attack_move", "target": (inter_x, inter_y)}
-
-    def _micro_pikeman_protector_V2(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
+        """Logique : S'interposer entre la menace et les protégés."""
         # 1. CIBLAGE
         knights = [e for e in enemies if e.name.lower() == "knight" and e.is_alive()]
         threats = knights if knights else [e for e in enemies if e.is_alive()]
