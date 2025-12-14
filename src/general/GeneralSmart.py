@@ -168,22 +168,26 @@ class GeneralSmart(BaseGeneral):
             return
 
         # On prend la menace la plus proche du GROUPE D'ARCHERS (protect_target_pos), pas du piquier
-
         nearest_threat = min(threats, key=lambda e: (e.position[0] - protect_target_pos[0]) ** 2 + (e.position[1] - protect_target_pos[1]) ** 2)
 
         # Calcul de la position d'interception -> on veut être sur la ligne entre [Menace] et [Archers]
         tx, ty = nearest_threat.position
         ax, ay = protect_target_pos
 
-        # Vecteur Menace -> Archers
-        dx = ax - tx
-        dy = ay - ty
-
         # Point d'interception : Archers - (Vecteur vers menace * petite distance)
-        # Position = Archers * 0.8 + Menace * 0.2 (On reste collé aux archers)
-        inter_x = ax * 0.8 + tx * 0.2  # Valeurs arbitraire qu'on peut ajuster au besoin
-        inter_y = ay * 0.8 + ty * 0.2
+        ratio_defense = 0.4  # Valeur arbitraire qu'on peut ajuster au besoin
+        inter_x = ax * (1 - ratio_defense) + tx * ratio_defense
+        inter_y = ay * (1 - ratio_defense) + ty * ratio_defense
 
+        # --- AJOUT D'UNE DISTANCE MINIMALE ---
+        dist_to_protected = (unit.position[0] - ax) ** 2 + (unit.position[1] - ay) ** 2
+        min_spacing_sq = 4.0**2  # 4 mètres de sécurité
+
+        if dist_to_protected < min_spacing_sq:  # si pikemen trop proche des archers
+            inter_x = (inter_x + tx) / 2  # On pousse artificiellement le point cible vers la menace pour dégager la voie.
+            inter_y = (inter_y + ty) / 2
+
+        # --- ACTION ---
         dist_to_threat = unit.dist_to(nearest_threat)
 
         if dist_to_threat < unit.attack_range + 2:  # +2 pour élargir la portée de détection => plus aggressif
@@ -211,9 +215,9 @@ class GeneralSmart(BaseGeneral):
         if target:
             unit.current_order = {"type": "attack_unit", "target": target}
         else:
-            unit.current_order = None
+            self._order_regroup(unit, bf)
 
-    # --- HELPERS --- TODO : ( _order_flee, etc.)
+    # --- HELPERS --- TODO
 
     def _order_regroup(self, unit: Unit, bf: Battlefield):
         """
