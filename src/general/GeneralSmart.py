@@ -49,18 +49,7 @@ class GeneralSmart(BaseGeneral):
         for squad in self.squads:
             self._execute_squad_tactics(squad, enemies, bf)
 
-    # --- PHASE 1: PERCEPTION ---
-    def _analyze_enemy_clusters(self, enemies: list[Unit]):
-        # TODO: Implémenter un K-Means simple ou une heuristique de distance
-        # Pour l'instant : Tout le monde est un seul cluster (le gros tas)
-        return [{"center": self._get_centroid(enemies), "units": enemies}]
-
-    def _get_centroid(self, units: list[Unit]) -> tuple[float, float]:
-        if not units:
-            return (0, 0)
-        sx = sum(u.position[0] for u in units)
-        sy = sum(u.position[1] for u in units)
-        return (sx / len(units), sy / len(units))
+    # --- PHASE 1: PERCEPTION --- --> Dans general_base.py
 
     # --- PHASE 2: STRATÉGIE ---
     def _manage_squads(self, my_units: list[Unit], enemy_clusters):

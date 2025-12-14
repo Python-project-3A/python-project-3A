@@ -91,6 +91,37 @@ class BaseGeneral(ABC):
         clamp_y = max(0, min(v[1], bf.height - 0.01))
         return clamp_x, clamp_y
 
+    #
+    @staticmethod
+    def _get_centroid(units: list[Unit]) -> tuple[float, float]:
+        """Calcule le barycentre d'une liste d'unités."""
+        if not units:
+            return (0.0, 0.0)
+
+        # Optimisation : On évite de faire 2 boucles sum() séparées
+        count = len(units)
+        sx = 0.0
+        sy = 0.0
+        for u in units:
+            sx += u.position[0]
+            sy += u.position[1]
+
+        return (sx / count, sy / count)
+
+    # --- PERCEPTION & ANALYSE (Lecture du jeu) ---
+
+    def _analyze_enemy_clusters(self, enemies: list[Unit]):
+        """
+        Découpe les ennemis en groupes logiques (Clusters).
+        Utile pour savoir si l'ennemi est séparé en deux armées.
+        """
+        # TODO: Implémenter un vrai K-Means ou DBSCAN si besoin plus tard.
+        # Pour l'instant : Une seule grosse armée.
+        if not enemies:
+            return []
+
+        return [{"center": self._get_centroid(enemies), "units": enemies, "count": len(enemies)}]
+
     # --- MOUVEMENT ---
 
     def _get_ennemis_repulsion_vector(self, unit, enemies: list["Unit"], threat_radius=10.0):
