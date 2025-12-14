@@ -193,6 +193,9 @@ class MovementSystem:
         dy = target_y - y
         new_x = x + (dx / dist * step)
         new_y = y + (dy / dist * step)
+        # epsilon = 0.001
+        # new_x = max(0.0, min(new_x, battlefield.width - epsilon))
+        # new_y = max(0.0, min(new_y, battlefield.height - epsilon))
 
         return battlefield.move_unit_on_map(unit, new_x, new_y)
 

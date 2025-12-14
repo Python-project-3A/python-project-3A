@@ -1,0 +1,72 @@
+{
+  "name": "Tiny Battle",
+  "description": "Tiny battle to test AI",
+  "map": {
+    "width": 120,
+    "height": 120
+  },
+  "armies": [
+    {
+      "player_id": 0,
+      "general": null,
+      "units": [
+        {
+          "type": "Knight",
+          "count": 10,
+          "formation": "line",
+          "start_x": 50,
+          "start_y": 70,
+          "spacing": 1.4
+        },
+        {
+          "type": "Pikeman",
+          "count": 10,
+          "formation": "line",
+          "start_x": 60,
+          "start_y": 75,
+          "spacing": 1.2
+        },
+        {
+          "type": "Crossbowman",
+          "count": 10,
+          "formation": "line",
+          "start_x": 45,
+          "start_y": 80,
+          "spacing": 1.2
+        }
+      ]
+    },
+    {
+      "player_id": 1,
+      "general": null,
+      "units": [
+        {
+          "type": "Knight",
+          "count": 10,
+          "formation": "line",
+          "start_x": 50,
+          "start_y": 15,
+          "spacing": 1
+        },
+        {
+          "type": "Pikeman",
+          "count": 10,
+          "formation": "line",
+          "start_x": 50,
+          "start_y": 10,
+          "spacing": 1
+
+        },
+        {
+          "type": "Crossbowman",
+          "count": 10,
+          "formation": "line",
+          "start_x": 50,
+          "start_y": 5,
+          "spacing": 1
+
+        }
+      ]
+    }
+  ]
+}

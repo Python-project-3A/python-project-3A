@@ -14,7 +14,7 @@
           "type": "Knight",
           "count": 50,
           "formation": "block",
-          "start_x": 10,
+          "start_x": 2,
           "start_y": 10,
           "spacing": 1.4
         }
@@ -28,7 +28,7 @@
           "type": "Pikeman",
           "count": 20,
           "formation": "block",
-          "start_x": 40,
+          "start_x": 35,
           "start_y": 10,
           "spacing": 1
         },

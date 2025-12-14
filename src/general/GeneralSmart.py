@@ -104,7 +104,7 @@ class GeneralSmart(BaseGeneral):
                 my_archers = [s for s in self.squads if s.role == "DPS"]
                 if my_archers and my_archers[0].units:
                     protect_position = self._get_centroid(my_archers[0].units)
-                    self._micro_pikeman_protector(unit, all_enemies, protect_position, target_pos, bf)
+                    self._micro_pikeman_protector_V2(unit, all_enemies, protect_position, target_pos, bf)
                 else:
                     self._micro_generic_attack(unit, all_enemies)
 
@@ -153,15 +153,15 @@ class GeneralSmart(BaseGeneral):
 
     def _micro_knight_flanker(self, unit: Unit, enemies: list["Unit"], target_pos: tuple, bf: Battlefield):
         # 1. Identifier les Cibles et les Menaces
-        priority_targets = [e for e in enemies if e.name.lower() in ["crossbowman", "skirmisher"] and e.is_alive()]
+        priority_targets = self._filter_enemies(enemies, ["crossbowman", "skirmisher"])
         if not priority_targets:
             self._micro_generic_attack(unit, enemies, bf)
             return
 
-        ennemies_threats = [e for e in enemies if e.name.lower() in ["pikeman", "halberdier"] and e.is_alive()]
+        ennemies_threats = self._filter_enemies(enemies, ["pikeman", "halberdier"])
 
         # 2. Trouver la cible la plus proche
-        primary_target = min(priority_targets, key=lambda e: unit.dist_to(e))
+        primary_target = CombatSystem.choose_nearest_target(unit, priority_targets, bf)
         dist_to_target = unit.dist_to(primary_target)
 
         # 3. Décision : CHARGE ou MANOEUVRE ?
@@ -175,32 +175,24 @@ class GeneralSmart(BaseGeneral):
         # 4. Calcul du Vecteur de Mouvement (Champs de Potentiel)
 
         # A. Vecteur d'Attraction (Vers la cible)
-        dx = primary_target.position[0] - unit.position[0]
-        dy = primary_target.position[1] - unit.position[1]
-        dist = math.hypot(dx, dy)
+        dx, dy = self.soustract_vec(primary_target.position, unit.position)
 
         # Normalisation
-        vx, vy = 0, 0
-        if dist > 0:
-            vx = (dx / dist) * 2.0  # On normalise et on applique un POIDS D'ATTRACTION FORT (2.0) pour se mieux se diriger vers la cible
-            vy = (dy / dist) * 2.0
+        ndx, ndy = self.normalize_vec(dx, dy)
+        if (ndx, ndy) != (0, 0):
+            ndx, ndy = self.scale_vec((ndx, ndy), 2.0)  # POIDS D'ATTRACTION FORT (2.0) pour se mieux se diriger vers la cible
 
         # B. Vecteur de Répulsion (Éviter les Piquiers)
         # On ne regarde que les piquiers sur le chemin (moins de xm, valeur arbitraire qu'on peut changer)
-        avoid_radius = 6.0
+        avoid_radius = 8.0
         repulsion_x, repulsion_y = 0.0, 0.0
 
         for threat in ennemies_threats:
             d_threat = unit.dist_to(threat)
             if d_threat < avoid_radius:
                 # Vecteur : De la menace vers le kngiht (pour s'éloigner)
-                rx = unit.position[0] - threat.position[0]
-                ry = unit.position[1] - threat.position[1]
-
-                r_len = math.hypot(rx, ry)
-                if r_len > 0:
-                    rx /= r_len
-                    ry /= r_len
+                rx, ry = self.soustract_vec(unit.position, threat.position)
+                rx, ry = self.normalize_vec(rx, ry)
 
                 # Force inversement proportionnelle à la distance (linéaire et pas exponentielle)
                 force = 3.0 * (1.0 - (d_threat / avoid_radius))
@@ -208,24 +200,17 @@ class GeneralSmart(BaseGeneral):
                 repulsion_x += rx * force
                 repulsion_y += ry * force
 
-        # 5. Combinaison des vecteurs
-        # Mouvement Final = Attraction + Répulsion
-        final_vx = vx + repulsion_x
-        final_vy = vy + repulsion_y
+        # 5. Combinaison des vecteurs : Mouvement Final = Attraction + Répulsion
+        final_vx, final_vy = self.add_vec((ndx, ndy), (repulsion_x, repulsion_y))
 
         # Normalisation finale
-        final_len = math.hypot(final_vx, final_vy)
-        if final_len > 0.01:
-            final_vx /= final_len
-            final_vy /= final_len
-
+        final_vx, final_vy = self.normalize_vec(final_vx, final_vy)
+        if (final_vx, final_vy) != (0, 0):
             # Projection vers l'avant
-            move_target_x = unit.position[0] + final_vx * 4.0
-            move_target_y = unit.position[1] + final_vy * 4.0
+            move_target_x, move_target_y = self._projection_vector(unit.position, (final_vx, final_vy), 4.0)
 
             # Clamp bordures de map
-            move_target_x = max(0, min(move_target_x, bf.width - 1))
-            move_target_y = max(0, min(move_target_y, bf.height - 1))
+            move_target_x, move_target_y = self._clamp_position((move_target_x, move_target_y), bf)
 
             unit.current_order = {"type": "move_to", "target": (move_target_x, move_target_y)}  # move to pour pas attaqer les ennemis sur le chemin
         else:
@@ -237,10 +222,9 @@ class GeneralSmart(BaseGeneral):
         """
         # Identification de la menace la plus dangereuse (pour nos archers)
         # On cherche un ennemi (surtout Cavalier) qui est proche de nos archers
-        knights = [e for e in enemies if e.name.lower() == "knight" and e.is_alive()]
-        threats = knights if knights else [e for e in enemies if e.is_alive()]
+        threats = self._filter_enemies(enemies, ["knight"])
 
-        if not threats:  # Pas de menace spécifique ? On avance vers l'objectif global (Attack Move)
+        if not threats:  # Si pas de menace spécifique on avance vers l'objectif global (Attack Move)
             unit.current_order = {"type": "attack_move", "target": default_target_pos}
             return
 
@@ -272,6 +256,43 @@ class GeneralSmart(BaseGeneral):
         else:
             unit.current_order = {"type": "attack_move", "target": (inter_x, inter_y)}
 
+    def _micro_pikeman_protector_V2(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
+        # 1. CIBLAGE
+        knights = [e for e in enemies if e.name.lower() == "knight" and e.is_alive()]
+        threats = knights if knights else [e for e in enemies if e.is_alive()]
+
+        if not threats:
+            unit.current_order = {"type": "attack_move", "target": default_target_pos}
+            return
+
+        # 2. PROJECTION DU MOUVEMENT
+        dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
+        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 6.0)  # On projette x mètres devant le groupe
+
+        # 3. INTERCEPTION DE LA MENACE
+        nearest_threat = min(threats, key=lambda e: (e.position[0] - proj_ax) ** 2 + (e.position[1] - proj_ay) ** 2)
+
+        # Calcul du point de blocage
+        dx, dy = self.soustract_vec(nearest_threat.position, (proj_ax, proj_ay))
+        dist_threat = (dx**2 + dy**2) ** 0.5
+
+        # Ratio dynamique :
+        if dist_threat > 15.0:
+            ratio = 0.2  # On reste à 20% du chemin vers l'ennemi (défensif)
+        else:
+            ratio = 0.5  # On va au contact (50%)
+
+        block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), ratio)
+
+        # --- ACTION ---
+        if unit.dist_to(nearest_threat) < unit.attack_range + 0.5:
+            unit.current_order = {"type": "attack_unit", "target": nearest_threat}
+        else:
+            if dist_threat < 8.0:
+                unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
+            else:
+                unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
+
     def _micro_generic_attack(self, unit: Unit, enemies: list["Unit"], bf: Battlefield):
         """
         Attaque intelligente : Garde sa cible actuelle si possible,
@@ -293,116 +314,3 @@ class GeneralSmart(BaseGeneral):
             unit.current_order = {"type": "attack_unit", "target": target}
         else:
             self._order_regroup(unit, bf)
-
-    # --- HELPERS --- TODO
-
-    def _order_regroup(self, unit: Unit, bf: Battlefield):
-        """
-        Ordre de repli stratégique : L'unité rejoint le gros de l'armée.
-        """
-        my_army = [u for u in self.get_my_units(bf) if u.is_alive()]
-
-        if not my_army:
-            return
-
-        sum_x = sum(u.position[0] for u in my_army)
-        sum_y = sum(u.position[1] for u in my_army)
-        count = len(my_army)
-
-        center_x = sum_x / count
-        center_y = sum_y / count
-
-        # Optimisation, si on est déjà quasi collé on fait rien
-        dist_sq = (unit.position[0] - center_x) ** 2 + (unit.position[1] - center_y) ** 2
-        if dist_sq < 16.0:  # distance² (éviter les racines carrés innutiles)
-            return
-
-        unit.current_order = {"type": "attack_move", "target": (center_x, center_y)}  # attaque_move pour ne pas être passif sur le trajet
-
-    def _fuite_strategique(self, unit: "Unit", enemies: list["Unit"], bf: "Battlefield"):
-        """
-        Calcule un vecteur de fuite basé sur la somme des répulsions.
-        Prend en compte : Les ennemis proches, les murs.
-        """
-        # Vecteur de mouvement final (x, y)
-        move_x, move_y = 0.0, 0.0
-
-        # 1. RÉPULSION DES ENNEMIS (Barycentre pondéré)
-        threat_radius = 10.0
-        threat_count = 0
-
-        for enemy in enemies:
-            if not enemy.is_alive():
-                continue
-
-            dx = unit.position[0] - enemy.position[0]
-            dy = unit.position[1] - enemy.position[1]
-            dist_sq = dx * dx + dy * dy
-
-            if dist_sq < threat_radius * threat_radius:  # répulsion inversement proportionnelle à la distance
-                dist = math.sqrt(dist_sq)
-                factor = 1.0 / (dist + 0.1)  # +0.1 pour éviter division par zéro
-
-                move_x += (dx / dist) * factor
-                move_y += (dy / dist) * factor
-                threat_count += 1
-
-        # 2. RÉPULSION DES MURS
-        wall_margin = 5.0  # valeur arbitraire qu'on peut changer
-
-        # Mur Gauche (x=0) -> Pousse vers la droite (+x)
-        if unit.position[0] < wall_margin:
-            force = (wall_margin - unit.position[0]) / wall_margin
-            move_x += force * 2.0  # *2.0 pour donner priorité à l'évitement du mur
-
-        # Mur Droit (x=Width) -> Pousse vers la gauche (-x)
-        if unit.position[0] > bf.width - wall_margin:
-            force = (unit.position[0] - (bf.width - wall_margin)) / wall_margin
-            move_x -= force * 2.0
-
-        # Mur Haut (y=0) -> Pousse vers le bas (+y)
-        if unit.position[1] < wall_margin:
-            force = (wall_margin - unit.position[1]) / wall_margin
-            move_y += force * 2.0
-
-        # Mur Bas (y=Height) -> Pousse vers le haut (-y)
-        if unit.position[1] > bf.height - wall_margin:
-            force = (unit.position[1] - (bf.height - wall_margin)) / wall_margin
-            move_y -= force * 2.0
-
-        # 3. NORMALISATION & APPLICATION
-        length = math.hypot(move_x, move_y)
-        if length <= 0.01:
-            return
-        else:  # lengyh > 0.1
-            move_x /= length
-            move_y /= length
-
-            # On projette le point cible loin devant
-            target_x = unit.position[0] + move_x * 10.0
-            target_y = unit.position[1] + move_y * 10.0
-
-            # Clamp final de sécurité
-            target_x = max(0, min(target_x, bf.width - 1))
-            target_y = max(0, min(target_y, bf.height - 1))
-
-            unit.current_order = {"type": "move_to", "target": (target_x, target_y)}
-        unit.current_order = {"type": "move_to", "target": (target_x, target_y)}
-
-    def _get_separation_vector(my_nearby_friends: list["Unit"], unit: "Unit") -> tuple[float, float]:
-        separation_x, separation_y = 0, 0
-        separation_radius = 1.3  # Rayon très court (juste l'espace vital)
-
-        for friend in my_nearby_friends:
-            dist = unit.dist_to(friend)
-            if dist < separation_radius and dist > 0:
-                push = (separation_radius - dist) / separation_radius  # Force linéaire
-
-                # Vecteur unit -> friend
-                dx = unit.position[0] - friend.position[0]
-                dy = unit.position[1] - friend.position[1]
-
-                # On ajoute une petite force répulsive
-                separation_x -= (dx / dist) * push * 0.5  # Poids faible (0.5)
-                separation_y -= (dy / dist) * push * 0.5
-        return separation_x, separation_y
