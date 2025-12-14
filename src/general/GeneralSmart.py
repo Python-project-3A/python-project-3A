@@ -388,3 +388,21 @@ class GeneralSmart(BaseGeneral):
 
             unit.current_order = {"type": "move_to", "target": (target_x, target_y)}
         unit.current_order = {"type": "move_to", "target": (target_x, target_y)}
+
+    def _get_separation_vector(my_nearby_friends: list["Unit"], unit: "Unit") -> tuple[float, float]:
+        separation_x, separation_y = 0, 0
+        separation_radius = 1.3  # Rayon très court (juste l'espace vital)
+
+        for friend in my_nearby_friends:
+            dist = unit.dist_to(friend)
+            if dist < separation_radius and dist > 0:
+                push = (separation_radius - dist) / separation_radius  # Force linéaire
+
+                # Vecteur unit -> friend
+                dx = unit.position[0] - friend.position[0]
+                dy = unit.position[1] - friend.position[1]
+
+                # On ajoute une petite force répulsive
+                separation_x -= (dx / dist) * push * 0.5  # Poids faible (0.5)
+                separation_y -= (dy / dist) * push * 0.5
+        return separation_x, separation_y
