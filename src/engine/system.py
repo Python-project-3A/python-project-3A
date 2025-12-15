@@ -270,7 +270,8 @@ class CombatSystem:
         final_damage = int(max(1, total_damage))
 
         # Application des dégâts
-        defender.hp = max(0, defender.hp - final_damage)
+        defender.pending_damage += final_damage
+        # defender.hp = max(0, defender.hp - final_damage)
 
         # Reset du cooldown
         attacker.reload_timer = attacker.attack_cooldown
@@ -354,7 +355,7 @@ class UnitController:
     def update(unit: "Unit", battlefield: "Battlefield", dt: float):  # noqa: C901
         """Update unit behavior based on its current order"""
         if not unit.is_alive():
-            battlefield.remove_unit(unit.id)
+            # battlefield.remove_unit(unit.id)
             return
 
         if not unit.current_order:

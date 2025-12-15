@@ -27,22 +27,37 @@ class Simulation:
         self.snapshot_utility = HTMLSnapshot(battlefield)
 
     def tick(self, constante_tick_duration):
-        """Exécute un tick unique."""
         self.tick_count += 1
 
-        # 1. Les généraux réfléchissent
-        for general in self.generals:
+        # 1. Mélange Généraux
+        active_generals = list(self.generals)
+        random.shuffle(active_generals)
+        for general in active_generals:
             general.update(self.battlefield, self.tick_count)
 
-        # 2. Les unités agissent
-        all_units = list(self.battlefield.get_all_units())
-        random.shuffle(all_units)
+        # 2. Mélange Unités
+        units_to_update = list(self.battlefield.get_all_units())
+        random.shuffle(units_to_update)
 
-        for unit in all_units:
+        # 3. Action des Unités
+        for unit in units_to_update:
+            # Maintenant, même si l'unité a pris 1000 dégâts "pending",
+            # son unit.hp est toujours > 0, donc is_alive() est Vrai.
+            # Elle peut donc riposter !
             if unit.is_alive():
                 UnitController.update(unit, self.battlefield, constante_tick_duration)
 
-        # 3. Condition de fin de bataille
+        # --- 4. PHASE DE RESOLUTION (Nouveau) ---
+        # On applique tous les dégâts en attente d'un coup
+        for unit in self.battlefield.get_all_units():
+            if unit.pending_damage > 0:
+                unit.hp = max(0, unit.hp - unit.pending_damage)
+                unit.pending_damage = 0  # Reset pour le prochain tour
+
+        # --- 5. PHASE DE NETTOYAGE ---
+        dead_units = self.battlefield.remove_dead_units()
+        
+        # 6. Fin de bataille
         if self.battlefield.is_battle_over():
             self.is_running = False
 

@@ -38,6 +38,7 @@ class Unit:
 
         # Combat stats
         self.hp = hp
+        self.pending_damage = 0.0
         self.armor = armor
         self.damage = damage
         self.attack_range = attack_range
