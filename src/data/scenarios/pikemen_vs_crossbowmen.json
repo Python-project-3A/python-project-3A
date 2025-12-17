@@ -2,8 +2,8 @@
   "name": "Pikemen vs Crossbowmen",
   "description": "Slow infantry trying to close the gap against ranged units",
   "map": {
-    "width": 50,
-    "height": 50
+    "width": 60,
+    "height": 40
   },
   "armies": [
     {
@@ -16,7 +16,7 @@
           "formation": "block",
           "start_x": 10,
           "start_y": 15,
-          "spacing": 1.2
+          "spacing": 1
         }
       ]
     },
@@ -30,7 +30,7 @@
           "formation": "block",
           "start_x": 45,
           "start_y": 15,
-          "spacing": 1.5
+          "spacing": 1
         }
       ]
     }

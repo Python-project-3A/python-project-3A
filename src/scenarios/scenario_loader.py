@@ -9,20 +9,19 @@ if TYPE_CHECKING:
 
 from src.units.knight import Knight
 from src.units.pikeman import Pikeman
+from src.units.crossbowman import Crossbowman
 from src.units.unit_base import Unit
-
-
 
 
 class ScenarioLoader:
     """Loads and spawns scenarios from JSON files"""
 
-    # Map string names to classes   
+    # Map string names to classes
     UNIT_CLASSES = {
         "Pikeman": Pikeman,
         "Knight": Knight,
+        "Crossbowman": Crossbowman,
         # Add more later
-        # "Crossbowman": Crossbowman,
         # "LongSwordsman": LongSwordsman,
     }
 
@@ -69,7 +68,7 @@ class ScenarioLoader:
             return json.load(f)
 
     @staticmethod
-    def create_unit_from_stats(unit_type: str, owner: int, x: float, y: float):
+    def create_unit_from_stats(unit_type: str, owner: int, x: float, y: float) -> Unit:
         """
         Crée une unité et lui injecte TOUTES les stats du JSON dynamiquement.
         """
@@ -94,7 +93,7 @@ class ScenarioLoader:
             y=y,
             r=stats.get("r", 0.4),
             hp=stats.get("hp", 10),
-            armor=stats.get("armor", 0),    # Valeur bidon pour satisfaire __init__
+            armor=stats.get("armor", 0),  # Valeur bidon pour satisfaire __init__
             damage=stats.get("damage", 0),  # Valeur bidon pour satisfaire __init__
             attack_range=stats.get("attack_range", 1.0),
             vision_range=stats.get("vision_range", 5.0),
@@ -117,7 +116,7 @@ class ScenarioLoader:
 
         for army in scenario_data["armies"]:
             player_id = army["player_id"]
-            
+
             # Gestion de l'override du général (ex: via ligne de commande)
             general_type = general_overrides.get(player_id, army.get("general"))
             general_types[player_id] = general_type
@@ -128,7 +127,7 @@ class ScenarioLoader:
                 formation = unit_group.get("formation", "column")
                 start_x = unit_group["start_x"]
                 start_y = unit_group["start_y"]
-                spacing = unit_group.get("spacing", 1.0) # 1.0 est plus standard pour éviter les trous
+                spacing = unit_group.get("spacing", 1.0)  # 1.0 est plus standard pour éviter les trous
 
                 # Calcul des positions
                 positions = ScenarioLoader._calculate_formation(formation, count, start_x, start_y, spacing)

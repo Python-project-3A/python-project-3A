@@ -41,7 +41,7 @@ class GeneralBraindead(BaseGeneral):
 
             # 1. On cherche la cible la plus proche parmi TOUS les ennemis
             # (Le général voit tout, mais l'unité ne tirera que si proche)
-            target = CombatSystem.choose_nearest_target(unit, enemies)
+            target = CombatSystem.choose_nearest_target(unit, enemies, battlefield)
 
             if target:
                 # 2. Vérification critique : Est-on à portée de TIR ?
@@ -50,6 +50,6 @@ class GeneralBraindead(BaseGeneral):
                     # OUI : On ordonne l'attaque DIRECTE (sans mouvement implicite)
                     unit.current_order = {"type": "attack_unit", "target": target}
                 else:
-                    # NON : On ne fait RIEN. 
+                    # NON : On ne fait RIEN.
                     # Surtout pas de "move_towards". L'unité reste Idle.
                     unit.current_order = None
