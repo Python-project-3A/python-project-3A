@@ -214,6 +214,10 @@ class Battlefield:
     def apply_soft_push(self, unit: Unit):
         ux, uy = unit.position
 
+        # On accumule toutes les forces de poussée avant d'appliquer
+        total_push_x = 0.0
+        total_push_y = 0.0
+
         neighbors = self.get_potential_neighbors(ux, uy, range_tiles=1)
 
         for other in neighbors:
@@ -224,26 +228,49 @@ class Battlefield:
             dx = ux - ox
             dy = uy - oy
 
-            dist = math.hypot(dx, dy)
+            dist_sq = dx * dx + dy * dy
             min_dist = unit.radius + other.radius
 
-            if dist <= 0 or dist >= min_dist:
+            # Optimisation : éviter la racine carrée si pas collision
+            if dist_sq >= min_dist * min_dist or dist_sq == 0:
                 continue
 
+            dist = math.sqrt(dist_sq)
             overlap = min_dist - dist
 
-            # Normalisation du vecteur de collision (normal)
+            # Normalisation
             nx = dx / dist
             ny = dy / dist
 
-            correction_strength = 0.5  # force de répulsion : on fait 50% de l'overlap (l'autre unité fera l'autre moitié)
-            push_x = nx * overlap * correction_strength
-            push_y = ny * overlap * correction_strength
+            # Force de répulsion :0.5 = partage de l'effort
+            correction_strength = 0.5
+            total_push_x += nx * overlap * correction_strength
+            total_push_y += ny * overlap * correction_strength
 
-            ux += push_x
-            uy += push_y
+        if total_push_x == 0.0 and total_push_y == 0.0:
+            return
 
-        unit.position = (ux, uy)
+        final_x = ux + total_push_x
+        final_y = uy + total_push_y
+
+        # Check Limites Map
+        final_x = max(0, min(final_x, self.width - 0.01))
+        final_y = max(0, min(final_y, self.height - 0.01))
+
+        # Mise à jour
+        unit.position = (final_x, final_y)
+
+        # Mise à jour de la grille (Vital si on a bougé de tuile)
+        nix, niy = self._tile_index_from_pos(final_x, final_y)
+        oix, oiy = self._tile_index_from_pos(ux, uy)
+
+        if (nix, niy) != (oix, oiy):
+            old_tile = self.game_map.get_tile(oix, oiy)
+            if old_tile:
+                old_tile.remove_occupant(unit)
+
+            new_tile = self.game_map.ensure_tile(nix, niy)
+            new_tile.add_occupant(unit)
 
     # -----------------------------------------------------
     # MOVEMENT SYSTEM

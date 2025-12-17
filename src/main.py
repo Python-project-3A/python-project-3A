@@ -1,6 +1,7 @@
 import argparse
 import sys
 import time
+import itertools
 
 from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
@@ -11,6 +12,7 @@ from src.general.GeneralSmart import GeneralSmart
 from src.scenarios.scenario_loader import ScenarioLoader
 from src.engine.input_provider import ConsoleInputProvider
 from src.engine.save_load import save_game, load_game, get_save_dir
+from src.engine.html_snapshot import HTMLSnapshot
 
 
 def parse_args():
@@ -98,124 +100,109 @@ def run_tournament(args):
     Exécute N simulations ultra-rapides et sort des stats.
     Gère l'interruption par Ctrl+C pour afficher les résultats partiels.
     """
-    # print("=" * 60)
-    # print("=== LOADING SCENARIO ===")
-    # print("=" * 60)
 
-    scenario_name = args.scenarios[0]
-    gen_type_1 = args.generals[0]
-    gen_type_2 = args.generals[1]  # si il y a un seul général on le met aussi en général 2
+    scenarios_to_run = args.scenarios if args.scenarios else ["pikemen_vs_pikemen"]  # , "pikemen_vs_knights", "knights_vs_pikemen", "knights_vs_knights"
+    available_generals = ["braindead", "daft", "generalsmart"]
+    generals_to_run = sorted(list(set(args.generals if args.generals else available_generals)))
     rounds = args.N
-    wins = {0: 0, 1: 0, "draw": 0}
-
-    # 1. Load Data
-    try:
-        scenario_data = ScenarioLoader.load_scenario(scenario_name)
-    except FileNotFoundError:
-        print("Scenario not found.")
-        return
+    tournament_data = {}  # Structure de stockage des résultats / results[scenario][p0_name][p1_name] = {wins0, wins1, draws}
 
     print("=" * 60)
     print(f"\n STARTING TOURNAMENT: {rounds} Rounds")
-    print(f" {gen_type_1.upper()} (General 0) vs {gen_type_2.upper()} (General 1)")
-    print(f"\n Scenario: {scenario_data['name']}")
-    print(f" {scenario_data.get('description', '')}")
-    print(f"\n Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
-    print(" Mode: Positions FIXES (Not Alternating)" if args.na else " Mode: Positions ALTERNATIVES (Alternating)")
+    print(f"\n Scenario: {scenarios_to_run}")
+    print(" \n Mode: Positions FIXES (Not Alternating)" if args.na else " Mode: Positions ALTERNATIVES (Alternating)")
+    print(f"\n Rounds per match: {rounds} (Alternate: {not args.na})")
     print(f"\n Ctrl+C pour interrompre le tournoi et voir les résultats partiels.")
     print("=" * 60)
 
-    start_time = time.time()
-    played_rounds = 0
-
-    # --- BLOC TRY / EXCEPT POUR CAPTURER L'INTERRUPTION ---
     try:
-        for i in range(rounds):
-            # Barre de progression
-            if i % 10 == 0:
-                sys.stdout.write(".")
+        # --- BOUCLE 1 : SCÉNARIOS ---
+        start_time = time.time()
+        for scen_name in scenarios_to_run:
+            print(f"\n SCENARIO: {scen_name}")
+            try:
+                scen_data = ScenarioLoader.load_scenario(scen_name)
+            except FileNotFoundError:
+                print(f"\n Skipping {scen_name} (File not found)")
+                continue
+
+            tournament_data[scen_name] = {}
+
+            # --- BOUCLE 2 & 3 : MATCHUPS (Gen A vs Gen B) ---
+            # combinations_with_replacement permet d'avoir (A,B), (A,C) et (A,A) mais pas (B,A) car c'est redondant si on alterne les positions.
+            matchups = list(itertools.combinations_with_replacement(generals_to_run, 2))
+
+            for gen_1, gen_2 in matchups:
+                match_id = f"{gen_1.upper()} vs {gen_2.upper()}"
+                sys.stdout.write(f"  Match {match_id} : \n")
                 sys.stdout.flush()
 
-            # Setup Battlefield
-            bf = Battlefield(scenario_data["map"]["width"], scenario_data["map"]["height"])
+                wins = {0: 0, 1: 0, "draw": 0}  # 0 est gen_1, 1 est gen_2
 
-            # --- MODE ALTERNATE PLAYER POSITIONS ---
-            # si on est au round pair : P0 = G1, P1 = G0
-            swapped = False
-            if not args.na and i % 2 != 0:
-                swapped = True
+                # --- EXECUTION DES N ROUNDS ---
+                for i in range(rounds):
+                    bf = Battlefield(scen_data["map"]["width"], scen_data["map"]["height"])
 
-            if swapped:
-                current_g0_type = gen_type_1
-                current_g1_type = gen_type_2
-            else:
-                current_g0_type = gen_type_2
-                current_g1_type = gen_type_1
+                    if i % 10 == 0:  # Feedback minimal
+                        sys.stdout.write(".")
+                        sys.stdout.flush()
 
-            # Setup Generals
-            bf.generals = [create_general(current_g0_type, 0), create_general(current_g1_type, 1)]
+                    # Alternance
+                    swapped = False
+                    if not args.na and i % 2 != 0:
+                        swapped = True
 
-            # Spawn
-            overrides = {0: current_g0_type, 1: current_g1_type}
-            ScenarioLoader.spawn_scenario(scenario_data, bf, overrides)
+                    p0_type = gen_2 if swapped else gen_1
+                    p1_type = gen_1 if swapped else gen_2
 
-            # Simulation Headless
-            sim = Simulation(bf.game_map, bf.generals, bf)
-            sim.run(None, visualizer=None, target_tps=0)
+                    bf.generals = [create_general(p0_type, 0), create_general(p1_type, 1)]
+                    overrides = {0: p0_type, 1: p1_type}
+                    ScenarioLoader.spawn_scenario(scen_data, bf, overrides)
 
-            # Résultat
-            survivors = set(u.owner for u in bf.get_all_units() if u.is_alive())
+                    sim = Simulation(bf.game_map, bf.generals, bf)
+                    sim.run(None, visualizer=None, target_tps=0, max_ticks=10000)  # Headless
 
-            winner = -1
-            if 0 in survivors and 1 not in survivors:
-                winner = 0
-            elif 1 in survivors and 0 not in survivors:
-                winner = 1
-            else:
-                winner = "draw"
+                    survivors = set(u.owner for u in bf.get_all_units() if u.is_alive())
 
-            if winner == "draw":
-                wins["draw"] += 1
-            else:
-                if not swapped:
-                    wins[winner] += 1
-                else:
-                    if winner == 0:
-                        wins[1] += 1
+                    winner = -1
+                    if 0 in survivors and 1 not in survivors:
+                        winner = 0
+                    elif 1 in survivors and 0 not in survivors:
+                        winner = 1
                     else:
-                        wins[0] += 1
+                        winner = "draw"
 
-            played_rounds += 1
+                    if winner == "draw":
+                        wins["draw"] += 1
+                    else:
+                        if not swapped:
+                            wins[winner] += 1
+                        else:
+                            if winner == 0:
+                                wins[1] += 1
+                            else:
+                                wins[0] += 1
+
+                # Fin du matchup
+                print(f" Done. Score: {wins[0]}-{wins[1]} (D:{wins['draw']})\n")
+
+                # Sauvegarde dans la structure
+                if gen_1 not in tournament_data[scen_name]:
+                    tournament_data[scen_name][gen_1] = {}
+                # On stocke le résultat du point de vue de Gen 1
+                tournament_data[scen_name][gen_1][gen_2] = wins
 
     except KeyboardInterrupt:
-        print("\n\n INTERRUPTION UTILISATEUR (Ctrl+C)")
+        print(f"\n\n{'-' * 60}")
+        print(" INTERRUPTION UTILISATEUR (Ctrl+C)")
         print(" Finalisation des résultats partiels...")
 
-    # --- AFFICHAGE DES RÉSULTATS ---
     total_time = time.time() - start_time
-
-    if played_rounds == 0:  # Sécurité pour éviter la division par zéro si on arrête instantanément
-        print("\n Aucun match n'a été terminé.")
-        return
-
-    print(f"\n{'=' * 60}")
-    print(f"RESULTS ({played_rounds} rounds played in {total_time:.2f}s)")
-    print(f"{'=' * 60}")
-    win_rate_0 = wins[0] / played_rounds * 100
-    win_rate_1 = wins[1] / played_rounds * 100
-    print(f"General 1 ({gen_type_1}): {wins[0]} wins ({win_rate_0:.1f}%)")
-    print(f"General 2 ({gen_type_2}): {wins[1]} wins ({win_rate_1:.1f}%)")
-    print(f"Draws: {wins['draw']} ({((wins['draw'] / played_rounds) * 100):.1f}%)")
+    print(f"\n\n Total time: {total_time:.2f} seconds.")
     print(f"{'=' * 60}")
 
-    # Analyse de Biais
-    if gen_type_1 == gen_type_2:
-        diff = abs(win_rate_0 - win_rate_1)
-        print(f"Vérification d'équité : L'écart est de {diff:.0f}%.")
-        if diff > 10.0:  # 10% d'écart
-            print(f" WARNING: Significant biais detecte (>10%) ! Le jeu favorise un camp.")
-        else:
-            print(f" Le jeu semble équilibré.")
+    # 4. GENERATION DU RAPPORT
+    HTMLSnapshot.save_tournament_report(tournament_data)
 
 
 def command_load(args):

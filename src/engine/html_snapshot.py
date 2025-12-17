@@ -5,7 +5,7 @@ import webbrowser
 
 
 class HTMLSnapshot:
-    def __init__(self, battlefield:Battlefield):
+    def __init__(self, battlefield: Battlefield):
         self.battlefield = battlefield
 
     def generate_html_snapshot(self, tick_count: int):
@@ -13,15 +13,15 @@ class HTMLSnapshot:
         Generates a static HTML page containing the battlefield and AI snapshot.
         """
         snapshot = self.battlefield.snapshot()
-        
+
         unit_rows = []
         # Sort units by owner and then ID for better readability
         sorted_units = sorted(self.battlefield.get_all_units(), key=lambda u: (u.owner, u.id))
-        
+
         for unit in sorted_units:
             status = "Alive" if unit.is_alive() else "Dead"
             order_desc = self._format_unit_order(unit)
-            
+
             unit_rows.append(f"""
             <tr>
                 <td>{unit.id}</td>
@@ -33,11 +33,11 @@ class HTMLSnapshot:
                 <td>{order_desc}</td>
             </tr>
             """)
-            
+
         unit_table = "".join(unit_rows)
 
         # AI Status Generation
-        ai_status:list[str] = []
+        ai_status: list[str] = []
         for general in self.battlefield.generals:
             ai_status.append(f"""
             <div class="general-section-content-item">
@@ -414,13 +414,69 @@ class HTMLSnapshot:
     </html>
     """
         return html_content
-    
+
+    def generate_html_report_tournament(data):
+        """
+        Génère un fichier HTML basique avec les matrices de scores.
+        """
+        html = """
+      <html>
+      <head>
+          <style>
+              table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+              th { background-color: #f2f2f2; }
+              h2 { color: #333; }
+          </style>
+      </head>
+      <body>
+      <h1>Rapport de Tournoi</h1>
+      """
+
+        for scen, matrix in data.items():
+            html += f"<h2>Scénario: {scen}</h2>"
+            html += "<table><tr><th>General</th>"
+
+            # Récupérer tous les adversaires pour les colonnes
+            opponents = set()
+            for p1, res in matrix.items():
+                opponents.add(p1)
+                opponents.update(res.keys())
+            sorted_opps = sorted(list(opponents))
+
+            for opp in sorted_opps:
+                html += f"<th>vs {opp}</th>"
+            html += "</tr>"
+
+            for gen_main in sorted_opps:
+                html += f"<tr><td><b>{gen_main}</b></td>"
+                for gen_opp in sorted_opps:
+                    # Retrouver le score (attention, la matrice peut être stockée dans un sens ou l'autre)
+                    # Ici simplification : il faut gérer la symétrie si on a stocké (A vs B) et qu'on cherche (B vs A)
+                    # Pour cet exemple, je te laisse gérer la récupération propre des données.
+                    cell = "-"
+                    if gen_main in matrix and gen_opp in matrix[gen_main]:
+                        w = matrix[gen_main][gen_opp]
+                        cell = f"{w[0]}-{w[1]}"  # Win-Loss du point de vue Main
+
+                    # Gestion Symétrie (si on a stocké A vs B, B vs A est l'inverse)
+                    elif gen_opp in matrix and gen_main in matrix[gen_opp]:
+                        w = matrix[gen_opp][gen_main]
+                        cell = f"{w[1]}-{w[0]}"  # Win-Loss inversé
+
+                    html += f"<td>{cell}</td>"
+                html += "</tr>"
+            html += "</table>"
+
+        html += "</body></html>"
+        return html
+
     def save_and_open_html_file(self, tick_count: int):
         FOLDER_NAME = "temp"
         FILE_NAME = "snapshot.html"
-        
+
         # Ensure the directory exists
-        os.makedirs(FOLDER_NAME, exist_ok=True) 
+        os.makedirs(FOLDER_NAME, exist_ok=True)
 
         # Construct the full path
         full_file_path = os.path.join(FOLDER_NAME, FILE_NAME)
@@ -433,20 +489,36 @@ class HTMLSnapshot:
             f.write(html_content)
 
         full_path_for_browser = os.path.abspath(full_file_path)
-        webbrowser.open(f'file://{full_path_for_browser}')
-        
+        webbrowser.open(f"file://{full_path_for_browser}")
+
     @staticmethod
-    def _format_unit_order(unit:Unit):
+    def save_tournament_report(data):
+        """Sauvegarde le rapport de tournoi."""
+        FOLDER_NAME = "temp"
+        FILE_NAME = "tournament_report.html"
+        os.makedirs(FOLDER_NAME, exist_ok=True)
+        full_file_path = os.path.join(FOLDER_NAME, FILE_NAME)
+
+        html_content = HTMLSnapshot.generate_html_report_tournament(data)
+
+        with open(full_file_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        full_path_for_browser = os.path.abspath(full_file_path)
+        webbrowser.open(f"file://{full_path_for_browser}")
+
+    @staticmethod
+    def _format_unit_order(unit: Unit):
         if not unit.current_order:
             return "Idle"
         order_type = unit.current_order["type"]
         if order_type == "move_to":
-            target = unit.current_order['target']
+            target = unit.current_order["target"]
             return f"Move To: ({target[0]:.1f}, {target[1]:.1f})"
         elif order_type == "attack_unit":
-            target_unit = unit.current_order['target']
+            target_unit = unit.current_order["target"]
             return f"Attack Unit {target_unit.id} ({target_unit.name})"
         elif order_type == "attack_move":
-            target = unit.current_order['target']
+            target = unit.current_order["target"]
             return f"Attack Move: ({target[0]:.1f}, {target[1]:.1f})"
         return str(unit.current_order)

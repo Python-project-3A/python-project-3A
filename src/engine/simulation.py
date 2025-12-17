@@ -26,13 +26,14 @@ class Simulation:
         self.game_speed = 1
         self.snapshot_utility = HTMLSnapshot(battlefield)
 
-    def tick(self, constante_tick_duration):
+    def tick(self, constante_tick_duration, should_update_logic):
         """Exécute un tick unique."""
         self.tick_count += 1
 
         # 1. Les généraux réfléchissent
-        for general in self.generals:
-            general.update(self.battlefield, self.tick_count)
+        if should_update_logic:
+            for general in self.generals:
+                general.update(self.battlefield, self.tick_count)
 
         # 2. Les unités agissent
         all_units = list(self.battlefield.get_all_units())
@@ -69,6 +70,7 @@ class Simulation:
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         while self.is_running and self.tick_count < max_ticks:
+            should_update_logic = self.tick_count % 10 == 0
             loop_start = time.time()
 
             # --- INPUTS ---
@@ -125,7 +127,7 @@ class Simulation:
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
-                self.tick(LOGICAL_DT * self.game_speed)
+                self.tick(LOGICAL_DT * self.game_speed, should_update_logic)
 
                 # STATS DE PERFORMANCE
                 frames_this_second += 1

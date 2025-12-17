@@ -96,7 +96,7 @@ class GeneralSmart(BaseGeneral):
                     protect_position = self._get_centroid(my_archers[0].units)
                     self._micro_pikeman_protector(unit, all_enemies, protect_position, target_pos, bf)
                 else:
-                    self._micro_generic_attack(unit, all_enemies)
+                    self._micro_generic_attack(unit, all_enemies, bf)
 
             elif squad.role == "FLANKER":
                 self._micro_knight_flanker(unit, all_enemies, target_pos, bf)
