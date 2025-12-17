@@ -47,7 +47,7 @@ Examples:
     tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft", "generalsmart"], help="Generals to include in tournament")
     tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
     tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
-    tourney_parser.add_argument("--no-alternate", action="store_true", help="Don't alternate player positions")
+    tourney_parser.add_argument("-na", action="store_true", help="Don't alternate player positions")
 
     return parser.parse_args()
 
@@ -121,14 +121,9 @@ def run_tournament(args):
     print(f"\n Scenario: {scenario_data['name']}")
     print(f" {scenario_data.get('description', '')}")
     print(f"\n Map: {scenario_data['map']['width']}x{scenario_data['map']['height']}")
+    print(" Mode: Positions FIXES (Not Alternating)" if args.na else " Mode: Positions ALTERNATIVES (Alternating)")
     print(f"\n Ctrl+C pour interrompre le tournoi et voir les résultats partiels.")
     print("=" * 60)
-
-    try:
-        scenario_data = ScenarioLoader.load_scenario(scenario_name)
-    except FileNotFoundError:
-        print("Scenario not found.")
-        return
 
     start_time = time.time()
     played_rounds = 0
@@ -144,8 +139,20 @@ def run_tournament(args):
             # Setup Battlefield
             bf = Battlefield(scenario_data["map"]["width"], scenario_data["map"]["height"])
 
-            current_g0_type = gen_type_1
-            current_g1_type = gen_type_2
+            # --- MODE ALTERNATE PLAYER POSITIONS ---
+            # si on est au round pair : P0 = G1, P1 = G0
+            swapped = False
+            if not args.na and i % 2 != 0:
+                swapped = True
+
+            if swapped:
+                current_g0_type = gen_type_1
+                current_g1_type = gen_type_2
+            else:
+                current_g0_type = gen_type_2
+                current_g1_type = gen_type_1
+
+            # Setup Generals
             bf.generals = [create_general(current_g0_type, 0), create_general(current_g1_type, 1)]
 
             # Spawn
@@ -157,10 +164,7 @@ def run_tournament(args):
             sim.run(None, visualizer=None, target_tps=0)
 
             # Résultat
-            survivors = {}
-            for u in bf.get_all_units():
-                if u.is_alive():
-                    survivors[u.owner] = True
+            survivors = set(u.owner for u in bf.get_all_units() if u.is_alive())
 
             winner = -1
             if 0 in survivors and 1 not in survivors:
@@ -173,7 +177,13 @@ def run_tournament(args):
             if winner == "draw":
                 wins["draw"] += 1
             else:
-                wins[winner] += 1
+                if not swapped:
+                    wins[winner] += 1
+                else:
+                    if winner == 0:
+                        wins[1] += 1
+                    else:
+                        wins[0] += 1
 
             played_rounds += 1
 
