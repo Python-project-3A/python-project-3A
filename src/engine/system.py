@@ -386,6 +386,28 @@ class UnitController:
         return False  # Not reached yet
 
     @staticmethod
+    def _reflex_self_defense(unit: "Unit", battlefield: "Battlefield") -> bool:
+        """
+        Réflexe de survie : Si l'unité est bloquée ou passe à côté d'un ennemi à portée immédiate.
+        """
+        # Optimisation : Unités de mêlée uniquement
+        if unit.attack_range > 2.0:
+            return False
+
+        # On cherche les menaces IMMÉDIATES (Portée d'attaque + petite marge)
+        melee_range = unit.attack_range + 0.5
+        potential_threats = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], melee_range)
+        valid_threats = [u for u in potential_threats if u.owner != unit.owner and u.is_alive() and unit.can_attack(u)]
+
+        if not valid_threats:
+            return False
+
+        target = min(valid_threats, key=lambda u: u.hp)
+
+        CombatSystem.attack(unit, target, battlefield)
+        return True
+
+    @staticmethod
     def update(unit: "Unit", battlefield: "Battlefield", dt: float):  # noqa: C901
         """Update unit behavior based on its current order"""
         if not unit.is_alive():
@@ -451,7 +473,13 @@ class UnitController:
                 else:
                     MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
             else:
+                # Réflexe : attasquer une untié bloquante :(si on a attaqué par réflexe, on s'arrête là pour ce tick (on ne bouge pas))
+                is_busy_fighting = UnitController._reflex_self_defense(unit, battlefield)
+
+                if not is_busy_fighting:
+                    MovementSystem.move_towards(unit, target, dt, battlefield)
                 unit.current_order = None
+
         elif order["type"] == "pathing_attack_unit":
             target = order["target"]
             if target and target.is_alive():
