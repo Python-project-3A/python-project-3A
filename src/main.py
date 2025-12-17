@@ -137,7 +137,10 @@ def run_tournament(args):
                 sys.stdout.write(f"  Match {match_id} : \n")
                 sys.stdout.flush()
 
-                wins = {0: 0, 1: 0, "draw": 0}  # 0 est gen_1, 1 est gen_2
+                if gen_1 not in tournament_data[scen_name]:
+                    tournament_data[scen_name][gen_1] = {}
+                tournament_data[scen_name][gen_1][gen_2] = {0: 0, 1: 0, "draw": 0}
+                wins = tournament_data[scen_name][gen_1][gen_2]
 
                 # --- EXECUTION DES N ROUNDS ---
                 for i in range(rounds):
@@ -185,12 +188,6 @@ def run_tournament(args):
 
                 # Fin du matchup
                 print(f" Done. Score: {wins[0]}-{wins[1]} (D:{wins['draw']})\n")
-
-                # Sauvegarde dans la structure
-                if gen_1 not in tournament_data[scen_name]:
-                    tournament_data[scen_name][gen_1] = {}
-                # On stocke le résultat du point de vue de Gen 1
-                tournament_data[scen_name][gen_1][gen_2] = wins
 
     except KeyboardInterrupt:
         print(f"\n\n{'-' * 60}")
