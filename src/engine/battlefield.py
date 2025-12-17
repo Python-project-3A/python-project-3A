@@ -11,6 +11,15 @@ from src.units.unit_base import Unit
 
 logger = logging.getLogger(__name__)
 
+# Codes ANSI
+RESET = "\033[0m"
+BLUE = "\033[34m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CLEAR_LINE = "\033[K"
+UP = "\033[A"
+DOWN = "\033[B"
+
 
 class Battlefield:
     """
@@ -355,11 +364,12 @@ class Battlefield:
             units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "radius": u.radius, "hibtox": u.radius})
         return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
 
-    def print_battle_result(self):
+    def print_battle_result(self) -> list:
         """Print battle results"""
-        print("\n" + "=" * 60)
-        print("=== BATTLE RESULT ===")
-        print("=" * 60)
+        lines = []
+        lines.append("\n" + "=" * 60)
+        lines.append("=== BATTLE RESULT ===")
+        lines.append("=" * 60)
 
         survivors_by_owner = {}
         for unit in self.get_all_units():
@@ -372,26 +382,34 @@ class Battlefield:
             general = self.generals[owner_id]
             survivors = survivors_by_owner.get(owner_id, [])
 
-            print(f"\n️  {general.name} (Player {owner_id}):")
-            print(f"   Survivors: {len(survivors)} units")
+            if owner_id == 0:
+                lines.append(f"\n  {BLUE}{general.name}{RESET} (Player {owner_id}):")
+            else:
+                lines.append(f"\n  {RED}{general.name}{RESET} (Player {owner_id}):")
+            lines.append(f"   Survivors: {len(survivors)} units")
 
             if survivors:
                 total_hp = sum(u.hp for u in survivors)
                 avg_hp = total_hp / len(survivors)
-                print(f"   Total HP: {total_hp:.1f}")
-                print(f"   Avg HP: {avg_hp:.1f}")
+                lines.append(f"   Total HP: {total_hp:.1f}")
+                lines.append(f"   Avg HP: {avg_hp:.1f}")
 
-        print("\n" + "-" * 60)
+        lines.append("\n" + "-" * 60)
         if len(survivors_by_owner) == 0:
-            print("  DRAW - All units eliminated!")
+            lines.append("  DRAW - All units eliminated!")
         elif len(survivors_by_owner) == 1:
             winner_id = list(survivors_by_owner.keys())[0]
             winner_general = self.generals[winner_id]
-            print(f" VICTORY for {winner_general.name} (Player {winner_id})!")
+            lines.append(f" VICTORY for {winner_general.name} (Player {winner_id})!")
         else:
             # counts = {owner: len(units) for owner, units in survivors_by_owner.items()}
             # winner_id = max(counts, key=counts.get)
             # winner_general = self.generals[winner_id]
             # print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
-            print(f" GAME STOPPED : BOTH TEAMS ARE ALIVE")
-        print("=" * 60 + "\n")
+            lines.append(f" GAME STOPPED : BOTH TEAMS ARE ALIVE")
+        lines.append("=" * 60 + "\n")
+        full_output = "\n".join(lines) + "\n"
+        return full_output
+
+
+#         lines.append(f"{BLUE}{g0:15}{RESET} Units: {alive_counts[0]:3} | HP: {hp_counts[0]:5.0f}" + CLEAR_LINE)

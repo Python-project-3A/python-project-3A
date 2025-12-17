@@ -32,6 +32,7 @@ class GeneralSmart(BaseGeneral):
         self.tick_counter = tick
 
         # 1. PERCEPTION (Macro) - TODO : Ne pas faire à chaque tick si ça rame (tous les 5/10/15 ticks)
+        # if self.tick_counter % 10 != 0:
         my_units = bf.get_my_units(self.player_id)
         enemies = bf.get_enemy_units(self.player_id)
         if not enemies or not my_units:

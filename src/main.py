@@ -248,7 +248,9 @@ def run_battle(args):
         sim.run(inp, visualizer=visualizer, target_tps=target_tps)
 
     # 7. Results
-    bf.print_battle_result()
+    full_output = bf.print_battle_result()
+    sys.stdout.write(full_output)
+    sys.stdout.flush()
 
 
 def main():
