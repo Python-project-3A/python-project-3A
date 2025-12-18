@@ -203,80 +203,72 @@ class CombatSystem:
     @staticmethod
     def attack(attacker: "Unit", defender: "Unit", battlefield: "Battlefield") -> bool:
         """
-        Gère l'attaque avec la formule complète :
-        Damage = Max(1, k_elev * (Max(0, Base_Atk - Base_Arm) + Bonuses))
+        Calcule et applique les dégâts selon la formule standard AoE2.
+        détecte automatiquement les catégories de dégâts (damage_*) et les armures correspondantes (armor_*).
+        Formule: Damage = Max(1, kelev * Sum(Max(0, Atk_i - Arm_i)))
         """
+        # 1. Vérifications d'usage
         if attacker.reload_timer > 0:
             return False
-
-        # Vérification de la portée
         if not attacker.can_attack(defender):
             return False
 
-        # --- 1. DÉTERMINATION DU TYPE D'ATTAQUE (Mêlée vs Percée) ---
-        # Si l'unité a des dégâts de percée (archer), on utilise l'armure de percée
-        if getattr(attacker, "damage_pierce", 0) > 0:
-            base_attack = attacker.damage_pierce
-            target_armor = getattr(defender, "armor_pierce", 0)
-        else:
-            base_attack = getattr(attacker, "damage_melee", 0)
-            target_armor = getattr(defender, "armor_melee", 0)
+        # 2. CALCUL DES DÉGÂTS BRUTS
+        raw_damage = 0.0
 
-        # Calcul des dégâts de base (ne peut pas être négatif)
-        base_damage = max(0, base_attack - target_armor)
+        # On inspecte l'attaquant pour trouver tous ses types de dégâts
+        for attr_name in dir(attacker):
+            if attr_name.startswith("damage_"):
+                damage_val = getattr(attacker, attr_name)
 
-        # --- 2. CALCUL DES BONUS (Contres) ---
-        # On parcourt tous les attributs de l'attaquant pour trouver les "damage_XYZ"
-        # Et on regarde si le défenseur a l'armure correspondante "armor_XYZ"
-        bonus_damage = 0
-        
-        # Liste des classes possibles basées sur ton JSON (à compléter si besoin)
-        # Le fait d'avoir "armor_cavalry": 0 dans le JSON du Knight signifie qu'il EST de la cavalerie
-        unit_classes = ["cavalry", "spearmen"]
+                if not isinstance(damage_val, (int, float)) or damage_val <= 0:  # On ignore les valeurs nulles ou négatives
+                    continue
 
-        for unit_class in unit_classes:
-            bonus_attr = f"damage_{unit_class}"
-            armor_attr = f"armor_{unit_class}"
+                category = attr_name.split("_", 1)[1]  # "cavalry"
+                armor_attr = f"armor_{category}"  # "armor_cavalry"
 
-            # Si l'attaquant a un bonus contre ce type ET que le défenseur EST de ce type
-            if hasattr(attacker, bonus_attr) and hasattr(defender, armor_attr):
-                bonus_val = getattr(attacker, bonus_attr)
-                # Note: Dans AOE2, il y a aussi une "armure de classe" qui réduit le bonus
-                # Ici on simplifie : si defender.armor_cavalry existe, on prend le bonus complet
-                # Sauf si tu veux soustraire la valeur de defender.armor_cavalry
-                class_armor = getattr(defender, armor_attr, 0)
-                bonus_damage += max(0, bonus_val - class_armor)
+                # Récupération de l'armure du défenseur
+                # Selon le texte : "If there is no match, the armor value is set to 1000"
+                if hasattr(defender, armor_attr):
+                    armor_val = getattr(defender, armor_attr)
+                else:
+                    armor_val = 1000.0  # Armure infinie si la catégorie n'est pas possédée
 
-        # --- 3. GESTION DE L'ÉLÉVATION (High Ground) ---
-        #[cite: 270]: x1.25 damage si plus haut, x0.75 si plus bas
-        k_elev = 1.0
-        
-        # On récupère la hauteur des tuiles via la GameMap
-        # (Supposons que game_map.get_tile(x, y) renvoie un objet avec un attribut 'elevation')
-        # A DECOMMENTER QUAND TA GAMEMAP GÉRERA L'ELEVATION
-        """
-        attacker_tile = battlefield.game_map.get_tile(*attacker.position)
-        defender_tile = battlefield.game_map.get_tile(*defender.position)
-        if attacker_tile and defender_tile:
-            if attacker_tile.elevation > defender_tile.elevation:
-                k_elev = 1.25
-            elif attacker_tile.elevation < defender_tile.elevation:
-                k_elev = 0.75
-        """
+                # Calcul par catégorie : Max(0, Attaque - Armure)
+                raw_damage += max(0, damage_val - armor_val)
 
-        # --- 4. FORMULE FINALE ---
-        # [cite: 116] Damage = max(1, ...)
-        total_damage = (base_damage + bonus_damage) * k_elev
-        final_damage = int(max(1, total_damage))
+        # 3. MULTIPLICATEUR DE HAUTEUR (Hill Bonus)
+        # Downhill (plus haut) = +25% | Uphill (plus bas) = -25% | Cliff = +25%
+        elevation_mult = 1.0
 
-        # Application des dégâts
+        tile_atk = battlefield.game_map.get_tile(int(attacker.position[0]), int(attacker.position[1]))
+        tile_def = battlefield.game_map.get_tile(int(defender.position[0]), int(defender.position[1]))
+
+        if tile_atk and tile_def:
+            h_atk = getattr(tile_atk, "elevation", 0)
+            h_def = getattr(tile_def, "elevation", 0)
+
+            if h_atk > h_def:
+                elevation_mult = 1.25  # Downhill bonus
+            elif h_atk < h_def:
+                elevation_mult = 0.75  # Uphill penalty
+
+        # 4. MULTIPLICATEUR DE PRÉCISION (Accuracy)
+        accuracy_mult = getattr(attacker, "accuracy", 1.0)
+
+        # 5. FORMULE FINALE & ARRONDIS
+        final_damage_float = raw_damage * elevation_mult * accuracy_mult
+
+        final_damage = int(max(1, round(final_damage_float)))  # "The minimum damage done in one hit is 1"
+
+        # 6. APPLICATION (Résolution Simultanée)
         defender.pending_damage += final_damage
-        # defender.hp = max(0, defender.hp - final_damage)
 
-        # Reset du cooldown
+        # 7. RESET COOLDOWN
         attacker.reload_timer = attacker.attack_cooldown
 
         return True
+
     @staticmethod
     def choose_nearest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
         """Choose nearest living enemy"""
