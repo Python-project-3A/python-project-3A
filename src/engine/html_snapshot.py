@@ -226,6 +226,14 @@ class HTMLSnapshot:
       h3 {{
         margin: 0;
       }}
+
+      .theme-icon-wrapper {{
+        width: 1.5rem;
+        height: 1.5rem;
+        place-self: end;
+        cursor: pointer;
+      }}
+              
       ::-webkit-scrollbar {{
         width: 0.5rem;
         height: 0.5rem;
@@ -279,6 +287,7 @@ class HTMLSnapshot:
       font-family: Inter;
     "
     >
+        <header><div class="theme-icon-wrapper" role="button"></div></header>
         <h1 class="main-title">Battlefield Snapshot</h1>
         <div class="battlefield-details" style="font-size: 18px">
             <p>
@@ -381,7 +390,7 @@ class HTMLSnapshot:
         </section>
         
         <script defer>
-            (() => {{
+            const handleCollapsible = () => {{
                 const collapsibleIcons = document.querySelectorAll(".collapsible-icon");
                 const collapsibleElements = document.querySelectorAll(
                 ".collapsible-element"
@@ -407,7 +416,61 @@ class HTMLSnapshot:
                     }}
                 }});
                 }});
-            }})();
+            }};
+            handleCollapsible();
+
+            const themeIconWrapper = document.querySelector(".theme-icon-wrapper");
+
+            let isDarkMode = document.documentElement.classList.contains("dark");
+
+            const sunIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-sun-icon lucide-sun theme-icon"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>`;
+            const moonIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-moon-icon lucide-moon theme-icon"
+                >
+                  <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
+                </svg>`;
+
+            themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+
+            themeIconWrapper.addEventListener("click", () => {{
+              document.documentElement.classList[isDarkMode ? "remove" : "add"](
+                "dark"
+              );
+              isDarkMode = document.documentElement.classList.contains("dark");
+
+              themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+            }});
+
         </script>
 
     </body>
@@ -417,60 +480,293 @@ class HTMLSnapshot:
 
     def generate_html_report_tournament(data):
         """
-        Génère un fichier HTML basique avec les matrices de scores.
+        Génère un fichier HTM avec les matrices de score
         """
-        html = """
-      <html>
-      <head>
-          <style>
-              table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-              th { background-color: #f2f2f2; }
-              h2 { color: #333; }
-          </style>
-      </head>
-      <body>
-      <h1>Rapport de Tournoi</h1>
-      """
 
+        GENERAL_COLORS={"daft":"oklch(0.6392 0.2189 29.23)", "braindead":"oklch(0.7 0.1 214)", "generalsmart":"oklch(0.5198 0.1473 142.4953)"}
+        
+        report_content = ""
+        
         for scen, matrix in data.items():
-            html += f"<h2>Scénario: {scen}</h2>"
-            html += "<table><tr><th>General</th>"
-
-            # Récupérer tous les adversaires pour les colonnes
+            # Identify all unique opponents for the headers
             opponents = set()
             for p1, res in matrix.items():
                 opponents.add(p1)
                 opponents.update(res.keys())
             sorted_opps = sorted(list(opponents))
 
-            for opp in sorted_opps:
-                html += f"<th>vs {opp}</th>"
-            html += "</tr>"
-
+            headers = "".join([f"<th><span class='general-name' style='color:{GENERAL_COLORS[opp]};'>{opp}</span></th>" for opp in sorted_opps])
+            
+            table_rows = ""
             for gen_main in sorted_opps:
-                html += f"<tr><td><b>{gen_main}</b></td>"
+                cells = ""
                 for gen_opp in sorted_opps:
-                    # Retrouver le score (attention, la matrice peut être stockée dans un sens ou l'autre)
-                    # Ici simplification : il faut gérer la symétrie si on a stocké (A vs B) et qu'on cherche (B vs A)
-                    # Pour cet exemple, je te laisse gérer la récupération propre des données.
-                    cell = "-"
+                    cell_value = "--"
+                    
+                    # Check direct match
                     if gen_main in matrix and gen_opp in matrix[gen_main]:
                         w = matrix[gen_main][gen_opp]
-                        cell = f"{w[0]}-{w[1]}"  # Win-Loss du point de vue Main
-
-                    # Gestion Symétrie (si on a stocké A vs B, B vs A est l'inverse)
+                        cell_value = f"<span style='color:{GENERAL_COLORS[gen_main]}'>{w[0]}</span> - <span style='color:{GENERAL_COLORS[gen_opp]}'>{w[1]}</span>"
+                    
+                    # Check symmetry (reverse match)
                     elif gen_opp in matrix and gen_main in matrix[gen_opp]:
                         w = matrix[gen_opp][gen_main]
-                        cell = f"{w[1]}-{w[0]}"  # Win-Loss inversé
+                        cell_value = f"<span style='color:{GENERAL_COLORS[gen_main]}'>{w[1]}</span> - <span style='color:{GENERAL_COLORS[gen_opp]}'>{w[0]}</span>"
+                    
+                    cells += f"<td>{cell_value}</td>"
+                
+                table_rows += f"<tr><td><span class='general-name' style='color:{GENERAL_COLORS[gen_main]};'>{gen_main}</span></td>{cells}</tr>"
 
-                    html += f"<td>{cell}</td>"
-                html += "</tr>"
-            html += "</table>"
+            report_content += f"""
+            <section>
+                <h2 class="scenario-title">Scenario: {scen}</h2>
+                <div class="table-wrapper">
+                  <table>
+                      <thead>
+                          <tr>
+                              <th>General</th>
+                              {headers}
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {table_rows}
+                      </tbody>
+                  </table>                
+                </div>
+            </section>
+            """
 
-        html += "</body></html>"
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <title>Tournament Report</title>
+            <link href="https://fonts.googleapis.com/css?family=Inter" rel="stylesheet" />
+            <style>
+                :root {{
+                    --background: oklch(1 0 0);
+                    --foreground: oklch(0.145 0 0);
+                    --primary: oklch(0.205 0 0);
+                    --primary-foreground: oklch(0.985 0 0);
+                    --secondary: oklch(0.97 0 0);
+                    --secondary-foreground: oklch(0.205 0 0);
+                    --muted: oklch(0.97 0 0);
+                    --muted-foreground: oklch(0.556 0 0);
+                    --accent: oklch(0.97 0 0);
+                    --accent-foreground: oklch(0.205 0 0);
+                    --border: oklch(0.922 0 0);
+                    --input: oklch(0.922 0 0);
+                    --ring: oklch(0.708 0 0);
+                    --radius: 0.625rem;
+                }}
+
+                .dark {{
+                    --background: oklch(0.145 0 0);
+                    --foreground: oklch(0.985 0 0);
+                    --primary: oklch(0.985 0 0);
+                    --primary-foreground: oklch(0.205 0 0);
+                    --secondary: oklch(0.269 0 0);
+                    --secondary-foreground: oklch(0.985 0 0);
+                    --muted: oklch(0.269 0 0);
+                    --muted-foreground: oklch(0.708 0 0);
+                    --accent: oklch(0.269 0 0);
+                    --accent-foreground: oklch(0.985 0 0);
+                    --border: oklch(0.269 0 0);
+                    --input: oklch(0.269 0 0);
+                    --ring: oklch(0.439 0 0);
+                }}
+
+                body{{
+                    background-color: var(--background);
+                    color: var(--foreground);
+                    font-family: Inter;
+                }}
+
+                tbody tr:last-child {{
+                  border-bottom: 0;
+                }}
+
+                th{{
+                  padding:0.5rem;
+                }}
+
+                tr {{
+                  border-bottom: 1px solid var(--border);
+                  &:hover {{
+                    background-color: var(--muted);
+                  }}
+
+                  th:first-child {{
+                    width: 25%;   
+                  }}
+
+                }}
+
+                td {{
+                  padding: 0.6rem;
+                  text-align: left;
+                  text-wrap: nowrap;
+                }}
+
+                thead {{
+                  padding-bottom: 1rem;
+                  height: 2.5rem;
+                  text-align: left;
+                  vertical-align: middle;
+                  text-wrap: nowrap;
+                }}
+
+                table {{
+                  width: 100%;
+                  border-collapse: collapse;
+                }}
+
+                .main-title{{
+                  font-size: 2.5rem;
+                  margin: 0;
+                  padding-top: 1rem;
+                  padding-bottom: 1rem;
+                  place-self: center;
+                  width: 90%;
+                }}
+
+                .table-wrapper{{
+                  width: 90%;
+                  margin: 0;
+                  place-self: center;              
+                  padding-top: 1rem;
+                  padding-bottom: 1rem;
+                  overflow-x: scroll;
+                }}
+
+                .scenario-title{{
+                  width: 90%;
+                  margin: 0;
+                  place-self: center;
+                  padding-top: 1.5rem;
+                }}
+
+                .general-name{{
+                  font-weight: bold;
+                }}
+
+                .theme-icon-wrapper {{
+                  width: 1.5rem;
+                  height: 1.5rem;
+                  place-self: end;
+                  cursor: pointer;
+                }}
+                
+                ::-webkit-scrollbar{{
+                  width: 0.5rem;
+                  height: 0.5rem;
+                }}
+
+                ::-webkit-scrollbar-track{{
+                  background: transparent;
+                }}
+
+                ::-webkit-scrollbar-thumb{{
+                  background: rgb(163 163 163 / var(--tw-bg-opacity, 1));
+                  border-radius: 0.25rem;
+                }}
+
+                ::-webkit-scrollbar-thumb:hover{{
+                  background: rgb(212 212 212 / var(--tw-bg-opacity, 1));
+                }}
+            </style>
+            <script>
+              const getThemePreference = () => {{
+                if (
+                  typeof localStorage !== "undefined" &&
+                  localStorage.getItem("theme")
+                ) {{
+                  return localStorage.getItem("theme");
+                }}
+                return window.matchMedia("(prefers-color-scheme: dark)").matches
+                  ? "dark"
+                  : "light";
+              }};
+              const isDark = getThemePreference() === "dark";
+              document.documentElement.classList[isDark ? "add" : "remove"]("dark");
+
+              if (typeof localStorage !== "undefined") {{
+                const observer = new MutationObserver(() => {{
+                  const isDark = document.documentElement.classList.contains("dark");
+                  localStorage.setItem("theme", isDark ? "dark" : "light");
+                }});
+                observer.observe(document.documentElement, {{
+                  attributes: true,
+                  attributeFilter: ["class"],
+                }});
+              }}
+            </script>
+
+        </head>
+        <body>
+            <header><div class="theme-icon-wrapper" role="button"></div></header>
+            <h1 class="main-title">Tournament report</h1>
+            {report_content}
+            <script defer>
+              const themeIconWrapper = document.querySelector(".theme-icon-wrapper");
+
+              let isDarkMode = document.documentElement.classList.contains("dark");
+
+              const sunIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-sun-icon lucide-sun theme-icon"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>`;
+              const moonIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-moon-icon lucide-moon theme-icon"
+                >
+                  <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
+                </svg>`;
+
+              themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+
+              themeIconWrapper.addEventListener("click", () => {{
+                document.documentElement.classList[isDarkMode ? "remove" : "add"](
+                  "dark"
+                );
+                isDarkMode = document.documentElement.classList.contains("dark");
+
+                themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+              }});
+            </script>
+        </body>
+        </html>
+        """
+        
         return html
-
+        
     def save_and_open_html_file(self, tick_count: int):
         FOLDER_NAME = "temp"
         FILE_NAME = "snapshot.html"

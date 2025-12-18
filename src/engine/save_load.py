@@ -15,12 +15,13 @@ from src.units.unit_base import Unit
 from src.scenarios.scenario_loader import ScenarioLoader  # Pour la factory d'unité
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
+from src.general.GeneralSmart import GeneralSmart
 
 # Liste des classes de généraux
 GENERAL_CLASSES = {
     "GeneralBraindead": GeneralBraindead,
     "GeneralDaft": GeneralDaft,
-    # Ajoutez d'autres classes de généraux ici
+    "GeneralSmart": GeneralSmart
 }
 
 
