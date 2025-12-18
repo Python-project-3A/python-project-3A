@@ -226,6 +226,14 @@ class HTMLSnapshot:
       h3 {{
         margin: 0;
       }}
+
+      .theme-icon-wrapper {{
+        width: 1.5rem;
+        height: 1.5rem;
+        place-self: end;
+        cursor: pointer;
+      }}
+              
       ::-webkit-scrollbar {{
         width: 0.5rem;
         height: 0.5rem;
@@ -279,6 +287,7 @@ class HTMLSnapshot:
       font-family: Inter;
     "
     >
+        <header><div class="theme-icon-wrapper" role="button"></div></header>
         <h1 class="main-title">Battlefield Snapshot</h1>
         <div class="battlefield-details" style="font-size: 18px">
             <p>
@@ -381,7 +390,7 @@ class HTMLSnapshot:
         </section>
         
         <script defer>
-            (() => {{
+            const handleCollapsible = () => {{
                 const collapsibleIcons = document.querySelectorAll(".collapsible-icon");
                 const collapsibleElements = document.querySelectorAll(
                 ".collapsible-element"
@@ -407,7 +416,61 @@ class HTMLSnapshot:
                     }}
                 }});
                 }});
-            }})();
+            }};
+            handleCollapsible();
+
+            const themeIconWrapper = document.querySelector(".theme-icon-wrapper");
+
+            let isDarkMode = document.documentElement.classList.contains("dark");
+
+            const sunIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-sun-icon lucide-sun theme-icon"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>`;
+            const moonIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-moon-icon lucide-moon theme-icon"
+                >
+                  <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
+                </svg>`;
+
+            themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+
+            themeIconWrapper.addEventListener("click", () => {{
+              document.documentElement.classList[isDarkMode ? "remove" : "add"](
+                "dark"
+              );
+              isDarkMode = document.documentElement.classList.contains("dark");
+
+              themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+            }});
+
         </script>
 
     </body>
@@ -588,6 +651,13 @@ class HTMLSnapshot:
                   font-weight: bold;
                 }}
 
+                .theme-icon-wrapper {{
+                  width: 1.5rem;
+                  height: 1.5rem;
+                  place-self: end;
+                  cursor: pointer;
+                }}
+                
                 ::-webkit-scrollbar{{
                   width: 0.5rem;
                   height: 0.5rem;
@@ -635,8 +705,62 @@ class HTMLSnapshot:
 
         </head>
         <body>
+            <header><div class="theme-icon-wrapper" role="button"></div></header>
             <h1 class="main-title">Tournament report</h1>
             {report_content}
+            <script defer>
+              const themeIconWrapper = document.querySelector(".theme-icon-wrapper");
+
+              let isDarkMode = document.documentElement.classList.contains("dark");
+
+              const sunIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-sun-icon lucide-sun theme-icon"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>`;
+              const moonIconSvg = `<svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-moon-icon lucide-moon theme-icon"
+                >
+                  <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
+                </svg>`;
+
+              themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+
+              themeIconWrapper.addEventListener("click", () => {{
+                document.documentElement.classList[isDarkMode ? "remove" : "add"](
+                  "dark"
+                );
+                isDarkMode = document.documentElement.classList.contains("dark");
+
+                themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
+              }});
+            </script>
         </body>
         </html>
         """
