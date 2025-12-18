@@ -25,6 +25,7 @@ class Simulation:
         self.paused = False
         self.game_speed = 1
         self.snapshot_utility = HTMLSnapshot(battlefield)
+        self.LOGICAL_DT = 1.0 / 30.0
 
     def tick(self, constante_tick_duration, should_update_logic):
         """Exécute un tick unique."""
@@ -35,26 +36,35 @@ class Simulation:
             for general in self.generals:
                 general.update(self.battlefield, self.tick_count)
 
-        # 2. Les unités agissent
-        all_units = list(self.battlefield.get_all_units())
-        random.shuffle(all_units)
+        all_units = self.battlefield.get_all_units()
 
+        # 2. PHASE DE MOUVEMENT DES UNITÉS
         for unit in all_units:
             if unit.is_alive():
-                UnitController.update(unit, self.battlefield, constante_tick_duration)
+                UnitController.process_movement(unit, self.battlefield, dt)
 
-        # 3. Condition de fin de bataille
+        # 3. PHASE D'ATTAQUE DES UNITÉS
+        for unit in all_units:
+            if unit.is_alive():
+                UnitController.process_attack(unit, self.battlefield)
+
+        # --- 4. PHASE DE RESOLUTION DES DEGATS ---
+        # On applique tous les dégâts en attente d'un coup
+        for unit in all_units:
+            if unit.pending_damage > 0:
+                unit.hp = max(0, unit.hp - unit.pending_damage)
+                unit.pending_damage = 0  # Reset pour le prochain tour
+
+        # --- 4. PHASE DE NETTOYAGE ---
+        self.battlefield.remove_dead_units()
+
+        # 5. Fin de bataille
         if self.battlefield.is_battle_over():
             self.is_running = False
 
     def run(self, input_provider, target_tps=30, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
-
-        if visualizer:
-            LOGICAL_DT = 1.0 / 30.0
-        else:
-            LOGICAL_DT = 0.1
 
         # LIMITEUR DE VITESSE (SLEEP)
         tick_duration = 1.0 / target_tps if target_tps > 0 else 0  # Si target_tps = 0 (Tournoi), on ne dort jamais (min_frame_duration = 0).Sinon, on dort pour respecter le rythme (ex: 1/30s)
@@ -127,7 +137,7 @@ class Simulation:
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
-                self.tick(LOGICAL_DT * self.game_speed, should_update_logic)
+                self.tick(self.LOGICAL_DT * self.game_speed)
 
                 # STATS DE PERFORMANCE
                 frames_this_second += 1
