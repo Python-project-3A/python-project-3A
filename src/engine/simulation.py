@@ -34,13 +34,19 @@ class Simulation:
         for general in list(self.generals):
             general.update(self.battlefield, self.tick_count)
 
-        # 2. Action des Unités : PHASE DE DÉCISION & MOUVEMENT
         all_units = self.battlefield.get_all_units()
-        for unit in list(self.battlefield.get_all_units()):
-            if unit.is_alive():
-                UnitController.update(unit, self.battlefield, dt)
 
-        # --- 3. PHASE DE RESOLUTION (Nouveau) ---
+        # 2. PHASE DE MOUVEMENT DES UNITÉS
+        for unit in all_units:
+            if unit.is_alive():
+                UnitController.process_movement(unit, self.battlefield, dt)
+
+        # 3. PHASE D'ATTAQUE DES UNITÉS
+        for unit in all_units:
+            if unit.is_alive():
+                UnitController.process_attack(unit, self.battlefield)
+
+        # --- 4. PHASE DE RESOLUTION DES DEGATS ---
         # On applique tous les dégâts en attente d'un coup
         for unit in all_units:
             if unit.pending_damage > 0:

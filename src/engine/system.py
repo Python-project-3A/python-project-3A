@@ -344,98 +344,163 @@ class UnitController:
         return False  # Not reached yet
 
     @staticmethod
-    def update(unit: "Unit", battlefield: "Battlefield", dt: float):  # noqa: C901
-        """Update unit behavior based on its current order"""
-        if not unit.is_alive():
-            # battlefield.remove_unit(unit.id)
-            return
-
-        if not unit.current_order:
+    def process_movement(unit: "Unit", battlefield: "Battlefield", dt: float):
+        """PHASE 1 : SEULEMENT LE DÉPLACEMENT"""
+        if not unit.is_alive() or not unit.current_order:
             return
 
         order = unit.current_order
 
-        # --- GESTION DU TEMPS DE RECHARGEMENT ---
-        if unit.reload_timer > 0:
-            unit.reload_timer -= dt  # On décrémente selon le temps du JEU, pas le temps RÉEL
+        if unit.reload_timer > 0:  # Gestion du cooldown
+            unit.reload_timer -= dt
 
-        # --- EXECUTION DES ORDRES ---
-        if order["type"] == "move_to":
+        # LOGIQUE DE MOUVEMENT
+        if order["type"] in ["attack_unit", "attack_move"]:
+            target = None
+
+            # Récupération de la cible selon le type d'ordre
+            if order["type"] == "attack_unit":
+                target = order["target"]
+            elif order["type"] == "attack_move":
+                enemies = battlefield.units_in_radius(unit.position[0], unit.position[1], unit.vision_range)
+                possible_targets = [u for u in enemies if u.owner != unit.owner and u.is_alive()]
+                if possible_targets:
+                    target = min(possible_targets, key=lambda e: unit.dist_to(e))
+                else:
+                    target = None  # Si pas d'ennemi, on continue d'avancer
+
+            # SI ON TROUVE UNE CIBLE :
+            if target and target.is_alive():
+                if unit.can_attack(target):  # Si on est à portée de tir, ON NE BOUGE PAS. On attend la phase de tir.
+                    return
+                else:
+                    MovementSystem.move_towards(unit, target, dt, battlefield)
+
+            # SI PAS DE CIBLE :
+            elif order["type"] == "attack_move":
+                UnitController._follow_path(unit, order["target"], order, battlefield, dt)
+
+        # MOVE TO STANDARD
+        elif order["type"] == "move_to":
             reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
             if reached:
                 unit.current_order = None
 
-        # ---------------------------------------------------------
-        # GESTION ATTACK MOVE (Avancer, taper si ennemi, sinon avancer)
-        # ---------------------------------------------------------
-        elif order["type"] == "attack_move":
-            target_pos = order["target"]
+    @staticmethod
+    def process_attack(unit: "Unit", battlefield: "Battlefield"):
+        """PHASE 2 : SEULEMENT L'ATTAQUE"""
+        if not unit.is_alive() or not unit.current_order:
+            return
 
-            # Recherche d'ennemis
-            enemies_around = [u for u in battlefield.units_in_radius(unit.position[0], unit.position[1], unit.vision_range) if u.owner != unit.owner and u.is_alive()]
+        order = unit.current_order
+
+        if order["type"] in ["attack_unit", "attack_move"]:  # Gestion des ordres offensifs
             target = None
-            if enemies_around:
-                # Trouve le plus proche
-                target = min(enemies_around, key=lambda e: unit.dist_to(e))
 
-            # Optimisation: ne chercher la cible la plus proche que si on en a (eviter O(N^2) inutile)
-            # enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
-            # if enemies:
-            # On ne regarde que ceux dans vision_range
-            # visible_enemies = [e for e in enemies if unit.dist_to(e) < unit.vision_range]
-            # if visible_enemies:
-            # target = min(visible_enemies, key=lambda e: unit.dist_to(e))
+            if order["type"] == "attack_unit":
+                target = order["target"]
+            elif order["type"] == "attack_move":
+                enemies = battlefield.get_enemy_units(unit.owner)
+                target = CombatSystem.choose_nearest_target(unit, enemies)
 
-            if target:
-                if unit.can_attack(target):
-                    CombatSystem.attack(unit, target, battlefield)
-                else:
-                    # Si on chasse une unité, on utilise move_towards (pas de A* dynamique pour l'instant)
-                    MovementSystem.move_towards(unit, target, dt, battlefield)
-            else:
-                # Pas d'ennemi : on continue le mouvement prévu (A*)
-                reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
-                if reached:
-                    unit.current_order = None
-
-        # ---------------------------------------------------------
-        # GESTION ATTACK UNIT (Ciblage direct)
-        # ---------------------------------------------------------
-        elif order["type"] == "attack_unit":
-            target = order["target"]
-            if target and target.is_alive():
-                if unit.can_attack(target):
-                    CombatSystem.attack(unit, target, battlefield)
-                else:
-                    MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
-            else:
-                unit.current_order = None
-        elif order["type"] == "pathing_attack_unit":
-            target = order["target"]
+            # EXECUTION DE L'ATTAQUE
             if target and target.is_alive():
                 if unit.can_attack(target):
                     CombatSystem.attack(unit, target, battlefield)
 
-                    # Clear path data after engaging
-                    if "path" in order:
-                        order["path"] = []
-                    if "path_target_pos" in order:
-                        del order["path_target_pos"]
-                else:
-                    target_pos = target.position
+    # @staticmethod
+    # def update(unit: "Unit", battlefield: "Battlefield", dt: float):  # noqa: C901
+    #     """Update unit behavior based on its current order"""
+    #     if not unit.is_alive():
+    #         # battlefield.remove_unit(unit.id)
+    #         return
 
-                    # --- DYNAMIC PATH RECALCULATION CHECK (1.0 tile threshold) ---
-                    path_is_stale = "path" in order and "path_target_pos" in order and unit.dist_to_point(order["path_target_pos"]) > 1.0
+    #     if not unit.current_order:
+    #         return
 
-                    if path_is_stale:
-                        order["path"] = []
-                        del order["path_target_pos"]
+    #     order = unit.current_order
 
-                    # Execute pathfinding movement
-                    UnitController._follow_path(unit, target_pos, order, battlefield, dt)
+    #     # --- GESTION DU TEMPS DE RECHARGEMENT ---
+    #     if unit.reload_timer > 0:
+    #         unit.reload_timer -= dt  # On décrémente selon le temps du JEU, pas le temps RÉEL
 
-                    # Store the position for next tick's staleness check
-                    if "path" in order and order["path"]:
-                        order["path_target_pos"] = target_pos
-            else:
-                unit.current_order = None  # Target is dead/gone, clear order.
+    #     # --- EXECUTION DES ORDRES ---
+    #     if order["type"] == "move_to":
+    #         reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
+    #         if reached:
+    #             unit.current_order = None
+
+    #     # ---------------------------------------------------------
+    #     # GESTION ATTACK MOVE (Avancer, taper si ennemi, sinon avancer)
+    #     # ---------------------------------------------------------
+    #     elif order["type"] == "attack_move":
+    #         target_pos = order["target"]
+
+    #         # Recherche d'ennemis
+    #         enemies_around = [u for u in battlefield.units_in_radius(unit.position[0], unit.position[1], unit.vision_range) if u.owner != unit.owner and u.is_alive()]
+    #         target = None
+    #         if enemies_around:
+    #             # Trouve le plus proche
+    #             target = min(enemies_around, key=lambda e: unit.dist_to(e))
+
+    #         # Optimisation: ne chercher la cible la plus proche que si on en a (eviter O(N^2) inutile)
+    #         # enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
+    #         # if enemies:
+    #         # On ne regarde que ceux dans vision_range
+    #         # visible_enemies = [e for e in enemies if unit.dist_to(e) < unit.vision_range]
+    #         # if visible_enemies:
+    #         # target = min(visible_enemies, key=lambda e: unit.dist_to(e))
+
+    #         if target:
+    #             if unit.can_attack(target):
+    #                 CombatSystem.attack(unit, target, battlefield)
+    #             else:
+    #                 # Si on chasse une unité, on utilise move_towards (pas de A* dynamique pour l'instant)
+    #                 MovementSystem.move_towards(unit, target, dt, battlefield)
+    #         else:
+    #             # Pas d'ennemi : on continue le mouvement prévu (A*)
+    #             reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
+    #             if reached:
+    #                 unit.current_order = None
+
+    #     # ---------------------------------------------------------
+    #     # GESTION ATTACK UNIT (Ciblage direct)
+    #     # ---------------------------------------------------------
+    #     elif order["type"] == "attack_unit":
+    #         target = order["target"]
+    #         if target and target.is_alive():
+    #             if unit.can_attack(target):
+    #                 CombatSystem.attack(unit, target, battlefield)
+    #             else:
+    #                 MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
+    #         else:
+    #             unit.current_order = None
+    #     elif order["type"] == "pathing_attack_unit":
+    #         target = order["target"]
+    #         if target and target.is_alive():
+    #             if unit.can_attack(target):
+    #                 CombatSystem.attack(unit, target, battlefield)
+
+    #                 # Clear path data after engaging
+    #                 if "path" in order:
+    #                     order["path"] = []
+    #                 if "path_target_pos" in order:
+    #                     del order["path_target_pos"]
+    #             else:
+    #                 target_pos = target.position
+
+    #                 # --- DYNAMIC PATH RECALCULATION CHECK (1.0 tile threshold) ---
+    #                 path_is_stale = "path" in order and "path_target_pos" in order and unit.dist_to_point(order["path_target_pos"]) > 1.0
+
+    #                 if path_is_stale:
+    #                     order["path"] = []
+    #                     del order["path_target_pos"]
+
+    #                 # Execute pathfinding movement
+    #                 UnitController._follow_path(unit, target_pos, order, battlefield, dt)
+
+    #                 # Store the position for next tick's staleness check
+    #                 if "path" in order and order["path"]:
+    #                     order["path_target_pos"] = target_pos
+    #         else:
+    #             unit.current_order = None  # Target is dead/gone, clear order.
