@@ -27,6 +27,7 @@ class GeneralSmart(BaseGeneral):
         # Paramètres de personnalité (pour faire varier les IA plus tard)
         self.aggressiveness = 0.5
         self.formation_spacing = 1.5
+        self.squads = {"FLANKER": Squad([], "FLANKER"), "DPS": Squad([], "DPS"), "TANK": Squad([], "TANK")}
 
     def update(self, bf: Battlefield, tick: int) -> None:
         self.tick_counter = tick
@@ -42,40 +43,41 @@ class GeneralSmart(BaseGeneral):
         enemy_clusters = self._analyze_enemy_clusters(enemies)
 
         # 2. STRATÉGIE (Gestion des Escouades)
-        # On réalloue les unités aux escouades si besoin
         self._manage_squads(my_units, enemy_clusters)
 
         # 3. TACTIQUE & MICRO (Exécution par unité)
         # Au lieu de boucler sur les unités, on boucle sur les escouades
-        for squad in self.squads:
+        for squad in self.squads.values():
+            if not squad.units:
+                continue
             self._execute_squad_tactics(squad, enemies, bf)
 
     # --- PHASE 1: PERCEPTION --- --> Dans general_base.py
 
     # --- PHASE 2: STRATÉGIE ---
     def _manage_squads(self, my_units: list[Unit], enemy_clusters):
-        # Pour l'instant:
-        # - knight -> Escouade Flank
-        # - crossbowman -> Escouade DPS
-        # - pikeman -> Escouade Tank
+        # RESET : On vide les listes d'unités (mais on garde l'objet Squad)
+        for squad in self.squads.values():
+            squad.units.clear()
 
-        # On vide et on recrée les escouades -> TODO A améliorer aussi
-        knights = [u for u in my_units if u.name.lower() == "knight"]
-        crossbowman = [u for u in my_units if u.name.lower() == "crossbowman"]
-        pikemen = [u for u in my_units if u.name.lower() == "pikeman"]
+        # DISPATCH
+        for unit in my_units:
+            if not unit.is_alive():
+                continue
 
-        self.squads = []
-        if knights:
-            self.squads.append(Squad(knights, "FLANKER"))
-        if crossbowman:
-            self.squads.append(Squad(crossbowman, "DPS"))
-        if pikemen:
-            self.squads.append(Squad(pikemen, "TANK"))
+            name = unit.name.lower()
+            if name == "knight":
+                self.squads["FLANKER"].units.append(unit)
+            elif name == "crossbowman":
+                self.squads["DPS"].units.append(unit)
+            elif name == "pikeman":
+                self.squads["TANK"].units.append(unit)
 
-        # Assignation des cibles d'escouade
-        main_enemy_pos = enemy_clusters[0]["center"]
-        for squad in self.squads:
-            squad.target_position = main_enemy_pos
+        # CIBLAGE
+        if enemy_clusters:
+            main_enemy_pos = enemy_clusters[0]["center"]
+            for squad in self.squads.values():
+                squad.target_position = main_enemy_pos
 
     # --- PHASE 3 & 4: TACTIQUE & MICRO ---
     def _execute_squad_tactics(self, squad: Squad, all_enemies: list[Unit], bf: Battlefield):
@@ -91,7 +93,7 @@ class GeneralSmart(BaseGeneral):
                 self._micro_archer(unit, all_enemies, target_pos, bf)
 
             elif squad.role == "TANK":
-                my_archers = [s for s in self.squads if s.role == "DPS"]
+                my_archers = [s for s in self.squads.values() if s.role == "DPS"]
                 if my_archers and my_archers[0].units:
                     protect_position = self._get_centroid(my_archers[0].units)
                     self._micro_pikeman_protector(unit, all_enemies, protect_position, target_pos, bf)
