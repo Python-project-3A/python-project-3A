@@ -27,7 +27,7 @@ class Simulation:
         self.snapshot_utility = HTMLSnapshot(battlefield)
         self.LOGICAL_DT = 1.0 / 30.0
 
-    def tick(self, constante_tick_duration, should_update_logic):
+    def tick(self, dt, should_update_logic):
         """Exécute un tick unique."""
         self.tick_count += 1
 
@@ -137,7 +137,7 @@ class Simulation:
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
-                self.tick(self.LOGICAL_DT * self.game_speed)
+                self.tick(self.LOGICAL_DT * self.game_speed, should_update_logic)
 
                 # STATS DE PERFORMANCE
                 frames_this_second += 1
