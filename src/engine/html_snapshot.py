@@ -483,10 +483,10 @@ class HTMLSnapshot:
         Génère un fichier HTM avec les matrices de score
         """
 
-        GENERAL_COLORS={"daft":"oklch(0.6392 0.2189 29.23)", "braindead":"oklch(0.7 0.1 214)", "generalsmart":"oklch(0.5198 0.1473 142.4953)"}
-        
+        GENERAL_COLORS = {"daft": "oklch(0.6392 0.2189 29.23)", "braindead": "oklch(0.7 0.1 214)", "generalsmart": "oklch(0.5198 0.1473 142.4953)"}
+
         report_content = ""
-        
+
         for scen, matrix in data.items():
             # Identify all unique opponents for the headers
             opponents = set()
@@ -496,25 +496,25 @@ class HTMLSnapshot:
             sorted_opps = sorted(list(opponents))
 
             headers = "".join([f"<th><span class='general-name' style='color:{GENERAL_COLORS[opp]};'>{opp}</span></th>" for opp in sorted_opps])
-            
+
             table_rows = ""
             for gen_main in sorted_opps:
                 cells = ""
                 for gen_opp in sorted_opps:
                     cell_value = "--"
-                    
+
                     # Check direct match
                     if gen_main in matrix and gen_opp in matrix[gen_main]:
                         w = matrix[gen_main][gen_opp]
                         cell_value = f"<span style='color:{GENERAL_COLORS[gen_main]}'>{w[0]}</span> - <span style='color:{GENERAL_COLORS[gen_opp]}'>{w[1]}</span>"
-                    
+
                     # Check symmetry (reverse match)
                     elif gen_opp in matrix and gen_main in matrix[gen_opp]:
                         w = matrix[gen_opp][gen_main]
                         cell_value = f"<span style='color:{GENERAL_COLORS[gen_main]}'>{w[1]}</span> - <span style='color:{GENERAL_COLORS[gen_opp]}'>{w[0]}</span>"
-                    
+
                     cells += f"<td>{cell_value}</td>"
-                
+
                 table_rows += f"<tr><td><span class='general-name' style='color:{GENERAL_COLORS[gen_main]};'>{gen_main}</span></td>{cells}</tr>"
 
             report_content += f"""
@@ -764,9 +764,9 @@ class HTMLSnapshot:
         </body>
         </html>
         """
-        
+
         return html
-        
+
     def save_and_open_html_file(self, tick_count: int):
         FOLDER_NAME = "temp"
         FILE_NAME = "snapshot.html"
@@ -795,7 +795,7 @@ class HTMLSnapshot:
         os.makedirs(FOLDER_NAME, exist_ok=True)
         full_file_path = os.path.join(FOLDER_NAME, FILE_NAME)
 
-        html_content = HTMLSnapshot.generate_html_report_tournament(data)
+        html_content = HTMLSnapshot.generate_html_report_tournament2(data)
 
         with open(full_file_path, "w", encoding="utf-8") as f:
             f.write(html_content)
@@ -818,3 +818,188 @@ class HTMLSnapshot:
             target = unit.current_order["target"]
             return f"Attack Move: ({target[0]:.1f}, {target[1]:.1f})"
         return str(unit.current_order)
+
+    @staticmethod
+    def generate_html_report_tournament2(data):
+        """
+        Génère un rapport HTML.
+        V5 : Couleurs positionnelles strictes (Bleu/Rouge) pour noms et scores.
+             Alignement titre à gauche.
+        """
+
+        # --- CONSTANTES DE COULEURS ---
+        # On utilise des couleurs bien lisibles sur fond sombre et clair
+        COLOR_P1 = "oklch(0.65 0.18 240)"  # Bleu (Ligne / Gauche)
+        COLOR_P2 = "oklch(0.63 0.22 30)"  # Rouge (Colonne / Droite)
+
+        report_content = ""
+
+        for scen, matrix in data.items():
+            opponents = set()
+            for p1, res in matrix.items():
+                opponents.add(p1)
+                opponents.update(res.keys())
+            sorted_opps = sorted(list(opponents))
+
+            # 2. Construction du Header (COLONNES = JOUEUR 2 = ROUGE)
+            headers = ""
+            for opp in sorted_opps:
+                headers += f"<th><span class='general-name' style='color:{COLOR_P2};'>{opp}</span></th>"
+
+            # 3. Construction des Lignes
+            table_rows = ""
+            total_rounds_display = ""
+
+            for gen_main in sorted_opps:
+                cells = ""
+
+                for gen_opp in sorted_opps:
+                    cell_content = "<span style='color:var(--muted-foreground); opacity:0.3'>--</span>"
+
+                    w_main, w_opp, draws, rounds = 0, 0, 0, 0
+                    has_match = False
+
+                    # Récupération des données
+                    if gen_main in matrix and gen_opp in matrix[gen_main]:
+                        res = matrix[gen_main][gen_opp]
+                        w_main, w_opp, draws = res[0], res[1], res["draw"]
+                        has_match = True
+                    elif gen_opp in matrix and gen_main in matrix[gen_opp]:
+                        res = matrix[gen_opp][gen_main]
+                        w_main, w_opp, draws = res[1], res[0], res["draw"]
+                        has_match = True
+
+                    if has_match:
+                        rounds = w_main + w_opp + draws
+                        if not total_rounds_display:
+                            total_rounds_display = f"(N={rounds})"
+
+                        # Mise en gras du vainqueur
+                        style_main = "font-weight:bold" if w_main > w_opp else ""
+                        style_opp = "font-weight:bold" if w_opp > w_main else ""
+
+                        # SCORE : BLEU (P1) - ROUGE (P2)
+                        cell_content = f"""
+                        <div class="score-cell">
+                            <span style='color:{COLOR_P1}; {style_main}'>{w_main}</span>
+                            <span class="separator">-</span>
+                            <span style='color:{COLOR_P2}; {style_opp}'>{w_opp}</span>
+                            <span class="draw-count">({draws})</span>
+                        </div>
+                        """
+
+                    cells += f"<td>{cell_content}</td>"
+
+                # Première colonne (LIGNE = JOUEUR 1 = BLEU)
+                table_rows += f"<tr><td><span class='general-name' style='color:{COLOR_P1};'>{gen_main}</span></td>{cells}</tr>"
+
+            report_content += f"""
+            <section>
+                <div class="scenario-header">
+                    <h2 class="scenario-title">Scenario: {scen}</h2>
+                    <span class="round-count">{total_rounds_display}</span>
+                </div>
+                <div class="table-wrapper">
+                  <table>
+                      <thead>
+                          <tr>
+                              <th></th>
+                              {headers}
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {table_rows}
+                      </tbody>
+                  </table>                
+                </div>
+            </section>
+            """
+
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <title>Tournament Report</title>
+            <link href="https://fonts.googleapis.com/css?family=Inter:400,700" rel="stylesheet" />
+            <style>
+                :root {{
+                    --background: oklch(1 0 0);
+                    --foreground: oklch(0.145 0 0);
+                    --muted: oklch(0.97 0 0);
+                    --muted-foreground: oklch(0.556 0 0);
+                    --border: oklch(0.922 0 0);
+                }}
+                .dark {{
+                    --background: oklch(0.145 0 0);
+                    --foreground: oklch(0.985 0 0);
+                    --muted: oklch(0.269 0 0);
+                    --muted-foreground: oklch(0.708 0 0);
+                    --border: oklch(0.269 0 0);
+                }}
+                body{{ background-color: var(--background); color: var(--foreground); font-family: 'Inter', sans-serif; margin:0; padding: 2rem; }}
+                
+                .main-title {{ text-align: center; margin-bottom: 2rem; }}
+                
+                /* ALIGNEMENT GAUCHE RESTAURÉ */
+                .scenario-header {{ display: flex; align-items: baseline; justify-content: flex-start; gap: 1rem; width: 90%; margin: 0 auto 1rem auto; }}
+                .scenario-title {{ margin: 0; font-size: 1.5rem; }}
+                .round-count {{ color: var(--muted-foreground); font-size: 1rem; font-weight: normal; }}
+
+                .table-wrapper {{ width: 90%; margin: 0 auto 3rem auto; overflow-x: auto; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border-radius: 0.5rem; border: 1px solid var(--border); }}
+                
+                table {{ width: 100%; border-collapse: collapse; text-align: center; }}
+                th, td {{ padding: 1rem; border-bottom: 1px solid var(--border); }}
+                th {{ background-color: var(--muted); font-weight: bold; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; }}
+                
+                /* Bordure droite fine pour séparer les noms des scores */
+                td:first-child, th:first-child {{ border-right: 1px solid var(--border); }}
+
+                .general-name {{ font-weight: 700; }}
+                
+                .score-cell {{ display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-variant-numeric: tabular-nums; font-size: 1.1em; }}
+                .separator {{ color: var(--muted-foreground); opacity: 0.5; }}
+                .draw-count {{ color: var(--muted-foreground); font-size: 0.85em; margin-left: 0.25rem; }}
+
+                .theme-icon-wrapper {{ position: absolute; top: 1rem; right: 1rem; cursor: pointer; padding: 0.5rem; border-radius: 50%; background: var(--muted); }}
+                .theme-icon {{ width: 1.5rem; height: 1.5rem; }}
+            </style>
+            <script>
+              const getThemePreference = () => {{
+                if (typeof localStorage !== "undefined" && localStorage.getItem("theme")) return localStorage.getItem("theme");
+                return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+              }};
+              const isDark = getThemePreference() === "dark";
+              document.documentElement.classList[isDark ? "add" : "remove"]("dark");
+            </script>
+        </head>
+        <body>
+            <div class="theme-icon-wrapper">
+                <svg id="moon" style="display:none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                <svg id="sun" style="display:none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </div>
+            
+            <h1 class="main-title">Tournament Report</h1>
+            {report_content}
+            
+            <script>
+                const wrapper = document.querySelector(".theme-icon-wrapper");
+                const moon = document.getElementById("moon");
+                const sun = document.getElementById("sun");
+                function updateIcon() {{
+                    const isDark = document.documentElement.classList.contains("dark");
+                    moon.style.display = isDark ? "none" : "block";
+                    sun.style.display = isDark ? "block" : "none";
+                }}
+                updateIcon();
+                wrapper.addEventListener("click", () => {{
+                    const isDark = document.documentElement.classList.contains("dark");
+                    document.documentElement.classList[isDark ? "remove" : "add"]("dark");
+                    localStorage.setItem("theme", !isDark ? "dark" : "light");
+                    updateIcon();
+                }});
+            </script>
+        </body>
+        </html>
+        """
+        return html
