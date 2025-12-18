@@ -495,7 +495,7 @@ class UnitController:
                 target = order["target"]
             elif order["type"] == "attack_move":
                 enemies = battlefield.get_enemy_units(unit.owner)
-                target = CombatSystem.choose_nearest_target(unit, enemies)
+                target = CombatSystem.choose_nearest_target(unit, enemies, battlefield)
 
             # EXECUTION DE L'ATTAQUE
             if target and target.is_alive():
