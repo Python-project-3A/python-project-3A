@@ -551,10 +551,15 @@ class HTMLSnapshot:
                 opponents.update(res.keys())
             sorted_opps = sorted(list(opponents))
 
+            # Separate trackers for column-wise (Red) and row-wise (Blue) victories
+            col_total_victories = {opp: 0 for opp in sorted_opps}
+            row_total_victories = {opp: 0 for opp in sorted_opps}
+
             # 2. Construction du Header (COLONNES = JOUEUR 2 = ROUGE)
             headers = ""
             for opp in sorted_opps:
                 headers += f"<th><span class='general-name' style='color:{COLOR_P2};'>{opp}</span></th>"
+            headers += "<th>TOTAL</th>"
 
             # 3. Construction des Lignes
             table_rows = ""
@@ -562,6 +567,7 @@ class HTMLSnapshot:
 
             for gen_main in sorted_opps:
                 cells = ""
+                current_row_blue_wins = 0
 
                 for gen_opp in sorted_opps:
                     cell_content = "<span style='color:var(--muted-foreground); opacity:0.3'>--</span>"
@@ -580,6 +586,10 @@ class HTMLSnapshot:
                         has_match = True
 
                     if has_match:
+                        # Logic: gen_main is Blue (Row), gen_opp is Red (Col)
+                        current_row_blue_wins += w_main
+                        col_total_victories[gen_opp] += w_opp
+
                         rounds = w_main + w_opp + draws
                         if not total_rounds_display:
                             total_rounds_display = f"(N={rounds})"
@@ -600,8 +610,20 @@ class HTMLSnapshot:
 
                     cells += f"<td>{cell_content}</td>"
 
+                # End of row: Add the Blue Total for this row general
+                row_total_victories[gen_main] = current_row_blue_wins
+                cells += f"<td><b>{current_row_blue_wins}</b></td>"
                 # Première colonne (LIGNE = JOUEUR 1 = BLEU)
                 table_rows += f"<tr><td><span class='general-name' style='color:{COLOR_P1};'>{gen_main}</span></td>{cells}</tr>"
+            
+            # 3. Construction du Footer (TOTAL ROW - Red Victories)
+            footer_cells = ""
+            for opp in sorted_opps:
+                footer_cells += f"<td><b>{col_total_victories[opp]}</b></td>"
+            
+            # Grand Total (Bottom Right)
+            footer_cells += "<td> <span style='color:var(--muted-foreground)'> -- </span></td>"
+            table_rows += f"<tr><td><b>Total Victoires</b></td>{footer_cells}</tr>"
 
             report_content += f"""
             <section>
