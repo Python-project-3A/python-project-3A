@@ -506,7 +506,7 @@ class HTMLSnapshot:
         os.makedirs(FOLDER_NAME, exist_ok=True)
         full_file_path = os.path.join(FOLDER_NAME, FILE_NAME)
 
-        html_content = HTMLSnapshot.generate_html_report_tournament2(data)
+        html_content = HTMLSnapshot.generate_html_report_tournament(data)
 
         with open(full_file_path, "w", encoding="utf-8") as f:
             f.write(html_content)
@@ -531,7 +531,7 @@ class HTMLSnapshot:
         return str(unit.current_order)
 
     @staticmethod
-    def generate_html_report_tournament2(data):
+    def generate_html_report_tournament(data):
         """
         Génère un rapport HTML.
         V5 : Couleurs positionnelles strictes (Bleu/Rouge) pour noms et scores.
