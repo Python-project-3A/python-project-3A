@@ -609,18 +609,20 @@ class HTMLSnapshot:
                     <h2 class="scenario-title">Scenario: {scen}</h2>
                     <span class="round-count">{total_rounds_display}</span>
                 </div>
-                <div class="table-wrapper">
-                  <table>
-                      <thead>
-                          <tr>
-                              <th></th>
-                              {headers}
-                          </tr>
-                      </thead>
-                      <tbody>
-                          {table_rows}
-                      </tbody>
-                  </table>                
+                <div class="table-wrapper-wrapper">
+                  <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                {headers}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {table_rows}
+                        </tbody>
+                    </table>                
+                  </div>
                 </div>
             </section>
             """
@@ -684,24 +686,41 @@ class HTMLSnapshot:
                     font-weight: normal;
                 }}
 
-                .table-wrapper {{ 
-                    width: 90%; 
-                    overflow-x: auto;
-                    box-shadow: 0 4px 6px -1px oklch(0 0 0 / 10%);
-                    border-radius: 0.5rem; 
-                    border: 1px solid var(--border);
+                .table-wrapper-wrapper {{
+                    width: 90%;
+                    overflow-x: scroll;
                     place-self:center;
+                    padding-bottom: 0.5rem;
                 }}
-                
-                table {{ 
+
+                .table-wrapper {{
+                    box-shadow: 0 4px 6px -1px oklch(0 0 0 / 10%);
+                    width: 98%;
+                    border: 1px solid var(--border);
+                    border-radius: 0.5rem;
+                }}
+
+                table {{
                     width: 100%;
                     border-collapse: collapse;
-                    text-align: center; 
+                    text-align: center;
+                }}
+
+                th:first-child {{
+                    border-top-left-radius: 0.3rem;
+                }}
+
+                th:last-child{{
+                    border-top-right-radius: 0.3rem
                 }}
 
                 th, td {{ 
                     padding: 1rem;
                     border-bottom: 1px solid var(--border);
+                }}
+                
+                tr:last-child > td{{
+                    border-bottom: 0px;
                 }}
 
                 th {{ 
@@ -782,7 +801,6 @@ class HTMLSnapshot:
                   background: oklch(0.8699 0 0);
                 }}
 
-            </style
             </style>
             <script>
               const getThemePreference = () => {{
