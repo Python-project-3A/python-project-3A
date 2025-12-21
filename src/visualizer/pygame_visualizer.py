@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 import pygame
 
@@ -37,6 +38,9 @@ class PygameVisualizer:
             "bg": (24, 116, 205),  # A deep blue for the "sea"
             "ground": (107, 142, 35),  # Olive Drab for the ground
         }
+
+        # Load Textures
+        self.load_assets()
 
         # Camera offset to center the map
         # Calculate initial projected map dimensions without scaling
@@ -77,7 +81,50 @@ class PygameVisualizer:
         # Calculate camera offset to center the entire projected map
         self.camera_offset_x = (self.screen_width / 2) - (projected_min_x + total_projected_width / 2)
         self.camera_offset_y = (self.screen_height / 2) - (projected_min_y + total_projected_height / 2)
-    
+
+        self.update_tile_textures()
+
+    def load_assets(self):
+        """Loads textures from data/textures."""
+        texture_dir = Path(__file__).parent.parent / "data" / "textures"
+        
+        def load_img(name):
+            try:
+                path = texture_dir / name
+                if path.exists():
+                    return pygame.image.load(str(path)).convert_alpha()
+            except Exception as e:
+                print(f"Warning: Could not load {name}: {e}")
+            return None
+
+        self.water_img = load_img("g_wtr_00_color.png")
+
+        # Load multiple grass textures for variety to avoid a repetitive look
+        self.grass_textures_raw = []
+        # Using a single grass texture for consistency
+        img = load_img("g_gr2_00_color.png")
+        if img:
+            self.grass_textures_raw.append(img)
+
+        # Keep high-resolution rotated versions of each texture
+        # Scaling will be done from these sources, ensuring quality at any zoom level
+        self.grass_iso_rotated_imgs = []
+        if self.grass_textures_raw:
+            for img_raw in self.grass_textures_raw:
+                self.grass_iso_rotated_imgs.append(pygame.transform.rotate(img_raw, 45))
+
+        self.current_grass_tiles = []
+
+    def update_tile_textures(self):
+        """Rescales tile sprites based on current zoom level."""
+        self.current_grass_tiles = []
+        if self.grass_iso_rotated_imgs:
+            for rotated_img in self.grass_iso_rotated_imgs:
+                # Scale from the high-res rotated source to the target size for rendering
+                # This ensures textures look good even when zoomed in
+                scaled_tile = pygame.transform.scale(rotated_img, (int(self._tile_width), int(self._tile_height)))
+                self.current_grass_tiles.append(scaled_tile)
+
     def zoom(self, direction: int):
         """
         Adjusts the zoom level.
@@ -91,6 +138,7 @@ class PygameVisualizer:
         
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
+        self.update_tile_textures()
 
     def move_camera(self, dx: int, dy: int):
         """
@@ -151,11 +199,22 @@ class PygameVisualizer:
         """Ensures Pygame is shut down cleanly on exit."""
         self.finish()
     
+    def _draw_background(self):
+        """Draws the water background (tiled) or solid color."""
+        if self.water_img:
+            w, h = self.water_img.get_size()
+            # Simple tiling
+            for x in range(0, self.screen_width, w):
+                for y in range(0, self.screen_height, h):
+                    self.screen.blit(self.water_img, (x, y))
+        else:
+            self.screen.fill(self.colors["bg"])
+
     def _draw_ground(self):
         """
         Draws the isometric ground plane.
         """
-        # Create a diamond shape for the ground
+        # Draw a solid base polygon first to hide gaps/cracks between tiles
         points = [
             self.world_to_screen(0, 0),
             self.world_to_screen(self.battlefield.width, 0),
@@ -163,6 +222,31 @@ class PygameVisualizer:
             self.world_to_screen(0, self.battlefield.height),
         ]
         pygame.draw.polygon(self.screen, self.colors["ground"], points)
+
+        # Draw tiles if texture is available
+        if self.current_grass_tiles:
+            half_w = int(self._tile_width / 2)
+            num_textures = len(self.current_grass_tiles)
+            # Iterate over all map tiles
+            for x in range(self.battlefield.width):
+                for y in range(self.battlefield.height):
+                    sx, sy = self.world_to_screen(x, y)
+                    # Simple culling to avoid drawing off-screen tiles
+                    if -self._tile_width < sx < self.screen_width + self._tile_width and -self._tile_height < sy < self.screen_height + self._tile_height:
+                        # Choose a texture based on tile position for variety, creating a non-uniform, more natural look.
+                        # Using prime numbers in the hash helps to break up patterns.
+                        texture_index = (x * 7 + y * 13) % num_textures
+                        tile_to_draw = self.current_grass_tiles[texture_index]
+                        # Center the sprite horizontally (sx is the top vertex x, which is the center of the tile's width)
+                        self.screen.blit(tile_to_draw, (sx - half_w, sy))
+
+        # Draw Map Border
+        points = [
+            self.world_to_screen(0, 0),
+            self.world_to_screen(self.battlefield.width, 0),
+            self.world_to_screen(self.battlefield.width, self.battlefield.height),
+            self.world_to_screen(0, self.battlefield.height),
+        ]
         pygame.draw.polygon(self.screen, (0, 0, 0), points, 2) # Black border
 
     def _draw_unit(self, unit):
@@ -209,8 +293,7 @@ class PygameVisualizer:
         4. Draws each unit in the sorted order.
         5. Updates the display.
         """
-        self.screen.fill(self.colors["bg"])
-
+        self._draw_background()
         self._draw_ground()
 
         # --- Y-SORTING (PAINTER'S ALGORITHM) ---
