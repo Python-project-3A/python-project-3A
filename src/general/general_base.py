@@ -91,7 +91,6 @@ class BaseGeneral(ABC):
         clamp_y = max(0, min(v[1], bf.height - 0.01))
         return clamp_x, clamp_y
 
-    #
     @staticmethod
     def _get_centroid(units: list[Unit]) -> tuple[float, float]:
         """Calcule le barycentre d'une liste d'unités."""
