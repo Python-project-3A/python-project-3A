@@ -28,25 +28,23 @@ class GeneralSmart(BaseGeneral):
         self.aggressiveness = 0.5
         self.formation_spacing = 1.5
         self.squads = {"FLANKER": Squad([], "FLANKER"), "DPS": Squad([], "DPS"), "TANK": Squad([], "TANK")}
+        self._squads_initialized = False
 
     def update(self, bf: Battlefield, tick: int) -> None:
         self.tick_counter = tick
-
-        # 1. PERCEPTION (Macro) - TODO : Ne pas faire à chaque tick si ça rame (tous les 5/10/15 ticks)
-        # if self.tick_counter % 10 != 0:
-        my_units = bf.get_my_units(self.player_id)
         enemies = bf.get_enemy_units(self.player_id)
-        if not enemies or not my_units:
+        if not enemies:
             return
+        if not self._squads_initialized:
+            self._initialize_squads(bf)
+            self._squads_initialized = True
+            self._macro_strategy(enemies, bf)
 
-        # Analyse des clusters ennemis (Barycentres des groupes)
-        enemy_clusters = self._analyze_enemy_clusters(enemies)
-
-        # 2. STRATÉGIE (Gestion des Escouades)
-        self._manage_squads(my_units, enemy_clusters)
+        # 1. PERCEPTION (Macro)
+        if tick % 15 == 0:
+            self._macro_strategy(enemies, bf)
 
         # 3. TACTIQUE & MICRO (Exécution par unité)
-        # Au lieu de boucler sur les unités, on boucle sur les escouades
         for squad in self.squads.values():
             if not squad.units:
                 continue
@@ -55,6 +53,41 @@ class GeneralSmart(BaseGeneral):
     # --- PHASE 1: PERCEPTION --- --> Dans general_base.py
 
     # --- PHASE 2: STRATÉGIE ---
+
+    def _macro_strategy(self, enemies, bf: Battlefield):
+        """Regroupe toute la réflexion lente."""
+        self._maintain_squads()
+
+        enemy_clusters = self._analyze_enemy_clusters(enemies)  # Analyse des clusters ennemis (Barycentres des groupes)
+        my_units = bf.get_my_units(self.player_id)
+        if not my_units:
+            return
+
+        self._manage_squads(my_units, enemy_clusters)
+
+    def _initialize_squads(self, bf: Battlefield):
+        """
+        Scan complet de l'armée pour remplir les escouades.
+        """
+        my_units = bf.get_my_units(self.player_id)
+
+        for unit in my_units:
+            name = unit.name.lower()
+            if name == "knight":
+                self.squads["FLANKER"].units.append(unit)
+            elif name == "crossbowman":
+                self.squads["DPS"].units.append(unit)
+            elif name == "pikeman":
+                self.squads["TANK"].units.append(unit)
+
+    def _maintain_squads(self):
+        """
+        Supprime les morts des listes. (O(N_vivants)).
+        """
+        for squad in self.squads.values():
+            if squad.units:
+                squad.units = [u for u in squad.units if u.is_alive()]
+
     def _manage_squads(self, my_units: list[Unit], enemy_clusters):
         # RESET : On vide les listes d'unités (mais on garde l'objet Squad)
         for squad in self.squads.values():
