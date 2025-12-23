@@ -56,13 +56,12 @@ class GeneralSmart(BaseGeneral):
 
     def _macro_strategy(self, enemies, bf: Battlefield):
         """Regroupe toute la réflexion lente."""
+        enemy_clusters = self._analyze_enemy_clusters(enemies)
         self._maintain_squads()
 
-        enemy_clusters = self._analyze_enemy_clusters(enemies)  # Analyse des clusters ennemis (Barycentres des groupes)
         my_units = bf.get_my_units(self.player_id)
         if not my_units:
             return
-
         self._manage_squads(my_units, enemy_clusters)
 
     def _initialize_squads(self, bf: Battlefield):
@@ -89,28 +88,10 @@ class GeneralSmart(BaseGeneral):
                 squad.units = [u for u in squad.units if u.is_alive()]
 
     def _manage_squads(self, my_units: list[Unit], enemy_clusters):
-        # RESET : On vide les listes d'unités (mais on garde l'objet Squad)
-        for squad in self.squads.values():
-            squad.units.clear()
-
-        # DISPATCH
-        for unit in my_units:
-            if not unit.is_alive():
-                continue
-
-            name = unit.name.lower()
-            if name == "knight":
-                self.squads["FLANKER"].units.append(unit)
-            elif name == "crossbowman":
-                self.squads["DPS"].units.append(unit)
-            elif name == "pikeman":
-                self.squads["TANK"].units.append(unit)
-
         # CIBLAGE
         if enemy_clusters:
-            main_enemy_pos = enemy_clusters[0]["center"]
             for squad in self.squads.values():
-                squad.target_position = main_enemy_pos
+                squad.target_position = enemy_clusters[0]["center"]
 
     # --- PHASE 3 & 4: TACTIQUE & MICRO ---
     def _execute_squad_tactics(self, squad: Squad, all_enemies: list[Unit], bf: Battlefield):
