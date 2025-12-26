@@ -17,6 +17,9 @@ class GeneralTactician(BaseGeneral):
     def update(self, bf: Battlefield, tick: int) -> None:
         self.tick_counter = tick
 
+        if self.tick_counter % 15 != 0:
+            return
+
         # 1. PERCEPTION -> TODO : faire chaque 5/10/15 ticks
         my_units = bf.get_my_units(self.player_id)
         enemies = bf.get_enemy_units(self.player_id)
@@ -80,12 +83,12 @@ class GeneralTactician(BaseGeneral):
         base_angle = math.atan2(dy, dx)
 
         # 3. Largeur de l'arc (Spread)
-        # Formule : Chaque unité a besoin d'environ 10 degrés (ou plus selon leur taille)
         unit_spacing_angle = 0.15  # Radians par unité
-        total_spread = min(math.pi * 1.5, len(units) * unit_spacing_angle)
+        max_spread = math.pi * 1.5
+        required_spread = len(units) * unit_spacing_angle
+        total_spread = min(max_spread, required_spread)
 
         start_angle = base_angle - total_spread / 2
-
         assignments = {}
 
         # 4. Tri angulaire pour éviter que les unités se croisent en allant à leur place
