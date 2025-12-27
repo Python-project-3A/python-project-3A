@@ -553,7 +553,7 @@ class HTMLSnapshot:
 
             # Separate trackers for column-wise (Red) and row-wise (Blue) victories
             col_total_victories = {opp: 0 for opp in sorted_opps}
-            row_total_victories = {opp: 0 for opp in sorted_opps}
+            col_total_matches = {opp: 0 for opp in sorted_opps}
 
             # 2. Construction du Header (COLONNES = JOUEUR 2 = ROUGE)
             headers = ""
@@ -568,6 +568,7 @@ class HTMLSnapshot:
             for gen_main in sorted_opps:
                 cells = ""
                 current_row_blue_wins = 0
+                current_row_matches = 0
 
                 for gen_opp in sorted_opps:
                     cell_content = "<span style='color:var(--muted-foreground); opacity:0.3'>--</span>"
@@ -586,13 +587,15 @@ class HTMLSnapshot:
                         has_match = True
 
                     if has_match:
-                        # Logic: gen_main is Blue (Row), gen_opp is Red (Col)
-                        current_row_blue_wins += w_main
-                        col_total_victories[gen_opp] += w_opp
-
-                        rounds = w_main + w_opp + draws
+                        match_rounds = w_main + w_opp + draws
                         if not total_rounds_display:
-                            total_rounds_display = f"(N={rounds})"
+                            total_rounds_display = f"(N={match_rounds})"
+
+                        # Accumulate totals
+                        current_row_blue_wins += w_main
+                        current_row_matches += match_rounds
+                        col_total_victories[gen_opp] += w_opp
+                        col_total_matches[gen_opp] += match_rounds
 
                         # Mise en gras du vainqueur
                         style_main = "font-weight:bold" if w_main > w_opp else ""
@@ -610,17 +613,21 @@ class HTMLSnapshot:
 
                     cells += f"<td>{cell_content}</td>"
 
-                # End of row: Add the Blue Total for this row general
-                row_total_victories[gen_main] = current_row_blue_wins
-                cells += f"<td><b>{current_row_blue_wins}</b></td>"
+                # Row calculation: Percentage of victories
+                row_pct = (current_row_blue_wins / current_row_matches * 100) if current_row_matches > 0 else 0
+                cells += f"<td><b>{row_pct:.1f}%</b></td>"
+
                 # Première colonne (LIGNE = JOUEUR 1 = BLEU)
                 table_rows += f"<tr><td><span class='general-name' style='color:{COLOR_P1};'>{gen_main}</span></td>{cells}</tr>"
-            
-            # 3. Construction du Footer (TOTAL ROW - Red Victories)
+
+            # 4. Construction du Footer (TOTAL ROW - Red Victories %)
             footer_cells = ""
             for opp in sorted_opps:
-                footer_cells += f"<td><b>{col_total_victories[opp]}</b></td>"
-            
+                wins = col_total_victories[opp]
+                matches = col_total_matches[opp]
+                col_pct = (wins / matches * 100) if matches > 0 else 0
+                footer_cells += f"<td><b>{col_pct:.1f}%</b></td>"
+
             # Grand Total (Bottom Right)
             footer_cells += "<td> <span style='color:var(--muted-foreground)'> -- </span></td>"
             table_rows += f"<tr><td><b>Total Victoires</b></td>{footer_cells}</tr>"
