@@ -234,6 +234,15 @@ class BaseGeneral(ABC):
             return []
         return [e for e in enemies if e.name.lower() in types and e.is_alive()]
 
+    def _is_unit_engaged(self, unit: Unit, enemies: list[Unit]) -> bool:
+        """Vérifie si l'unité est déjà en combat."""
+        if not unit.current_order or unit.current_order["type"] != "attack_unit":
+            return False
+        target = unit.current_order["target"]
+        if target.is_alive():  # and unit.dist_to(target) <= unit.attack_range * 1.2:
+            return True
+        return False
+
     # --- COMPORTEMENTS GENERIQUES ---
 
     def _order_regroup(self, unit: Unit, bf: Battlefield):
@@ -287,7 +296,8 @@ class BaseGeneral(ABC):
         # Clamp final de sécurité
         clamp_x, clamp_y = self._clamp_position((target_x, target_y), bf)
 
-        unit.current_order = {"type": "move_to", "target": (clamp_x, clamp_y)}
+        # unit.current_order = {"type": "move_to", "target": (clamp_x, clamp_y)}
+        return (clamp_x, clamp_y)
 
     def _order_attack_opti(self, unit: Unit, target: Unit) -> None:
         """
@@ -308,3 +318,36 @@ class BaseGeneral(ABC):
         """
         data = {"class": self.__class__.__name__, "player_id": self.player_id, "name": self.name}
         return data
+
+    def micro_ranged_unit_logic(self, unit: Unit, enemies: list[Unit], bf: Battlefield, critical_dist: float = 4.0) -> dict | None:
+        """
+        Logique standardisée pour les unités à distance (Hit & Run).
+        Retourne un Ordre (dict) si une action micro est requise, sinon None.
+        """
+        if not enemies:
+            return None
+
+        # 1. Analyse de la menace
+        nearest = min(enemies, key=lambda e: unit.dist_to(e))
+        dist_to_threat = unit.dist_to(nearest)
+
+        # Seuils
+        safe_dist = unit.attack_range * 0.85
+
+        is_threatened = dist_to_threat < safe_dist
+        is_critical = dist_to_threat < critical_dist
+        is_reloading = unit.reload_timer > 0
+
+        from src.engine.system import CombatSystem
+
+        # 2. DÉCISION : FUITE
+        if is_critical or (is_threatened and is_reloading):
+            return {"type": "move_to", "target": self._fuite_strategique(unit, enemies, bf)}
+        target = CombatSystem.choose_weakest_target(unit, enemies, bf)
+        if not target:
+            target = nearest
+
+        if target and unit.dist_to(target) <= unit.attack_range:
+            return {"type": "attack_unit", "target": target}
+
+        return None
