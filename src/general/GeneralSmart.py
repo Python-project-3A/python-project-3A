@@ -119,41 +119,6 @@ class GeneralSmart(BaseGeneral):
 
     # --- MICRO-GESTION UNITAIRE ---
 
-    def _micro_archer(self, unit: Unit, enemies: list[Unit], target_pos: tuple, bf: Battlefield):
-        nearest = CombatSystem.choose_nearest_target(unit, enemies, bf)
-        safe_dist = unit.attack_range * 0.85  # pourcentage de portée à partir de laquelle il est en danger
-
-        # --- FUITE ---
-
-        # Condition de fuite :  Un ennemi est trop près ET Je ne suis PAS prêt à tirer OU l'ennemi est vraiment TROP près
-        critical_dist = 3.0  # Danger de mort immédiat
-        is_threatened = nearest and unit.dist_to(nearest) < safe_dist
-        is_critical = nearest and unit.dist_to(nearest) < critical_dist
-        is_reloading = unit.reload_timer > 0
-
-        if is_threatened:
-            # Cas 1 : DANGER IMMÉDIAT (Trop près) OU Cas 2 : JE RECHARGE (Pas prêt à tirer)
-            if is_critical or is_reloading:
-                self._fuite_strategique(unit, enemies, bf)
-                return  # Si on fuit, on ne tire pas ce tick-ci ?? Question dans le Notion
-            # Cas 3 : DANGER MODÉRÉ + ARME PRÊTE
-            else:
-                # Je suis en danger MAIS mon arme est prête -> JE TIRE (Stutter Step)
-                # On laisse le code continuer vers la section ATTACK -> séparer dans plusieurs fonctions ?
-                pass
-
-        # --- ATTAQUE ---  -> Si on est en sécurité, on applique la stratégie DPS
-        # On veut le "Focus Fire" : Taper l'ennemi le plus faible à portée
-        target = CombatSystem.choose_weakest_target(unit, enemies, bf)
-
-        # Si pas de cible faible trouvée, on se rabat sur le plus proche (fallback)
-        if not target:
-            target = nearest
-
-        if target:
-            self._order_attack_opti(unit, target)
-            return
-
     def _micro_knight_flanker(self, unit: Unit, enemies: list["Unit"], target_pos: tuple, bf: Battlefield):
         # 1. Identifier les Cibles et les Menaces
         priority_targets = self._filter_enemies(enemies, ["crossbowman"])  # , "skirmisher"
