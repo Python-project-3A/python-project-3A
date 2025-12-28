@@ -21,12 +21,15 @@ class GeneralDaft(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="Major DAFT")
 
-    def update(self, battlefield: Battlefield, tick: int) -> None:
+    def update(self, bf: "Battlefield", tick: int) -> None:
         """
-        Simple strategy: every unit attacks the nearest enemy.
+        DAFT: Agressivité totale.
+        - Utilise la vision globale du Général.
+        - Chasse l'ennemi le plus proche sur toute la carte.
         """
-        my_units = self.get_my_units(battlefield)
-        enemies = self.get_enemy_units(battlefield)
+        my_units = self.get_my_units(bf)
+        enemies = self.get_enemy_units(bf)
+
         if not enemies:
             return
 
@@ -34,12 +37,14 @@ class GeneralDaft(BaseGeneral):
             if not unit.is_alive():
                 continue
 
-            # --- CORRECTION : PERSISTENCE ---
-            # Si on a déjà une cible vivante, on continue de la focus (sauf si daft doit être plus intelligent et changer de cible, mais a priori non)
-            if unit.current_order and unit.current_order["type"] == "attack_unit" and unit.current_order["target"].is_alive():
+            current_order = unit.current_order
+            if current_order and current_order["type"] == "attack_unit" and current_order["target"].is_alive() and unit.dist_to(current_order["target"]) < 10.0:  # Garde le focus si < 10m
                 continue
-            # -------------------------------
 
-            target = CombatSystem.choose_nearest_target(unit, enemies)
+            target = CombatSystem.choose_nearest_target(unit, enemies, bf)
+
+            # 2. Ordre
             if target:
-                unit.current_order = {"type": "attack_unit", "target": target}
+                self._order_attack_opti(unit, target)
+            else:
+                self._order_regroup(unit, bf)

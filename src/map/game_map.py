@@ -21,12 +21,14 @@ class GameMap:
         return 0 <= ix < self.width and 0 <= iy < self.height
 
     def get_tile(self, ix: int, iy: int) -> Tile | None:
-        return self.tiles.get((ix, iy))
+        if self.in_bounds(ix, iy):
+            return self.tiles.get((ix, iy))
+        return None
 
     def ensure_tile(self, ix: int, iy: int) -> Tile:
-        if not self.in_bounds(ix, iy):
-            raise ValueError("Out of bounds")
-        return self.tiles.setdefault((ix, iy), Tile())
+        if self.in_bounds(ix, iy):
+            return self.tiles.setdefault((ix, iy), Tile())
+        raise ValueError(f"Out of bounds: {ix}, {iy}")
 
     # --------------------------
     # Terrain / Walkability
@@ -60,4 +62,3 @@ class GameMap:
 
     def init_map(self):
         self.tiles = {(i, j): Tile() for i in range(self.width) for j in range(self.height)}
-        

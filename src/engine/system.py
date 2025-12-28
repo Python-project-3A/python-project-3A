@@ -193,6 +193,9 @@ class MovementSystem:
         dy = target_y - y
         new_x = x + (dx / dist * step)
         new_y = y + (dy / dist * step)
+        # epsilon = 0.001
+        # new_x = max(0.0, min(new_x, battlefield.width - epsilon))
+        # new_y = max(0.0, min(new_y, battlefield.height - epsilon))
 
         return battlefield.move_unit_on_map(unit, new_x, new_y)
 
@@ -201,53 +204,130 @@ class CombatSystem:
     """Handles all combat logic"""
 
     @staticmethod
-    def attack(attacker: "Unit", defender: "Unit") -> bool:
+    def attack(attacker: "Unit", defender: "Unit", battlefield: "Battlefield") -> bool:
         """
-        Attaque une unité si elle est à portée et que le cooldown est terminé.
-        Modifie la vie de la cible et met à jour le temps de la dernière attaque.
+        Calcule et applique les dégâts selon la formule standard AoE2.
+        détecte automatiquement les catégories de dégâts (damage_*) et les armures correspondantes (armor_*).
+        Formule: Damage = Max(1, kelev * Sum(Max(0, Atk_i - Arm_i)))
         """
-
+        # 1. Vérifications d'usage
         if attacker.reload_timer > 0:
             return False
-
-        # Check if in range
         if not attacker.can_attack(defender):
             return False
 
-        # Apply damage
-        damage = max(0, attacker.damage - defender.armor)
-        defender.hp = max(0, defender.hp - damage)  # pour ne pas avoir d'hp < 0
+        # 2. CALCUL DES DÉGÂTS BRUTS
+        raw_damage = 0.0
 
-        # reset du timer avec la valeur du cooldown
+        # On inspecte l'attaquant pour trouver tous ses types de dégâts
+        for attr_name in dir(attacker):
+            if attr_name.startswith("damage_"):
+                damage_val = getattr(attacker, attr_name)
+
+                if not isinstance(damage_val, (int, float)) or damage_val <= 0:  # On ignore les valeurs nulles ou négatives
+                    continue
+
+                category = attr_name.split("_", 1)[1]  # "cavalry"
+                armor_attr = f"armor_{category}"  # "armor_cavalry"
+
+                # Récupération de l'armure du défenseur
+                # Selon le texte : "If there is no match, the armor value is set to 1000"
+                if hasattr(defender, armor_attr):
+                    armor_val = getattr(defender, armor_attr)
+                else:
+                    armor_val = 1000.0  # Armure infinie si la catégorie n'est pas possédée
+
+                # Calcul par catégorie : Max(0, Attaque - Armure)
+                raw_damage += max(0, damage_val - armor_val)
+
+        # 3. MULTIPLICATEUR DE HAUTEUR (Hill Bonus)
+        # Downhill (plus haut) = +25% | Uphill (plus bas) = -25% | Cliff = +25%
+        elevation_mult = 1.0
+
+        tile_atk = battlefield.game_map.get_tile(int(attacker.position[0]), int(attacker.position[1]))
+        tile_def = battlefield.game_map.get_tile(int(defender.position[0]), int(defender.position[1]))
+
+        if tile_atk and tile_def:
+            h_atk = getattr(tile_atk, "elevation", 0)
+            h_def = getattr(tile_def, "elevation", 0)
+
+            if h_atk > h_def:
+                elevation_mult = 1.25  # Downhill bonus
+            elif h_atk < h_def:
+                elevation_mult = 0.75  # Uphill penalty
+
+        # 4. MULTIPLICATEUR DE PRÉCISION (Accuracy)
+        accuracy_mult = getattr(attacker, "accuracy", 1.0)
+
+        # 5. FORMULE FINALE & ARRONDIS
+        final_damage_float = raw_damage * elevation_mult * accuracy_mult
+
+        final_damage = int(max(1, round(final_damage_float)))  # "The minimum damage done in one hit is 1"
+
+        # 6. APPLICATION (Résolution Simultanée)
+        defender.pending_damage += final_damage
+
+        # 7. RESET COOLDOWN
         attacker.reload_timer = attacker.attack_cooldown
 
         return True
 
     @staticmethod
-    def choose_nearest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
-        """Choose nearest living enemy"""
+    def choose_nearest_target(unit: "Unit", enemies: list["Unit"], battlefield: "Battlefield") -> "Unit | None":
+        """
+        Stratégie Hybride :
+        1. Fast Path : Regarde dans le champ de vision (O(1)).
+        2. Slow Path : Regarde toute la carte (O(N)).
+        """
+
+        # --- 1. FAST PATH (Local) ---
+        # On utilise ta vision_range comme limite de recherche optimisée
+        local_candidates = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], unit.vision_range)
+
+        # On filtre : Ennemis vivants uniquement
+        # (Note: local_candidates contient peut-être des alliés ou l'unité elle-même)
+        valid_local_targets = [u for u in local_candidates if u.owner != unit.owner and u.is_alive()]
+
+        if valid_local_targets:
+            # BINGO : On a trouvé une cible proche.
+            # On trie seulement cette petite liste (ex: 5 unités) -> Ultra rapide
+            return min(valid_local_targets, key=lambda e: unit.dist_to(e))
+
+        # --- 2. SLOW PATH (Global / Fallback) ---
+        # Si personne n'est à vue, on scanne la liste complète fournie par le général
         living_enemies = [e for e in enemies if e.is_alive()]
 
         if not living_enemies:
             return None
 
+        # Scan global (plus lent, mais nécessaire si la cible est loin)
         return min(living_enemies, key=lambda e: unit.dist_to(e))
 
     @staticmethod
-    def choose_weakest_target(unit: "Unit", enemies: list["Unit"]) -> "Unit | None":
+    def choose_weakest_target(unit: "Unit", enemies: list["Unit"], battlefield: "Battlefield") -> "Unit | None":
         """
-        Choose the weakest (lowest HP) living enemy.
-        Useful for focus-fire strategies (for other generals than braindead and daft)
+        Choisit l'ennemi le plus faible (HP bas).
+        PRIORITÉ : Les ennemis à portée de vue (Optimisation Spatiale).
+        FALLBACK : Si personne à vue, on cherche globalement (optionnel, mais cohérent).
         """
-        living_enemies = [e for e in enemies if e.is_alive()]
 
+        # --- 1. FAST PATH (Local - Stratégique) ---
+        local_candidates = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], unit.vision_range)
+        valid_local_targets = [u for u in local_candidates if u.owner != unit.owner and u.is_alive()]
+
+        if valid_local_targets:
+            return min(valid_local_targets, key=lambda e: (e.hp, unit.dist_to(e)))
+
+        # --- 2. SLOW PATH (Global - Chasseur de prime) ---
+        # Si personne n'est visible, est-ce qu'on veut vraiment chasser le plus faible de la map ? oui pour un général agressif, donc je laisse cette option :
+        living_enemies = [e for e in enemies if e.is_alive()]
         if not living_enemies:
             return None
 
-        return min(living_enemies, key=lambda e: e.hp)
+        return min(living_enemies, key=lambda e: (e.hp, unit.dist_to(e)))  # Moins de HP, puis le plus proche
 
     @staticmethod
-    def get_enemies_in_range(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
+    def get_visible_enemies(unit: "Unit", enemies: list["Unit"]) -> list["Unit"]:
         """
         Filter enemies to only those within the unit's vision range
 
@@ -298,98 +378,112 @@ class UnitController:
         return False  # Not reached yet
 
     @staticmethod
-    def update(unit: "Unit", battlefield: "Battlefield", dt: float):  # noqa: C901
-        """Update unit behavior based on its current order"""
+    def _reflex_self_defense(unit: "Unit", battlefield: "Battlefield") -> bool:
+        """Réflexe de survie."""
+        if unit.attack_range > 2.0:
+            return False
+
+        melee_range = unit.attack_range + 0.5
+        potential_threats = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], melee_range)
+        valid_threats = [u for u in potential_threats if u.owner != unit.owner and u.is_alive() and unit.can_attack(u)]
+
+        if not valid_threats:
+            return False
+
+        target = min(valid_threats, key=lambda u: u.hp)
+        CombatSystem.attack(unit, target, battlefield)
+        return True
+
+    @staticmethod
+    def process_movement(unit: "Unit", battlefield: "Battlefield", dt: float):
+        """
+        Gère UNIQUEMENT le déplacement et la gestion du timer.
+        Ne déclenche aucune attaque (sauf réflexe de self-defense qui bloque le mouvement).
+        """
         if not unit.is_alive():
-            battlefield.remove_unit(unit.id)
             return
+
+        if unit.reload_timer > 0:  # Gestion du Cooldown (C'est le seul endroit où on décrémente)
+            unit.reload_timer -= dt
 
         if not unit.current_order:
             return
 
         order = unit.current_order
 
-        # --- GESTION DU TEMPS DE RECHARGEMENT ---
-        if unit.reload_timer > 0:
-            unit.reload_timer -= dt  # On décrémente selon le temps du JEU, pas le temps RÉEL
-
-        # --- EXECUTION DES ORDRES ---
+        # --- CAS 1 : MOUVEMENT SIMPLE ---
         if order["type"] == "move_to":
             reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
             if reached:
                 unit.current_order = None
 
-        # ---------------------------------------------------------
-        # GESTION ATTACK MOVE (Avancer, taper si ennemi, sinon avancer)
-        # ---------------------------------------------------------
+        # --- CAS 2 : ATTACK MOVE (Avancer jusqu'à trouver un ennemi) ---
         elif order["type"] == "attack_move":
-            target_pos = order["target"]
-
-            # Recherche d'ennemis
-            enemies_around = [u for u in battlefield.units_in_radius(unit.position[0], unit.position[1], unit.vision_range) if u.owner != unit.owner and u.is_alive()]
+            # Scan local rapide pour voir si on doit s'arrêter
+            enemies_around = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], unit.vision_range)
             target = None
-            if enemies_around:
-                # Trouve le plus proche
-                target = min(enemies_around, key=lambda e: unit.dist_to(e))
+            valid_enemies = [e for e in enemies_around if e.owner != unit.owner and e.is_alive()]
 
-            # Optimisation: ne chercher la cible la plus proche que si on en a (eviter O(N^2) inutile)
-            # enemies = [u for u in battlefield.get_all_units() if u.owner != unit.owner and u.is_alive()]
-            # if enemies:
-            # On ne regarde que ceux dans vision_range
-            # visible_enemies = [e for e in enemies if unit.dist_to(e) < unit.vision_range]
-            # if visible_enemies:
-            # target = min(visible_enemies, key=lambda e: unit.dist_to(e))
+            if valid_enemies:
+                target = min(valid_enemies, key=lambda e: unit.dist_to(e))
 
             if target:
                 if unit.can_attack(target):
-                    CombatSystem.attack(unit, target)
+                    return  # ON STOPPE : On est à portée, on attend la phase d'attaque
                 else:
-                    # Si on chasse une unité, on utilise move_towards (pas de A* dynamique pour l'instant)
                     MovementSystem.move_towards(unit, target, dt, battlefield)
             else:
-                # Pas d'ennemi : on continue le mouvement prévu (A*)
                 reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
                 if reached:
                     unit.current_order = None
 
-        # ---------------------------------------------------------
-        # GESTION ATTACK UNIT (Ciblage direct)
-        # ---------------------------------------------------------
-        elif order["type"] == "attack_unit":
+        # --- CAS 3 : ATTACK UNIT (Ciblage direct & Pathing Attack) ---
+        elif order["type"] in ["attack_unit", "pathing_attack_unit"]:
             target = order["target"]
+
+            if not target or not target.is_alive():  # Si la cible est morte
+                return
+
+            if unit.can_attack(target):
+                return
+
+            if UnitController._reflex_self_defense(unit, battlefield):
+                return
+
+            if order["type"] == "attack_unit":
+                MovementSystem.move_towards(unit, target, dt, battlefield)
+
+            elif order["type"] == "pathing_attack_unit":
+                # Logique complexe du GeneralSmart pour recalculer le chemin
+                target_pos = target.position
+                path_is_stale = "path" in order and "path_target_pos" in order and unit.dist_to_point(order["path_target_pos"]) > 1.0
+
+                if path_is_stale:
+                    order["path"] = []
+                    del order["path_target_pos"]
+
+                UnitController._follow_path(unit, target_pos, order, battlefield, dt)
+
+                if "path" in order and order["path"]:
+                    order["path_target_pos"] = target_pos
+
+    @staticmethod
+    def process_attack(unit: "Unit", battlefield: "Battlefield"):
+        """Gère UNIQUEMENT l'attaque offensive."""
+        if not unit.is_alive() or not unit.current_order:
+            return
+
+        order = unit.current_order
+        target = None
+
+        if order["type"] in ["attack_unit", "attack_move"]:  # Gestion des ordres offensifs
+            if order["type"] == "attack_unit":
+                target = order["target"]
+            elif order["type"] == "attack_move":
+                enemies = battlefield.get_enemy_units(unit.owner)
+                target = CombatSystem.choose_nearest_target(unit, enemies, battlefield)
+
+            # EXECUTION DE L'ATTAQUE
             if target and target.is_alive():
                 if unit.can_attack(target):
-                    CombatSystem.attack(unit, target)
-                else:
-                    MovementSystem.move_towards(unit, target, dt, battlefield)  # Pour suivre une unité mobile, on utilise move_towards (ligne droite)
-            else:
-                unit.current_order = None
-        elif order["type"] == "pathing_attack_unit":
-            target = order["target"]
-            if target and target.is_alive():
-                if unit.can_attack(target):
-                    CombatSystem.attack(unit, target)
-
-                    # Clear path data after engaging
-                    if "path" in order:
-                        order["path"] = []
-                    if "path_target_pos" in order:
-                        del order["path_target_pos"]
-                else:
-                    target_pos = target.position
-
-                    # --- DYNAMIC PATH RECALCULATION CHECK (1.0 tile threshold) ---
-                    path_is_stale = "path" in order and "path_target_pos" in order and unit.dist_to_point(order["path_target_pos"]) > 1.0
-
-                    if path_is_stale:
-                        order["path"] = []
-                        del order["path_target_pos"]
-
-                    # Execute pathfinding movement
-                    UnitController._follow_path(unit, target_pos, order, battlefield, dt)
-
-                    # Store the position for next tick's staleness check
-                    if "path" in order and order["path"]:
-                        order["path_target_pos"] = target_pos
-            else:
-                unit.current_order = None  # Target is dead/gone, clear order.
+                    CombatSystem.attack(unit, target, battlefield)

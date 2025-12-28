@@ -9,20 +9,19 @@ if TYPE_CHECKING:
 
 from src.units.knight import Knight
 from src.units.pikeman import Pikeman
+from src.units.crossbowman import Crossbowman
 from src.units.unit_base import Unit
-
-
 
 
 class ScenarioLoader:
     """Loads and spawns scenarios from JSON files"""
 
-    # Map string names to classes   
+    # Map string names to classes
     UNIT_CLASSES = {
         "Pikeman": Pikeman,
         "Knight": Knight,
+        "Crossbowman": Crossbowman,
         # Add more later
-        # "Crossbowman": Crossbowman,
         # "LongSwordsman": LongSwordsman,
     }
 
@@ -69,79 +68,75 @@ class ScenarioLoader:
             return json.load(f)
 
     @staticmethod
-    def create_unit_from_stats(unit_type: str, owner: int, x: float, y: float):
+    def create_unit_from_stats(unit_type: str, owner: int, x: float, y: float) -> Unit:
         """
-        Create a unit instance (Pikeman, Knight, etc.) from JSON stats.
-        Instantiates the right subclass depending on unit_type.
+        Crée une unité et lui injecte TOUTES les stats du JSON dynamiquement.
         """
-
-        # Load JSON stats
         all_stats = ScenarioLoader.load_unit_stats()
 
         if unit_type not in all_stats:
-            raise ValueError(f"Unknown unit type: {unit_type}. Available: {list(all_stats.keys())}")
+            # Fallback utile si le JSON est mal formé ou incomplet
+            raise ValueError(f"Unknown unit type: {unit_type}")
 
         stats = all_stats[unit_type]
 
-        # Select correct class (fallback = Unit)
+        # Récupération de la classe (Pikeman, Knight...) ou Unit par défaut
         cls = ScenarioLoader.UNIT_CLASSES.get(unit_type, Unit)
 
-        # Instantiate unit
-        return cls(
+        # 1. Instanciation "Sécurisée" :
+        # On utilise .get(key, 0) pour fournir des valeurs par défaut au constructeur __init__
+        # car tes nouvelles unités n'ont plus de clé "damage" ou "armor" simple.
+        unit = cls(
+            name=unit_type,
             owner=owner,
             x=x,
             y=y,
-            r=stats["r"],
-            hp=stats["hp"],
-            armor=stats["armor"],
-            damage=stats["damage"],
-            attack_range=stats["attack_range"],
-            attack_cooldown=stats["attack_cooldown"],
-            vision_range=stats["vision_range"],
-            speed=stats["speed"],
-            name=unit_type,  # Ignored by Pikeman/Knight since they set their own name
+            r=stats.get("r", 0.4),
+            hp=stats.get("hp", 10),
+            armor=stats.get("armor", 0),  # Valeur bidon pour satisfaire __init__
+            damage=stats.get("damage", 0),  # Valeur bidon pour satisfaire __init__
+            attack_range=stats.get("attack_range", 1.0),
+            vision_range=stats.get("vision_range", 5.0),
+            attack_cooldown=stats.get("attack_cooldown", 2.0),
+            speed=stats.get("speed", 1.0),
         )
+
+        # 2. Injection Dynamique (Magie Python) :
+        # C'est ici qu'on ajoute unit.damage_cavalry, unit.armor_pierce, etc.
+        # sans avoir besoin de les déclarer dans le __init__ de la classe.
+        for key, value in stats.items():
+            setattr(unit, key, value)
+
+        return unit
 
     @staticmethod
     def spawn_scenario(scenario_data: dict, battlefield: Battlefield, general_overrides: dict[int, str] | None = None) -> dict[int, str]:
-        """
-        Spawn units from scenario data onto battlefield.
-
-        Args:
-            scenario_data: Loaded scenario dictionary
-            battlefield: Battlefield to spawn units on
-            general_overrides: Optional dict {player_id: general_type} to override scenario generals
-
-        Returns:
-            Dict mapping player_id to general_type for each army
-        """
         general_overrides = general_overrides or {}
         general_types = {}
 
         for army in scenario_data["armies"]:
             player_id = army["player_id"]
 
-            # Get general type (override or from scenario)
+            # Gestion de l'override du général (ex: via ligne de commande)
             general_type = general_overrides.get(player_id, army.get("general"))
             general_types[player_id] = general_type
 
-            # Spawn units for this army
             for unit_group in army["units"]:
                 unit_type = unit_group["type"]
                 count = unit_group["count"]
                 formation = unit_group.get("formation", "column")
                 start_x = unit_group["start_x"]
                 start_y = unit_group["start_y"]
-                spacing = unit_group.get("spacing", 1.5)
+                spacing = unit_group.get("spacing", 1.0)  # 1.0 est plus standard pour éviter les trous
 
-                # Calculate positions according to formation
+                # Calcul des positions
                 positions = ScenarioLoader._calculate_formation(formation, count, start_x, start_y, spacing)
 
-                # Spawn each unit
                 for x, y in positions:
-                    # Create factory that captures the current x, y values
-                    def make_unit(unit_type=unit_type, owner=player_id, pos_x=x, pos_y=y):
-                        return ScenarioLoader.create_unit_from_stats(unit_type, owner, pos_x, pos_y)
+                    # Fonction interne pour "capturer" les valeurs de x, y, unit_type et owner
+                    # C'est nécessaire car battlefield.spawn_unit attend une fonction (factory)
+                    def make_unit(u_type=unit_type, owner=player_id, px=x, py=y):
+                        return ScenarioLoader.create_unit_from_stats(u_type, owner, px, py)
 
                     battlefield.spawn_unit(make_unit, x, y, owner=player_id)
 

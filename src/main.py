@@ -1,14 +1,19 @@
 import argparse
 import sys
+import time
+import itertools
 
 from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
 from src.engine.simulation import Simulation
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
+from src.general.GeneralSmart import GeneralSmart
 from src.scenarios.scenario_loader import ScenarioLoader
 from src.visualizer.pygame_visualizer import PygameVisualizer
 from src.engine.input_provider import ConsoleInputProvider
+from src.engine.save_load import save_game, load_game, get_save_dir
+from src.engine.html_snapshot import HTMLSnapshot
 
 
 def parse_args():
@@ -33,24 +38,24 @@ Examples:
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
     run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
     run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
-    
+
     # Visualizer choice
     viz_group = run_parser.add_mutually_exclusive_group()
     viz_group.add_argument("-gui", action="store_true", help="Use Pygame GUI visualizer.")
-    viz_group.add_argument("-t", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
+    viz_group.add_argument("-t", "--terminal", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
 
-    run_parser.add_argument("--speed", type=int, default=30, help="Target ticks per second (TPS). 0 for max speed in headless mode.")
+    run_parser.add_argument("--speed", type=float, default=0.1, help="Target ticks per second (TPS). 0 for max speed in headless mode.")
 
-    # --- COMMAND: load (TODO) ---
-    load_parser = subparsers.add_parser("load", help="Load a saved game (TODO)")
+    # --- COMMAND: load ---
+    load_parser = subparsers.add_parser("load", help="Load a saved game")
     load_parser.add_argument("savefile", type=str, help="Save file path")
 
-    # --- COMMAND: tourney (TODO) ---
-    tourney_parser = subparsers.add_parser("tourney", help="Run tournament (TODO)")
-    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft"], help="Generals to include in tournament")
+    # --- COMMAND: tourney ---
+    tourney_parser = subparsers.add_parser("tourney", help="Run tournament")
+    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft", "generalsmart"], help="Generals to include in tournament")
     tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
     tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
-    tourney_parser.add_argument("--no-alternate", action="store_true", help="Don't alternate player positions")
+    tourney_parser.add_argument("-na", action="store_true", help="Don't alternate player positions")
 
     return parser.parse_args()
 
@@ -61,6 +66,8 @@ def create_general(general_type: str, player_id: int):
         return GeneralBraindead(player_id)
     elif general_type == "daft":
         return GeneralDaft(player_id)
+    elif general_type == "GeneralSmart" or general_type == "generalsmart":
+        return GeneralSmart(player_id)
     else:
         raise ValueError(f"Unknown general type: {general_type}")
 
@@ -92,6 +99,139 @@ def command_list():
             print(f"\n  {scenario_name}: Error loading - {e}")
 
     print("\n" + "=" * 60 + "\n")
+
+
+def run_tournament(args):
+    """
+    Exécute N simulations ultra-rapides et sort des stats.
+    Gère l'interruption par Ctrl+C pour afficher les résultats partiels.
+    """
+
+    scenarios_to_run = args.scenarios if args.scenarios else ["pikemen_vs_pikemen"]  # , "pikemen_vs_knights", "knights_vs_pikemen", "knights_vs_knights"
+    available_generals = ["braindead", "daft", "generalsmart"]
+    generals_to_run = sorted(list(set(args.generals if args.generals else available_generals)))
+    rounds = args.N
+    tournament_data = {}  # Structure de stockage des résultats / results[scenario][p0_name][p1_name] = {wins0, wins1, draws}
+
+    print("=" * 60)
+    print(f"\n STARTING TOURNAMENT: {rounds} Rounds")
+    print(f"\n Scenario: {scenarios_to_run}")
+    print(" \n Mode: Positions FIXES (Not Alternating)" if args.na else " Mode: Positions ALTERNATIVES (Alternating)")
+    print(f"\n Rounds per match: {rounds} (Alternate: {not args.na})")
+    print(f"\n Ctrl+C pour interrompre le tournoi et voir les résultats partiels.")
+    print("=" * 60)
+
+    try:
+        # --- BOUCLE 1 : SCÉNARIOS ---
+        start_time = time.time()
+        for scen_name in scenarios_to_run:
+            print(f"\n SCENARIO: {scen_name}")
+            try:
+                scen_data = ScenarioLoader.load_scenario(scen_name)
+            except FileNotFoundError:
+                print(f"\n Skipping {scen_name} (File not found)")
+                continue
+
+            tournament_data[scen_name] = {}
+
+            # --- BOUCLE 2 & 3 : MATCHUPS (Gen A vs Gen B) ---
+            # combinations_with_replacement permet d'avoir (A,B), (A,C) et (A,A) mais pas (B,A) car c'est redondant si on alterne les positions.
+            matchups = list(itertools.combinations_with_replacement(generals_to_run, 2))
+
+            for gen_1, gen_2 in matchups:
+                match_id = f"{gen_1.upper()} vs {gen_2.upper()}"
+                sys.stdout.write(f"  Match {match_id} : \n")
+                sys.stdout.flush()
+
+                if gen_1 not in tournament_data[scen_name]:
+                    tournament_data[scen_name][gen_1] = {}
+                tournament_data[scen_name][gen_1][gen_2] = {0: 0, 1: 0, "draw": 0}
+                wins = tournament_data[scen_name][gen_1][gen_2]
+
+                # --- EXECUTION DES N ROUNDS ---
+                for i in range(rounds):
+                    bf = Battlefield(scen_data["map"]["width"], scen_data["map"]["height"])
+
+                    if i % 10 == 0:  # Feedback minimal
+                        sys.stdout.write(".")
+                        sys.stdout.flush()
+
+                    # Alternance
+                    swapped = False
+                    if not args.na and i % 2 != 0:
+                        swapped = True
+
+                    p0_type = gen_2 if swapped else gen_1
+                    p1_type = gen_1 if swapped else gen_2
+
+                    bf.generals = [create_general(p0_type, 0), create_general(p1_type, 1)]
+                    overrides = {0: p0_type, 1: p1_type}
+                    ScenarioLoader.spawn_scenario(scen_data, bf, overrides)
+
+                    sim = Simulation(bf.game_map, bf.generals, bf)
+                    sim.run(None, visualizer=None, target_tps=0, max_ticks=10000)  # Headless
+
+                    survivors = set(u.owner for u in bf.get_all_units() if u.is_alive())
+
+                    winner = -1
+                    if 0 in survivors and 1 not in survivors:
+                        winner = 0
+                    elif 1 in survivors and 0 not in survivors:
+                        winner = 1
+                    else:
+                        winner = "draw"
+
+                    if winner == "draw":
+                        wins["draw"] += 1
+                    else:
+                        if not swapped:
+                            wins[winner] += 1
+                        else:
+                            if winner == 0:
+                                wins[1] += 1
+                            else:
+                                wins[0] += 1
+
+                # Fin du matchup
+                print(f" Done. Score: {wins[0]}-{wins[1]} (D:{wins['draw']})\n")
+
+    except KeyboardInterrupt:
+        print(f"\n\n{'-' * 60}")
+        print(" INTERRUPTION UTILISATEUR (Ctrl+C)")
+        print(" Finalisation des résultats partiels...")
+
+    total_time = time.time() - start_time
+    print(f"\n\n Total time: {total_time:.2f} seconds.")
+    print(f"{'=' * 60}")
+
+    # 4. GENERATION DU RAPPORT
+    HTMLSnapshot.save_tournament_report(tournament_data)
+
+
+def command_load(args):
+    """Charge une sauvegarde et lance la simulation."""
+    try:
+        # La fonction load_game retourne un nouvel objet Simulation
+        simulation = load_game(args.savefile)
+    except FileNotFoundError:
+        print(f"Error: Save file '{args.savefile}.json' not found in {get_save_dir()}.")
+        return
+    except Exception as e:
+        print(f"Error loading game: {e}")
+        return
+
+    # Setup View (même logique que run_battle)
+    width, height = simulation.battlefield.width, simulation.battlefield.height
+    visualizer = CLIVisualizer(width, height)  # Le chargement impose la vue Terminale (pour l'instant)
+    target_tps = 30  # Taux de rafraîchissement visuel standard
+
+    print("\n Loading battle...\n")
+
+    with ConsoleInputProvider() as inp:
+        simulation.run(inp, visualizer=visualizer, target_tps=target_tps)
+
+    # 7. Results
+    simulation.battlefield.print_battle_result()
 
 
 def run_battle(args):
@@ -140,8 +280,9 @@ def run_battle(args):
         sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=target_tps)
 
     # Print results
-    bf.print_battle_result()
-
+    full_output = bf.print_battle_result()
+    sys.stdout.write(full_output)
+    sys.stdout.flush()
 
 
 def main():
@@ -151,13 +292,13 @@ def main():
         command_list()
 
     elif args.command == "run":
-        # command_run(args)
         run_battle(args)
+
     elif args.command == "load":
-        print("  'load' command not yet implemented")
+        command_load(args)
 
     elif args.command == "tourney":
-        print("  'tourney' command not yet implemented")
+        run_tournament(args)
 
     else:
         print(" No command specified. Use --help for usage.")

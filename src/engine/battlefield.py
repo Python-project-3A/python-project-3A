@@ -3,13 +3,22 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Iterator
 
 from src.general.general_base import BaseGeneral
 from src.map.game_map import GameMap
 from src.units.unit_base import Unit
 
 logger = logging.getLogger(__name__)
+
+# Codes ANSI
+RESET = "\033[0m"
+BLUE = "\033[34m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CLEAR_LINE = "\033[K"
+UP = "\033[A"
+DOWN = "\033[B"
 
 
 class Battlefield:
@@ -99,22 +108,32 @@ class Battlefield:
     def check_position(self, unit: Unit, new_x: float, new_y: float) -> bool:
         """
         Checks circular hitbox collision based on unit.radius.
+        Optimisation : Inlining de la recherche de voisins + Distance au carré.
         """
-        # On cherche les voisins dans un rayon de 2 tuiles
-        potential_colliders = self.get_potential_neighbors(new_x, new_y, range_tiles=2)
+        # 1. On calcule la tuile centrale cible
+        cx, cy = int(new_x), int(new_y)
 
-        for other in potential_colliders:
-            # Skip the unit itself and also the dead units
-            if other is unit or not other.is_alive():
-                continue
+        # 2. On itère manuellement sur les 25 tuiles autour (rayon 2), c'est moche mais c'est sensé être + perfformant
+        for dy in range(-2, 3):
+            for dx in range(-2, 3):
+                tile = self.game_map.get_tile(cx + dx, cy + dy)
 
-            ox, oy = other.position
-            dx = new_x - ox
-            dy = new_y - oy
+                if not tile or not tile.occupants:
+                    continue
 
-            # circle collision using derived radius from width/height
-            if math.hypot(dx, dy) < (unit.radius + other.radius):
-                return True
+                for other in tile.occupants:
+                    if other is unit or not other.is_alive():
+                        continue
+
+                    # 3. Optimisation Mathématique (Distance Carrée)  évite math.hypot (qui fait une racine carrée)
+                    d_x = new_x - other.position[0]
+                    d_y = new_y - other.position[1]
+                    dist_sq = d_x * d_x + d_y * d_y
+
+                    # On compare avec (r1 + r2)^2
+                    min_dist = unit.radius + other.radius
+                    if dist_sq < min_dist * min_dist:
+                        return True
 
             # Optimisation
             # if (dx * dx + dy * dy) < ((unit.radius + other.radius) * (unit.radius + other.radius)):
@@ -198,6 +217,10 @@ class Battlefield:
     def apply_soft_push(self, unit: Unit):
         ux, uy = unit.position
 
+        # On accumule toutes les forces de poussée avant d'appliquer
+        total_push_x = 0.0
+        total_push_y = 0.0
+
         neighbors = self.get_potential_neighbors(ux, uy, range_tiles=1)
 
         for other in neighbors:
@@ -208,26 +231,49 @@ class Battlefield:
             dx = ux - ox
             dy = uy - oy
 
-            dist = math.hypot(dx, dy)
+            dist_sq = dx * dx + dy * dy
             min_dist = unit.radius + other.radius
 
-            if dist <= 0 or dist >= min_dist:
+            # Optimisation : éviter la racine carrée si pas collision
+            if dist_sq >= min_dist * min_dist or dist_sq == 0:
                 continue
 
+            dist = math.sqrt(dist_sq)
             overlap = min_dist - dist
 
-            # Normalisation du vecteur de collision (normal)
+            # Normalisation
             nx = dx / dist
             ny = dy / dist
 
-            correction_strength = 0.5  # force de répulsion : on fait 50% de l'overlap (l'autre unité fera l'autre moitié)
-            push_x = nx * overlap * correction_strength
-            push_y = ny * overlap * correction_strength
+            # Force de répulsion :0.5 = partage de l'effort
+            correction_strength = 0.5
+            total_push_x += nx * overlap * correction_strength
+            total_push_y += ny * overlap * correction_strength
 
-            ux += push_x
-            uy += push_y
+        if total_push_x == 0.0 and total_push_y == 0.0:
+            return
 
-        unit.position = (ux, uy)
+        final_x = ux + total_push_x
+        final_y = uy + total_push_y
+
+        # Check Limites Map
+        final_x = max(0, min(final_x, self.width - 0.01))
+        final_y = max(0, min(final_y, self.height - 0.01))
+
+        # Mise à jour
+        unit.position = (final_x, final_y)
+
+        # Mise à jour de la grille (Vital si on a bougé de tuile)
+        nix, niy = self._tile_index_from_pos(final_x, final_y)
+        oix, oiy = self._tile_index_from_pos(ux, uy)
+
+        if (nix, niy) != (oix, oiy):
+            old_tile = self.game_map.get_tile(oix, oiy)
+            if old_tile:
+                old_tile.remove_occupant(unit)
+
+            new_tile = self.game_map.ensure_tile(nix, niy)
+            new_tile.add_occupant(unit)
 
     # -----------------------------------------------------
     # MOVEMENT SYSTEM
@@ -273,13 +319,23 @@ class Battlefield:
     # -----------------------------------------------------
     # UTILITIES
     # -----------------------------------------------------
-    def get_all_units(self) -> list[Unit]:
-        """Renvoie une liste des unités du Battlefield."""
-        return list(self.units.values())
+    # def get_all_units(self) -> list[Unit]:
+    #     """Renvoie une liste des unités du Battlefield."""
+    #     return list(self.units.values())
+
+    def get_all_units(self) -> Iterator[Unit]:
+        """Renvoie un itérateur sur les unités (beaucoup plus rapide que créer une liste)."""
+        return self.units.values()
 
     def units_by_owner(self, owner: int) -> list[Unit]:
         """Renvoie une liste des unités appartenant au owner."""
         return [u for u in self.units.values() if u.owner == owner]
+
+    def get_my_units(self, owner: int) -> list[Unit]:
+        return [u for u in self.get_all_units() if u.owner == owner]
+
+    def get_enemy_units(self, owner: int) -> list[Unit]:
+        return [u for u in self.get_all_units() if u.owner != owner]
 
     def find_unit(self, unit_id: int) -> Unit | None:
         """Renvoie l'unité ayant l'id unit_id."""
@@ -308,6 +364,20 @@ class Battlefield:
         enemies_in_los = [u for u in visible_units if u.is_alive() and u.owner != unit.owner]
 
         return enemies_in_los
+
+    def remove_dead_units(self) -> list[Unit]:
+        """
+        Parcourt toutes les unités, identifie les mortes (hp <= 0),
+        les retire de la map et renvoie la liste des supprimés.
+        """
+        # 1. On identifie les morts
+        dead_units = [u for u in self.units.values() if not u.is_alive()]
+
+        # 2. On les retire proprement
+        for unit in dead_units:
+            self.remove_unit(unit.id)
+
+        return dead_units
 
     def get_potential_neighbors(self, x: float, y: float, range_tiles: int = 1) -> list[Unit]:
         """
@@ -338,11 +408,12 @@ class Battlefield:
             units_ser.append({"id": u.id, "type": u.name, "owner": u.owner, "position": u.position, "hp": u.hp, "radius": u.radius, "hibtox": u.radius})
         return {"width": self.width, "height": self.height, "units": units_ser, "generals": [str(g) for g in self.generals]}
 
-    def print_battle_result(self):
+    def print_battle_result(self) -> list:
         """Print battle results"""
-        print("\n" + "=" * 60)
-        print("=== BATTLE RESULT ===")
-        print("=" * 60)
+        lines = []
+        lines.append("\n" + "=" * 60)
+        lines.append("=== BATTLE RESULT ===")
+        lines.append("=" * 60)
 
         survivors_by_owner = {}
         for unit in self.get_all_units():
@@ -355,26 +426,34 @@ class Battlefield:
             general = self.generals[owner_id]
             survivors = survivors_by_owner.get(owner_id, [])
 
-            print(f"\n️  {general.name} (Player {owner_id}):")
-            print(f"   Survivors: {len(survivors)} units")
+            if owner_id == 0:
+                lines.append(f"\n  {BLUE}{general.name}{RESET} (Player {owner_id}):")
+            else:
+                lines.append(f"\n  {RED}{general.name}{RESET} (Player {owner_id}):")
+            lines.append(f"   Survivors: {len(survivors)} units")
 
             if survivors:
                 total_hp = sum(u.hp for u in survivors)
                 avg_hp = total_hp / len(survivors)
-                print(f"   Total HP: {total_hp:.1f}")
-                print(f"   Avg HP: {avg_hp:.1f}")
+                lines.append(f"   Total HP: {total_hp:.1f}")
+                lines.append(f"   Avg HP: {avg_hp:.1f}")
 
-        print("\n" + "-" * 60)
+        lines.append("\n" + "-" * 60)
         if len(survivors_by_owner) == 0:
-            print("  DRAW - All units eliminated!")
+            lines.append("  DRAW - All units eliminated!")
         elif len(survivors_by_owner) == 1:
             winner_id = list(survivors_by_owner.keys())[0]
             winner_general = self.generals[winner_id]
-            print(f" VICTORY for {winner_general.name} (Player {winner_id})!")
+            lines.append(f" VICTORY for {winner_general.name} (Player {winner_id})!")
         else:
             # counts = {owner: len(units) for owner, units in survivors_by_owner.items()}
             # winner_id = max(counts, key=counts.get)
             # winner_general = self.generals[winner_id]
             # print(f" TACTICAL VICTORY for {winner_general.name} (Player {winner_id})!")
-            print(" PARTIE STOP : BOTH TEAMS ARE ALIVE")
-        print("=" * 60 + "\n")
+            lines.append(f" GAME STOPPED : BOTH TEAMS ARE ALIVE")
+        lines.append("=" * 60 + "\n")
+        full_output = "\n".join(lines) + "\n"
+        return full_output
+
+
+#         lines.append(f"{BLUE}{g0:15}{RESET} Units: {alive_counts[0]:3} | HP: {hp_counts[0]:5.0f}" + CLEAR_LINE)

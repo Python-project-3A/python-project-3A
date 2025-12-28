@@ -1,6 +1,6 @@
 {
-  "name": "Knights vs Pikemen",
-  "description": "Classic cavalry charge against spearmen",
+  "name": "Pikemen vs Crossbowmen",
+  "description": "Slow infantry trying to close the gap against ranged units",
   "map": {
     "width": 60,
     "height": 40
@@ -11,12 +11,12 @@
       "general": null,
       "units": [
         {
-          "type": "Knight",
+          "type": "Pikeman",
           "count": 20,
-          "formation": "line",
+          "formation": "block",
           "start_x": 10,
           "start_y": 15,
-          "spacing": 2.0
+          "spacing": 1
         }
       ]
     },
@@ -25,12 +25,12 @@
       "general": null,
       "units": [
         {
-          "type": "Pikeman",
+          "type": "Crossbowman",
           "count": 20,
           "formation": "block",
           "start_x": 45,
           "start_y": 15,
-          "spacing": 1.2
+          "spacing": 1
         }
       ]
     }

@@ -1,6 +1,6 @@
 {
-  "name": "Knights vs Pikemen",
-  "description": "Classic cavalry charge against spearmen",
+  "name": "1Pikeman vs 1Knight",
+  "description": "1 vs 1",
   "map": {
     "width": 60,
     "height": 40
@@ -12,7 +12,7 @@
       "units": [
         {
           "type": "Knight",
-          "count": 20,
+          "count": 1,
           "formation": "line",
           "start_x": 10,
           "start_y": 15,
@@ -26,8 +26,8 @@
       "units": [
         {
           "type": "Pikeman",
-          "count": 20,
-          "formation": "block",
+          "count": 1,
+          "formation": "line",
           "start_x": 45,
           "start_y": 15,
           "spacing": 1.2

@@ -11,6 +11,17 @@ else:
     import select
     import tty
     import termios
+    import fcntl
+
+
+# Codes des touches F11 et F12 pour différents environnements
+# MSVCRT (Windows)
+WINDOWS_F11_CODE = b"\x85"
+WINDOWS_F12_CODE = b"\x86"
+
+# Séquences XTERM/Linux
+UNIX_F11_SEQUENCE = "\x1b[23~"
+UNIX_F12_SEQUENCE = "\x1b[24~"
 
 
 class ConsoleInputProvider:
@@ -43,25 +54,67 @@ class ConsoleInputProvider:
         """Renvoie la touche pressée ou None."""
         if self.os_type == "nt":
             if msvcrt.kbhit():
-                char = msvcrt.getch()
-                if char == b'\x1b':  # Escape key
-                    return "escape"
-                if char == "\t":
-                    return "tab"
-                try:
-                    return char.decode().lower()
-                except (UnicodeDecodeError, AttributeError):
+                key = msvcrt.getch()
+
+                # \x00 (0) ou \xe0 (224) indiquent le début d'une touche spéciale
+                if key in (b"\x00", b"\xe0"):
+                    # Lire le deuxième octet (le code étendu)
+                    extended_key = msvcrt.getch()
+
+                    if extended_key == WINDOWS_F11_CODE:
+                        return "F11"
+                    if extended_key == WINDOWS_F12_CODE:
+                        return "F12"
+
+                    # On ignore toutes les autres touches spéciales (flèches, autres F-keys)
                     return None
+                else:
+                    # Caractère simple
+                    try:
+                        # Ajout : Gérer la touche ESC sur Windows si elle est lue comme un caractère simple
+                        if key == b"\x1b":
+                            return "esc"
+                        return key.decode().lower()
+                    except UnicodeDecodeError:
+                        return None
+            return None
         else:
             # Linux / Mac
-            # Vérifie si des données sont prêtes à être lues sur l'entrée standard (fd 0)
-            # Un timeout de 0 signifie une vérification non bloquante
-            dr, dw, de = select.select([sys.stdin], [], [], 0)
-            if dr:
+            # Vérifie si des données sont prêtes à être lues sur l'entrée standard (fd 0), un timeout de 0 signifie une vérification non bloquante
+            r, _, _ = select.select([sys.stdin], [], [], 0)
+            if r:
                 char = sys.stdin.read(1)
-                if char == '\x1b': # Escape key
-                    return "escape"
-                if char == "\t":
-                    return "tab"
+
+                if char == "\x1b":  # Début d'une séquence
+                    fd = sys.stdin.fileno()
+                    old_fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+                    fcntl.fcntl(fd, fcntl.F_SETFL, old_fl | os.O_NONBLOCK)
+
+                    # Petit délai pour recevoir la séquence complète
+                    import time
+
+                    time.sleep(0.02)
+
+                    rest = ""
+                    try:
+                        rest = sys.stdin.read(10)  # Buffer augmenté
+                    except BlockingIOError:
+                        pass
+
+                    fcntl.fcntl(fd, fcntl.F_SETFL, old_fl)
+
+                    sequence = char + rest
+
+                    if sequence == UNIX_F11_SEQUENCE:
+                        return "F11"
+                    elif sequence == UNIX_F12_SEQUENCE:
+                        return "F12"
+                    elif sequence == "\x1b":
+                        return "esc"
+
+                    # Autres séquences ignorées
+                    return None
+
+                # Caractère simple
                 return char.lower()
-        return None
+            return None
