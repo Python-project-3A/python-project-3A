@@ -15,7 +15,7 @@
           "count": 20,
           "formation": "block",
           "start_x": 5,
-          "start_y": 10,
+          "start_y": 15,
           "spacing": 1
         }
       ]
@@ -29,7 +29,7 @@
           "count": 20,
           "formation": "block",
           "start_x": 40,
-          "start_y": 10,
+          "start_y": 15,
           "spacing": 1
         },
         {
@@ -37,7 +37,7 @@
           "count": 20,
           "formation": "block",
           "start_x": 50,
-          "start_y": 10,
+          "start_y": 15,
           "spacing": 1
         }
       ]
