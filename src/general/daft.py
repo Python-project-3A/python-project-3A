@@ -21,14 +21,14 @@ class GeneralDaft(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="Major DAFT")
 
-    def update(self, bf: "Battlefield", tick: int) -> None:
+    def update(self, battlefield: Battlefield, tick: int) -> None:
         """
         DAFT: Agressivité totale.
         - Utilise la vision globale du Général.
         - Chasse l'ennemi le plus proche sur toute la carte.
         """
-        my_units = self.get_my_units(bf)
-        enemies = self.get_enemy_units(bf)
+        my_units = self.get_my_units(battlefield)
+        enemies = self.get_enemy_units(battlefield)
 
         if not enemies:
             return
@@ -41,10 +41,10 @@ class GeneralDaft(BaseGeneral):
             if current_order and current_order["type"] == "attack_unit" and current_order["target"].is_alive() and unit.dist_to(current_order["target"]) < 10.0:  # Garde le focus si < 10m
                 continue
 
-            target = CombatSystem.choose_nearest_target(unit, enemies, bf)
+            target = CombatSystem.choose_nearest_target(unit, enemies, battlefield)
 
             # 2. Ordre
             if target:
                 self._order_attack_opti(unit, target)
             else:
-                self._order_regroup(unit, bf)
+                self._order_regroup(unit, battlefield)

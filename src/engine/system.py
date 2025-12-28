@@ -350,46 +350,32 @@ class UnitController:
         Logique partagée pour suivre un chemin A*.
         Gère le calcul initial et le déplacement waypoint par waypoint.
         """
+        # calcul du chemin si nécessaire
         if "path" not in order:
-            if unit.dist_to_point(target_pos) < 2.0:  # si très proche (< 2 tuiles), ligne droite directe
+            # si très proche (< 2 tuiles), ligne droite directe
+            if unit.dist_to_point(target_pos) < 2.0:
                 order["path"] = [target_pos]
             else:
                 order["path"] = PathFinding.search(unit.position, target_pos, battlefield)
 
         path = order["path"]
 
+        # suivi du chemin
         if path:
             next_waypoint = path[0]
+
+            # utilise move_to_position pour aller vers le waypoint
             MovementSystem.move_to_position(unit, next_waypoint[0], next_waypoint[1], dt, battlefield)
+
+            # Si on est arrivé au waypoint (seuil 0.2 tuile)
             if unit.dist_to_point(next_waypoint) < 0.2:
                 path.pop(0)  # Waypoint atteint, on passe au suivant
 
         # 3. Fin de parcours
         if not path:
-            return True
+            # On est arrivé au bout
+            return True  # Reached
         return False  # Not reached yet
-
-    @staticmethod
-    def _reflex_self_defense(unit: "Unit", battlefield: "Battlefield") -> bool:
-        """
-        Réflexe de survie : Si l'unité est bloquée ou passe à côté d'un ennemi à portée immédiate.
-        """
-        # Optimisation : Unités de mêlée uniquement
-        if unit.attack_range > 2.0:
-            return False
-
-        # On cherche les menaces IMMÉDIATES (Portée d'attaque + petite marge)
-        melee_range = unit.attack_range + 0.5
-        potential_threats = battlefield.units_in_radius_opti(unit.position[0], unit.position[1], melee_range)
-        valid_threats = [u for u in potential_threats if u.owner != unit.owner and u.is_alive() and unit.can_attack(u)]
-
-        if not valid_threats:
-            return False
-
-        target = min(valid_threats, key=lambda u: u.hp)
-
-        CombatSystem.attack(unit, target, battlefield)
-        return True
 
     @staticmethod
     def _reflex_self_defense(unit: "Unit", battlefield: "Battlefield") -> bool:

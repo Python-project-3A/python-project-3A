@@ -2,7 +2,9 @@ import time
 import random
 from src.engine.battlefield import Battlefield
 from src.general.general_base import BaseGeneral
+from src.cli.cli import CLIVisualizer
 from src.map.game_map import GameMap
+from src.visualizer.pygame_visualizer import PygameVisualizer
 from .system import UnitController
 from .html_snapshot import HTMLSnapshot
 from .save_load import save_game, load_game
@@ -79,61 +81,32 @@ class Simulation:
             visualizer.render(self.battlefield, 0, speed=self.game_speed, paused=self.paused)  # On affiche le TICK 0, pour voir la position initiale des unités.
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
+        is_gui = isinstance(visualizer, PygameVisualizer)
+        step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
+
         while self.is_running and self.tick_count < max_ticks:
             should_update_logic = self.tick_count % 10 == 0
             loop_start = time.time()
 
-            # --- INPUTS ---
-            key = None
-            if input_provider:
-                key = input_provider.get_key()
-            match key:
-                case "p":
-                    self.paused = not self.paused
-                case "esc":
-                    self.is_running = False
-                case "=":
-                    self.game_speed += 0.2
-                case "-":
-                    self.game_speed = max(0.2, self.game_speed - 0.2)
-                case "r":
-                    self.game_speed = 1
-                case "\t":
-                    self.snapshot_utility.save_and_open_html_file(self.tick_count)
-                case "F11":
-                    # autoriser d'autres noms de fichier de sauvegarde plus tard
-                    save_game(self)
-                case "F12":
-                    # Quick Load
-                    try:
-                        # Remplacer la simulation actuelle par la version chargée
-                        loaded_sim = load_game()
-                        self.map = loaded_sim.map
-                        self.generals = loaded_sim.generals
-                        self.battlefield = loaded_sim.battlefield
-                        self.tick_count = loaded_sim.tick_count
-                        self.paused = True
-                        self.snapshot_utility = loaded_sim.snapshot_utility  # Mise à jour de l'utilitaire
-                    except FileNotFoundError:
-                        print("\n Erreur: Pas de Quick Save trouvée.")
-                    except Exception as e:
-                        print(f"\n Erreur pendant le rechargement: {e}")
+            # --- TERMINAL INPUTS ---
+            if not is_gui:
+                terminal_key = input_provider.get_key()
+                self.base_key_matching(terminal_key)
 
-            if visualizer and key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
-                step = 2  # vitesse de déplacement de la cam, on met ce qu'on veut
-                match key:
-                    case "z":
-                        visualizer.move_camera(0, -step)  # haut
-                    case "w":
-                        visualizer.move_camera(0, -step)  # haut
-                    case "s":
-                        visualizer.move_camera(0, step)  # bas
-                    case "q":
-                        visualizer.move_camera(-step, 0)  # gauche
-                    case "a":
-                        visualizer.move_camera(-step, 0)  # gauche
-                    case "d":
-                        visualizer.move_camera(step, 0)  # droite
+                if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
+                    step = 2
+                    self.direction_key_matching(terminal_key, step, visualizer=visualizer)
+
+            # --- GUI INPUTS ---
+            if is_gui:
+                pygame_key = visualizer.get_key()
+                self.base_key_matching(pygame_key)
+                self.direction_key_matching(pygame_key, step, visualizer=visualizer)
+                match pygame_key:
+                    case "zoom_in":
+                        visualizer.zoom(1)
+                    case "zoom_out":
+                        visualizer.zoom(-1)
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
@@ -160,6 +133,55 @@ class Simulation:
                 time.sleep(wait)
 
         print(f" Simulation terminée après {self.tick_count} ticks. Durée : {(time.time() - debut):.4f}s. Environ : {self.tick_count / (time.time() - debut):.0f} TPS.")
+
+    def base_key_matching(self, key: str):
+        match key:
+            case "p":
+                self.paused = not self.paused
+            case "escape":
+                self.is_running = False
+            case "=":
+                self.game_speed += 0.2
+            case "-":
+                self.game_speed = max(0.2, self.game_speed - 0.2)
+            case "r":
+                self.game_speed = 1
+            case "tab":
+                self.snapshot_utility.save_and_open_html_file(self.tick_count)
+            case "F11":
+                # autoriser d'autres noms de fichier de sauvegarde plus tard
+                save_game(self)
+            case "F12":
+                # Quick Load
+                try:
+                    # Remplacer la simulation actuelle par la version chargée
+                    loaded_sim = load_game()
+                    self.map = loaded_sim.map
+                    self.generals = loaded_sim.generals
+                    self.battlefield = loaded_sim.battlefield
+                    self.tick_count = loaded_sim.tick_count
+                    self.paused = True
+                    self.snapshot_utility = loaded_sim.snapshot_utility  # Mise à jour de l'utilitaire
+                except FileNotFoundError:
+                    print("\n Erreur: Pas de Quick Save trouvée.")
+                except Exception as e:
+                    print(f"\n Erreur pendant le rechargement: {e}")
+
+    @staticmethod
+    def direction_key_matching(key: str, step: int, visualizer):
+        match key:
+            case "z":
+                visualizer.move_camera(0, -step)  # haut
+            case "w":
+                visualizer.move_camera(0, -step)  # haut
+            case "s":
+                visualizer.move_camera(0, step)  # bas
+            case "q":
+                visualizer.move_camera(-step, 0)  # gauche
+            case "a":
+                visualizer.move_camera(-step, 0)  # gauche
+            case "d":
+                visualizer.move_camera(step, 0)  # droite
 
     def to_dict(self):
         """

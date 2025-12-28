@@ -11,6 +11,7 @@ from src.general.daft import GeneralDaft
 from src.general.GeneralTactician import GeneralTactician
 from src.general.GeneralSmart import GeneralSmart
 from src.scenarios.scenario_loader import ScenarioLoader
+from src.visualizer.pygame_visualizer import PygameVisualizer
 from src.engine.input_provider import ConsoleInputProvider
 from src.engine.save_load import save_game, load_game, get_save_dir
 from src.engine.html_snapshot import HTMLSnapshot
@@ -251,16 +252,20 @@ def run_battle(args):
     bf.generals = [create_general(args.general0, 0), create_general(args.general1, 1)]
     ScenarioLoader.spawn_scenario(scenario_data, bf, {0: args.general0, 1: args.general1})
 
-    # 4. Setup View
-    visualizer = CLIVisualizer(width, height) if args.terminal else None
+    # 4. Setup View & Input Provider
+    visualizer = None
+
+    if args.gui:
+        visualizer = PygameVisualizer(battlefield=bf)
+    elif args.t:
+        visualizer = CLIVisualizer(width, height)
 
     # 5. Run Simulation
-    sim = Simulation(bf.game_map, bf.generals, bf)  # tick_duration is logic only now
-
-    # Mode Chooser: Visual (30 TPS) vs Headless (Max Speed)
+    sim = Simulation(bf.game_map, bf.generals, bf)
     target_tps = 30 if visualizer else 0
 
     # 6. Affichage des headers statiques
+
     print(f"\n Scenario: {scenario_data['name']}")
     print(f"\n {scenario_data.get('description', '')}")
     print(f" Map: {width}x{height}")
@@ -268,10 +273,11 @@ def run_battle(args):
     print(f" Spawned {len(bf.units_by_owner(1))} units for Player 1")
     print("\n Starting battle...\n")
 
-    with ConsoleInputProvider() as inp:
-        sim.run(inp, visualizer=visualizer, target_tps=target_tps)
+    with ConsoleInputProvider() as input_sys:
+        # On injecte le système d'input dans la simulation
+        sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=target_tps)
 
-    # 7. Results
+    # Print results
     full_output = bf.print_battle_result()
     sys.stdout.write(full_output)
     sys.stdout.flush()

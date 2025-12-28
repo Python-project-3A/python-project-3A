@@ -37,6 +37,7 @@ class Unit:
         self.radius = r
 
         # Combat stats
+        self.max_hp = hp
         self.hp = hp
         self.pending_damage = 0.0
         self.armor = armor
@@ -98,6 +99,7 @@ class Unit:
             "owner": self.owner,
             "position": self.position,
             "radius": self.radius,
+            "max_hp": self.max_hp,
             "hp": self.hp,
             "armor": self.armor,
             "damage": self.damage,

@@ -110,7 +110,9 @@ class ConsoleInputProvider:
                     elif sequence == UNIX_F12_SEQUENCE:
                         return "F12"
                     elif sequence == "\x1b":
-                        return "esc"
+                        return "escape"
+                    elif sequence == "\t":
+                        return "tab"
 
                     # Autres séquences ignorées
                     return None

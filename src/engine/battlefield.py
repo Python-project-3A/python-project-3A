@@ -135,6 +135,9 @@ class Battlefield:
                     if dist_sq < min_dist * min_dist:
                         return True
 
+            # Optimisation
+            # if (dx * dx + dy * dy) < ((unit.radius + other.radius) * (unit.radius + other.radius)):
+            #     return True
         return False
 
     def attempt_sliding_move(self, unit: Unit, target_x: float, target_y: float) -> tuple[float, float]:
@@ -361,6 +364,7 @@ class Battlefield:
         enemies_in_los = [u for u in visible_units if u.is_alive() and u.owner != unit.owner]
 
         return enemies_in_los
+
     def remove_dead_units(self) -> list[Unit]:
         """
         Parcourt toutes les unités, identifie les mortes (hp <= 0),
@@ -368,11 +372,11 @@ class Battlefield:
         """
         # 1. On identifie les morts
         dead_units = [u for u in self.units.values() if not u.is_alive()]
-        
+
         # 2. On les retire proprement
         for unit in dead_units:
             self.remove_unit(unit.id)
-            
+
         return dead_units
 
     def get_potential_neighbors(self, x: float, y: float, range_tiles: int = 1) -> list[Unit]:
