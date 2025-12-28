@@ -244,12 +244,12 @@ class HTMLSnapshot:
         }}
 
         ::-webkit-scrollbar-thumb {{
-        background: rgb(163 163 163 / var(--tw-bg-opacity, 1));
+        background: rgb(163 163 163 );
          border-radius: 0.25rem;
         }}
 
         ::-webkit-scrollbar-thumb:hover {{
-          background: rgb(212 212 212 / var(--tw-bg-opacity, 1));
+          background: rgb(212 212 212 );
         }}
 
         </style>
@@ -478,295 +478,6 @@ class HTMLSnapshot:
     """
         return html_content
 
-    def generate_html_report_tournament(data):
-        """
-        Génère un fichier HTM avec les matrices de score
-        """
-
-        GENERAL_COLORS = {"daft": "oklch(0.6392 0.2189 29.23)", "braindead": "oklch(0.7 0.1 214)", "generalsmart": "oklch(0.5198 0.1473 142.4953)"}
-
-        report_content = ""
-
-        for scen, matrix in data.items():
-            # Identify all unique opponents for the headers
-            opponents = set()
-            for p1, res in matrix.items():
-                opponents.add(p1)
-                opponents.update(res.keys())
-            sorted_opps = sorted(list(opponents))
-
-            headers = "".join([f"<th><span class='general-name' style='color:{GENERAL_COLORS[opp]};'>{opp}</span></th>" for opp in sorted_opps])
-
-            table_rows = ""
-            for gen_main in sorted_opps:
-                cells = ""
-                for gen_opp in sorted_opps:
-                    cell_value = "--"
-
-                    # Check direct match
-                    if gen_main in matrix and gen_opp in matrix[gen_main]:
-                        w = matrix[gen_main][gen_opp]
-                        cell_value = f"<span style='color:{GENERAL_COLORS[gen_main]}'>{w[0]}</span> - <span style='color:{GENERAL_COLORS[gen_opp]}'>{w[1]}</span>"
-
-                    # Check symmetry (reverse match)
-                    elif gen_opp in matrix and gen_main in matrix[gen_opp]:
-                        w = matrix[gen_opp][gen_main]
-                        cell_value = f"<span style='color:{GENERAL_COLORS[gen_main]}'>{w[1]}</span> - <span style='color:{GENERAL_COLORS[gen_opp]}'>{w[0]}</span>"
-
-                    cells += f"<td>{cell_value}</td>"
-
-                table_rows += f"<tr><td><span class='general-name' style='color:{GENERAL_COLORS[gen_main]};'>{gen_main}</span></td>{cells}</tr>"
-
-            report_content += f"""
-            <section>
-                <h2 class="scenario-title">Scenario: {scen}</h2>
-                <div class="table-wrapper">
-                  <table>
-                      <thead>
-                          <tr>
-                              <th>General</th>
-                              {headers}
-                          </tr>
-                      </thead>
-                      <tbody>
-                          {table_rows}
-                      </tbody>
-                  </table>                
-                </div>
-            </section>
-            """
-
-        html = f"""
-        <!DOCTYPE html>
-        <html lang="fr">
-        <head>
-            <meta charset="UTF-8">
-            <title>Tournament Report</title>
-            <link href="https://fonts.googleapis.com/css?family=Inter" rel="stylesheet" />
-            <style>
-                :root {{
-                    --background: oklch(1 0 0);
-                    --foreground: oklch(0.145 0 0);
-                    --primary: oklch(0.205 0 0);
-                    --primary-foreground: oklch(0.985 0 0);
-                    --secondary: oklch(0.97 0 0);
-                    --secondary-foreground: oklch(0.205 0 0);
-                    --muted: oklch(0.97 0 0);
-                    --muted-foreground: oklch(0.556 0 0);
-                    --accent: oklch(0.97 0 0);
-                    --accent-foreground: oklch(0.205 0 0);
-                    --border: oklch(0.922 0 0);
-                    --input: oklch(0.922 0 0);
-                    --ring: oklch(0.708 0 0);
-                    --radius: 0.625rem;
-                }}
-
-                .dark {{
-                    --background: oklch(0.145 0 0);
-                    --foreground: oklch(0.985 0 0);
-                    --primary: oklch(0.985 0 0);
-                    --primary-foreground: oklch(0.205 0 0);
-                    --secondary: oklch(0.269 0 0);
-                    --secondary-foreground: oklch(0.985 0 0);
-                    --muted: oklch(0.269 0 0);
-                    --muted-foreground: oklch(0.708 0 0);
-                    --accent: oklch(0.269 0 0);
-                    --accent-foreground: oklch(0.985 0 0);
-                    --border: oklch(0.269 0 0);
-                    --input: oklch(0.269 0 0);
-                    --ring: oklch(0.439 0 0);
-                }}
-
-                body{{
-                    background-color: var(--background);
-                    color: var(--foreground);
-                    font-family: Inter;
-                }}
-
-                tbody tr:last-child {{
-                  border-bottom: 0;
-                }}
-
-                th{{
-                  padding:0.5rem;
-                }}
-
-                tr {{
-                  border-bottom: 1px solid var(--border);
-                  &:hover {{
-                    background-color: var(--muted);
-                  }}
-
-                  th:first-child {{
-                    width: 25%;   
-                  }}
-
-                }}
-
-                td {{
-                  padding: 0.6rem;
-                  text-align: left;
-                  text-wrap: nowrap;
-                }}
-
-                thead {{
-                  padding-bottom: 1rem;
-                  height: 2.5rem;
-                  text-align: left;
-                  vertical-align: middle;
-                  text-wrap: nowrap;
-                }}
-
-                table {{
-                  width: 100%;
-                  border-collapse: collapse;
-                }}
-
-                .main-title{{
-                  font-size: 2.5rem;
-                  margin: 0;
-                  padding-top: 1rem;
-                  padding-bottom: 1rem;
-                  place-self: center;
-                  width: 90%;
-                }}
-
-                .table-wrapper{{
-                  width: 90%;
-                  margin: 0;
-                  place-self: center;              
-                  padding-top: 1rem;
-                  padding-bottom: 1rem;
-                  overflow-x: scroll;
-                }}
-
-                .scenario-title{{
-                  width: 90%;
-                  margin: 0;
-                  place-self: center;
-                  padding-top: 1.5rem;
-                }}
-
-                .general-name{{
-                  font-weight: bold;
-                }}
-
-                .theme-icon-wrapper {{
-                  width: 1.5rem;
-                  height: 1.5rem;
-                  place-self: end;
-                  cursor: pointer;
-                }}
-                
-                ::-webkit-scrollbar{{
-                  width: 0.5rem;
-                  height: 0.5rem;
-                }}
-
-                ::-webkit-scrollbar-track{{
-                  background: transparent;
-                }}
-
-                ::-webkit-scrollbar-thumb{{
-                  background: rgb(163 163 163 / var(--tw-bg-opacity, 1));
-                  border-radius: 0.25rem;
-                }}
-
-                ::-webkit-scrollbar-thumb:hover{{
-                  background: rgb(212 212 212 / var(--tw-bg-opacity, 1));
-                }}
-            </style>
-            <script>
-              const getThemePreference = () => {{
-                if (
-                  typeof localStorage !== "undefined" &&
-                  localStorage.getItem("theme")
-                ) {{
-                  return localStorage.getItem("theme");
-                }}
-                return window.matchMedia("(prefers-color-scheme: dark)").matches
-                  ? "dark"
-                  : "light";
-              }};
-              const isDark = getThemePreference() === "dark";
-              document.documentElement.classList[isDark ? "add" : "remove"]("dark");
-
-              if (typeof localStorage !== "undefined") {{
-                const observer = new MutationObserver(() => {{
-                  const isDark = document.documentElement.classList.contains("dark");
-                  localStorage.setItem("theme", isDark ? "dark" : "light");
-                }});
-                observer.observe(document.documentElement, {{
-                  attributes: true,
-                  attributeFilter: ["class"],
-                }});
-              }}
-            </script>
-
-        </head>
-        <body>
-            <header><div class="theme-icon-wrapper" role="button"></div></header>
-            <h1 class="main-title">Tournament report</h1>
-            {report_content}
-            <script defer>
-              const themeIconWrapper = document.querySelector(".theme-icon-wrapper");
-
-              let isDarkMode = document.documentElement.classList.contains("dark");
-
-              const sunIconSvg = `<svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="lucide lucide-sun-icon lucide-sun theme-icon"
-                >
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="m4.93 4.93 1.41 1.41" />
-                  <path d="m17.66 17.66 1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="m6.34 17.66-1.41 1.41" />
-                  <path d="m19.07 4.93-1.41 1.41" />
-                </svg>`;
-              const moonIconSvg = `<svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="lucide lucide-moon-icon lucide-moon theme-icon"
-                >
-                  <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
-                </svg>`;
-
-              themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
-
-              themeIconWrapper.addEventListener("click", () => {{
-                document.documentElement.classList[isDarkMode ? "remove" : "add"](
-                  "dark"
-                );
-                isDarkMode = document.documentElement.classList.contains("dark");
-
-                themeIconWrapper.innerHTML = isDarkMode ? sunIconSvg : moonIconSvg;
-              }});
-            </script>
-        </body>
-        </html>
-        """
-
-        return html
-
     def save_and_open_html_file(self, tick_count: int):
         FOLDER_NAME = "temp"
         FILE_NAME = "snapshot.html"
@@ -795,7 +506,7 @@ class HTMLSnapshot:
         os.makedirs(FOLDER_NAME, exist_ok=True)
         full_file_path = os.path.join(FOLDER_NAME, FILE_NAME)
 
-        html_content = HTMLSnapshot.generate_html_report_tournament2(data)
+        html_content = HTMLSnapshot.generate_html_report_tournament(data)
 
         with open(full_file_path, "w", encoding="utf-8") as f:
             f.write(html_content)
@@ -820,14 +531,13 @@ class HTMLSnapshot:
         return str(unit.current_order)
 
     @staticmethod
-    def generate_html_report_tournament2(data):
+    def generate_html_report_tournament(data):
         """
         Génère un rapport HTML.
         V5 : Couleurs positionnelles strictes (Bleu/Rouge) pour noms et scores.
              Alignement titre à gauche.
         """
 
-        # --- CONSTANTES DE COULEURS ---
         # On utilise des couleurs bien lisibles sur fond sombre et clair
         COLOR_P1 = "oklch(0.65 0.18 240)"  # Bleu (Ligne / Gauche)
         COLOR_P2 = "oklch(0.63 0.22 30)"  # Rouge (Colonne / Droite)
@@ -841,10 +551,15 @@ class HTMLSnapshot:
                 opponents.update(res.keys())
             sorted_opps = sorted(list(opponents))
 
+            # Separate trackers for column-wise (Red) and row-wise (Blue) victories
+            col_total_victories = {opp: 0 for opp in sorted_opps}
+            col_total_matches = {opp: 0 for opp in sorted_opps}
+
             # 2. Construction du Header (COLONNES = JOUEUR 2 = ROUGE)
             headers = ""
             for opp in sorted_opps:
                 headers += f"<th><span class='general-name' style='color:{COLOR_P2};'>{opp}</span></th>"
+            headers += "<th>TOTAL</th>"
 
             # 3. Construction des Lignes
             table_rows = ""
@@ -852,6 +567,8 @@ class HTMLSnapshot:
 
             for gen_main in sorted_opps:
                 cells = ""
+                current_row_blue_wins = 0
+                current_row_matches = 0
 
                 for gen_opp in sorted_opps:
                     cell_content = "<span style='color:var(--muted-foreground); opacity:0.3'>--</span>"
@@ -870,9 +587,15 @@ class HTMLSnapshot:
                         has_match = True
 
                     if has_match:
-                        rounds = w_main + w_opp + draws
+                        match_rounds = w_main + w_opp + draws
                         if not total_rounds_display:
-                            total_rounds_display = f"(N={rounds})"
+                            total_rounds_display = f"(N={match_rounds})"
+
+                        # Accumulate totals
+                        current_row_blue_wins += w_main
+                        current_row_matches += match_rounds
+                        col_total_victories[gen_opp] += w_opp
+                        col_total_matches[gen_opp] += match_rounds
 
                         # Mise en gras du vainqueur
                         style_main = "font-weight:bold" if w_main > w_opp else ""
@@ -890,8 +613,24 @@ class HTMLSnapshot:
 
                     cells += f"<td>{cell_content}</td>"
 
+                # Row calculation: Percentage of victories
+                row_pct = (current_row_blue_wins / current_row_matches * 100) if current_row_matches > 0 else 0
+                cells += f"<td><b>{row_pct:.1f}%</b></td>"
+
                 # Première colonne (LIGNE = JOUEUR 1 = BLEU)
                 table_rows += f"<tr><td><span class='general-name' style='color:{COLOR_P1};'>{gen_main}</span></td>{cells}</tr>"
+
+            # 4. Construction du Footer (TOTAL ROW - Red Victories %)
+            footer_cells = ""
+            for opp in sorted_opps:
+                wins = col_total_victories[opp]
+                matches = col_total_matches[opp]
+                col_pct = (wins / matches * 100) if matches > 0 else 0
+                footer_cells += f"<td><b>{col_pct:.1f}%</b></td>"
+
+            # Grand Total (Bottom Right)
+            footer_cells += "<td> <span style='color:var(--muted-foreground)'> -- </span></td>"
+            table_rows += f"<tr><td><b>Total Victoires</b></td>{footer_cells}</tr>"
 
             report_content += f"""
             <section>
@@ -899,18 +638,20 @@ class HTMLSnapshot:
                     <h2 class="scenario-title">Scenario: {scen}</h2>
                     <span class="round-count">{total_rounds_display}</span>
                 </div>
-                <div class="table-wrapper">
-                  <table>
-                      <thead>
-                          <tr>
-                              <th></th>
-                              {headers}
-                          </tr>
-                      </thead>
-                      <tbody>
-                          {table_rows}
-                      </tbody>
-                  </table>                
+                <div class="table-wrapper-wrapper">
+                  <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                {headers}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {table_rows}
+                        </tbody>
+                    </table>                
+                  </div>
                 </div>
             </section>
             """
@@ -921,7 +662,9 @@ class HTMLSnapshot:
         <head>
             <meta charset="UTF-8">
             <title>Tournament Report</title>
-            <link href="https://fonts.googleapis.com/css?family=Inter:400,700" rel="stylesheet" />
+            <link href="https://fonts.googleapis.com/css?family=Inter:400,700"
+              rel="stylesheet" 
+            />
             <style>
                 :root {{
                     --background: oklch(1 0 0);
@@ -930,6 +673,7 @@ class HTMLSnapshot:
                     --muted-foreground: oklch(0.556 0 0);
                     --border: oklch(0.922 0 0);
                 }}
+
                 .dark {{
                     --background: oklch(0.145 0 0);
                     --foreground: oklch(0.985 0 0);
@@ -937,32 +681,155 @@ class HTMLSnapshot:
                     --muted-foreground: oklch(0.708 0 0);
                     --border: oklch(0.269 0 0);
                 }}
-                body{{ background-color: var(--background); color: var(--foreground); font-family: 'Inter', sans-serif; margin:0; padding: 2rem; }}
-                
-                .main-title {{ text-align: center; margin-bottom: 2rem; }}
-                
-                /* ALIGNEMENT GAUCHE RESTAURÉ */
-                .scenario-header {{ display: flex; align-items: baseline; justify-content: flex-start; gap: 1rem; width: 90%; margin: 0 auto 1rem auto; }}
-                .scenario-title {{ margin: 0; font-size: 1.5rem; }}
-                .round-count {{ color: var(--muted-foreground); font-size: 1rem; font-weight: normal; }}
 
-                .table-wrapper {{ width: 90%; margin: 0 auto 3rem auto; overflow-x: auto; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border-radius: 0.5rem; border: 1px solid var(--border); }}
+                body{{ 
+                    background-color: var(--background); 
+                    color: var(--foreground);
+                    font-family: 'Inter', sans-serif; 
+                    margin:0;
+                    padding: 2rem;
+                }}
                 
-                table {{ width: 100%; border-collapse: collapse; text-align: center; }}
-                th, td {{ padding: 1rem; border-bottom: 1px solid var(--border); }}
-                th {{ background-color: var(--muted); font-weight: bold; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; }}
+                .main-title {{
+                    text-align: center;                    
+                }}
                 
-                /* Bordure droite fine pour séparer les noms des scores */
-                td:first-child, th:first-child {{ border-right: 1px solid var(--border); }}
+                .scenario-header {{ 
+                    display: flex;
+                    align-items: center;
+                    justify-content: start;
+                    gap: 1rem;
+                    width: 90%;
+                    place-self: center;
+                    padding-bottom: 1rem;
+                }}
 
-                .general-name {{ font-weight: 700; }}
-                
-                .score-cell {{ display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-variant-numeric: tabular-nums; font-size: 1.1em; }}
-                .separator {{ color: var(--muted-foreground); opacity: 0.5; }}
-                .draw-count {{ color: var(--muted-foreground); font-size: 0.85em; margin-left: 0.25rem; }}
+                .scenario-title {{ 
+                    margin: 0;
+                    font-size: 1.5rem;
+                }}
 
-                .theme-icon-wrapper {{ position: absolute; top: 1rem; right: 1rem; cursor: pointer; padding: 0.5rem; border-radius: 50%; background: var(--muted); }}
-                .theme-icon {{ width: 1.5rem; height: 1.5rem; }}
+                .round-count {{ 
+                    color: var(--muted-foreground);
+                    font-size: 1rem; 
+                    font-weight: normal;
+                }}
+
+                .table-wrapper-wrapper {{
+                    width: 90%;
+                    overflow-x: scroll;
+                    place-self:center;
+                    padding-bottom: 0.5rem;
+                }}
+
+                .table-wrapper {{
+                    box-shadow: 0 4px 6px -1px oklch(0 0 0 / 10%);
+                    width: 98%;
+                    border: 1px solid var(--border);
+                    border-radius: 0.5rem;
+                }}
+
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    text-align: center;
+                }}
+
+                th:first-child {{
+                    border-top-left-radius: 0.3rem;
+                }}
+
+                th:last-child{{
+                    border-top-right-radius: 0.3rem
+                }}
+
+                th, td {{ 
+                    padding: 1rem;
+                    border-bottom: 1px solid var(--border);
+                }}
+                
+                tr:last-child > td{{
+                    border-bottom: 0px;
+                }}
+
+                th {{ 
+                    background-color: var(--muted);
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    font-size: 0.85rem; 
+                    letter-spacing: 0.05em;
+
+                    &:first-child{{
+                        border-right: 1px solid var(--border);                    
+                    }}
+                }}
+                
+                td:first-child {{ 
+                    border-right: 1px solid var(--border);
+                }}
+
+                .general-name {{ 
+                    font-weight: bold;
+                }}
+                
+                .score-cell {{ 
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    font-variant-numeric: tabular-nums;
+                    font-size: 1.1em; 
+                }}
+
+                .separator {{ 
+                    color: var(--muted-foreground);
+                    opacity: 0.5;
+                }}
+
+                .draw-count {{ 
+                    color: var(--muted-foreground);
+                    font-size: 0.85em;
+                    margin-left: 0.25rem;
+                }}
+
+                section{{
+                    padding-top: 1rem;
+                    padding-bottom: 1rem;
+                }}
+
+                .theme-icon-wrapper {{ 
+                    position: absolute;
+                    top: 1rem;
+                    right: 1rem;
+                    cursor: pointer;
+                    padding: 0.5rem;
+                    border-radius: 50%;
+                    background: var(--muted); 
+                }}
+
+                .theme-icon {{ 
+                  width: 1.5rem;
+                  height: 1.5rem;
+                }}
+
+                ::-webkit-scrollbar{{
+                  width: 0.5rem;
+                  height: 0.5rem;
+                }}
+
+                ::-webkit-scrollbar-track{{
+                  background: transparent;
+                }}
+
+                ::-webkit-scrollbar-thumb{{
+                  background: oklch(0.7155 0 0);
+                  border-radius: 0.25rem;
+                }}
+
+                ::-webkit-scrollbar-thumb:hover{{
+                  background: oklch(0.8699 0 0);
+                }}
+
             </style>
             <script>
               const getThemePreference = () => {{
@@ -982,22 +849,26 @@ class HTMLSnapshot:
             <h1 class="main-title">Tournament Report</h1>
             {report_content}
             
-            <script>
+            <script defer>
                 const wrapper = document.querySelector(".theme-icon-wrapper");
                 const moon = document.getElementById("moon");
                 const sun = document.getElementById("sun");
-                function updateIcon() {{
+
+                const updateIcon =  () => {{
                     const isDark = document.documentElement.classList.contains("dark");
                     moon.style.display = isDark ? "none" : "block";
                     sun.style.display = isDark ? "block" : "none";
                 }}
+
                 updateIcon();
+
                 wrapper.addEventListener("click", () => {{
                     const isDark = document.documentElement.classList.contains("dark");
                     document.documentElement.classList[isDark ? "remove" : "add"]("dark");
                     localStorage.setItem("theme", !isDark ? "dark" : "light");
                     updateIcon();
                 }});
+
             </script>
         </body>
         </html>

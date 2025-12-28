@@ -8,6 +8,7 @@ from src.engine.battlefield import Battlefield
 from src.engine.simulation import Simulation
 from src.general.braindead import GeneralBraindead
 from src.general.daft import GeneralDaft
+from src.general.GeneralTactician import GeneralTactician
 from src.general.GeneralSmart import GeneralSmart
 from src.scenarios.scenario_loader import ScenarioLoader
 from src.visualizer.pygame_visualizer import PygameVisualizer
@@ -36,15 +37,10 @@ Examples:
     # --- COMMAND: run ---
     run_parser = subparsers.add_parser("run", help="Run a battle scenario")
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
-    run_parser.add_argument("general0", type=str, choices=["braindead", "daft"], help="General for player 0")
-    run_parser.add_argument("general1", type=str, choices=["braindead", "daft"], help="General for player 1")
-
-    # Visualizer choice
-    viz_group = run_parser.add_mutually_exclusive_group()
-    viz_group.add_argument("-gui", action="store_true", help="Use Pygame GUI visualizer.")
-    viz_group.add_argument("-t", "--terminal", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
-
-    run_parser.add_argument("--speed", type=float, default=0.1, help="Target ticks per second (TPS). 0 for max speed in headless mode.")
+    run_parser.add_argument("general0", type=str, choices=["braindead", "daft", "generalsmart", "generaltactician"], help="General for player 0")
+    run_parser.add_argument("general1", type=str, choices=["braindead", "daft", "generalsmart", "generaltactician"], help="General for player 1")
+    run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
+    run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
     # --- COMMAND: load ---
     load_parser = subparsers.add_parser("load", help="Load a saved game")
@@ -52,7 +48,7 @@ Examples:
 
     # --- COMMAND: tourney ---
     tourney_parser = subparsers.add_parser("tourney", help="Run tournament")
-    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft", "generalsmart"], help="Generals to include in tournament")
+    tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft", "generalsmart", "generaltactician"], help="Generals to include in tournament")
     tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
     tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
     tourney_parser.add_argument("-na", action="store_true", help="Don't alternate player positions")
@@ -68,6 +64,8 @@ def create_general(general_type: str, player_id: int):
         return GeneralDaft(player_id)
     elif general_type == "GeneralSmart" or general_type == "generalsmart":
         return GeneralSmart(player_id)
+    elif general_type == "generaltactician" or general_type == "GeneralTactician":
+        return GeneralTactician(player_id)
     else:
         raise ValueError(f"Unknown general type: {general_type}")
 

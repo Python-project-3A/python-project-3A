@@ -91,7 +91,6 @@ class BaseGeneral(ABC):
         clamp_y = max(0, min(v[1], bf.height - 0.01))
         return clamp_x, clamp_y
 
-    #
     @staticmethod
     def _get_centroid(units: list[Unit]) -> tuple[float, float]:
         """Calcule le barycentre d'une liste d'unités."""
@@ -110,17 +109,55 @@ class BaseGeneral(ABC):
 
     # --- PERCEPTION & ANALYSE (Lecture du jeu) ---
 
-    def _analyze_enemy_clusters(self, enemies: list[Unit]):
+    def _analyze_enemy_clusters(self, enemies: list[Unit], dist_threshold: float = 15.0) -> list[dict]:
         """
-        Découpe les ennemis en groupes logiques (Clusters).
-        Utile pour savoir si l'ennemi est séparé en deux armées.
+        Divise les ennemis en groupes distincts basés sur la distance.
+        Retourne une liste de dict : [{'center': (x,y), 'units': [u1, u2...], 'size': n}, ...]
         """
-        # TODO: Implémenter un vrai K-Means ou DBSCAN si besoin plus tard.
-        # Pour l'instant : Une seule grosse armée.
+        # TODO : faire de la propagation de clusters ?
         if not enemies:
             return []
 
-        return [{"center": self._get_centroid(enemies), "units": enemies, "count": len(enemies)}]
+        clusters = []
+        visited = set()
+        sorted_enemies = sorted(enemies, key=lambda u: u.position)
+
+        for unit in sorted_enemies:
+            if unit.id in visited:
+                continue
+
+            current_cluster = [unit]
+            visited.add(unit.id)
+
+            center_x, center_y = unit.position
+
+            for other in sorted_enemies:
+                if other.id in visited:
+                    continue
+
+                d2 = (other.position[0] - center_x) ** 2 + (other.position[1] - center_y) ** 2
+
+                if d2 < dist_threshold**2:
+                    current_cluster.append(other)
+                    visited.add(other.id)
+
+            # Calcul du centre du cluster trouvé
+            sum_x = sum(u.position[0] for u in current_cluster)
+            sum_y = sum(u.position[1] for u in current_cluster)
+            count = len(current_cluster)
+
+            clusters.append(
+                {
+                    "center": (sum_x / count, sum_y / count),
+                    "units": current_cluster,
+                    "size": count,
+                    "danger_level": sum(u.damage for u in current_cluster),  #
+                    "health_level": sum(u.hp for u in current_cluster),
+                }
+            )
+
+        clusters.sort(key=lambda c: c["size"], reverse=True)
+        return clusters
 
     # --- MOUVEMENT ---
 
