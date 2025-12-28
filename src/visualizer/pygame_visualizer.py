@@ -7,6 +7,7 @@ from src.engine.battlefield import Battlefield
 from src.map.game_map import GameMap
 from src.units.unit_base import Unit
 
+
 class PygameVisualizer:
     """
     Renders the battlefield in a 2.5D isometric view using Pygame.
@@ -16,7 +17,7 @@ class PygameVisualizer:
     ISO_BASE_TILE_WIDTH = 64
     ISO_BASE_TILE_HEIGHT = 32
 
-    def __init__(self, battlefield, screen_width=1280, screen_height=720):
+    def __init__(self, battlefield: Battlefield, screen_width=1280, screen_height=720):
         """
         Initializes Pygame, the screen, and visualizer settings.
         """
@@ -30,7 +31,7 @@ class PygameVisualizer:
         self.screen_height = screen_height
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Age of Empires 2 - Simulation")
-        
+
         self.font = pygame.font.SysFont("Arial", 16)
         self.colors = {
             0: (50, 50, 255),  # Blue for Player 0
@@ -53,14 +54,14 @@ class PygameVisualizer:
         projected_max_x_raw = self.battlefield.width * (self.ISO_BASE_TILE_WIDTH / 2)
         total_projected_width_raw = projected_max_x_raw - projected_min_x_raw
 
-        projected_min_y_raw = 0 # The top-most point is (0,0) or (width,0) or (0,height)
+        projected_min_y_raw = 0  # The top-most point is (0,0) or (width,0) or (0,height)
         projected_max_y_raw = (self.battlefield.width + self.battlefield.height) * (self.ISO_BASE_TILE_HEIGHT / 2)
         total_projected_height_raw = projected_max_y_raw - projected_min_y_raw
 
         # Determine scaling factor if map is too large for the screen
         self.scale_factor = 1.0
         padding_ratio = 0.9  # Use 90% of screen for map to leave some margin
-        self.base_scale_factor = 1.0 # To keep the initial fit-to-screen scale
+        self.base_scale_factor = 1.0  # To keep the initial fit-to-screen scale
         if total_projected_width_raw > self.screen_width * padding_ratio or total_projected_height_raw > self.screen_height * padding_ratio:
             scale_x = (self.screen_width * padding_ratio) / total_projected_width_raw
             scale_y = (self.screen_height * padding_ratio) / total_projected_height_raw
@@ -87,7 +88,7 @@ class PygameVisualizer:
     def load_assets(self):
         """Loads textures from data/textures."""
         texture_dir = Path(__file__).parent.parent / "data" / "textures"
-        
+
         def load_img(name):
             try:
                 path = texture_dir / name
@@ -132,10 +133,10 @@ class PygameVisualizer:
         """
         zoom_step = 0.1
         if direction > 0:
-            self.scale_factor *= (1 + zoom_step)
+            self.scale_factor *= 1 + zoom_step
         else:
-            self.scale_factor *= (1 - zoom_step)
-        
+            self.scale_factor *= 1 - zoom_step
+
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
         self.update_tile_textures()
@@ -172,10 +173,14 @@ class PygameVisualizer:
                 if event.key == pygame.K_ESCAPE:
                     return "escape"
                 # Camera Movement Keys
-                if event.key in (pygame.K_w, pygame.K_z): return "w" # z for AZERTY
-                if event.key == pygame.K_s: return "s"
-                if event.key in (pygame.K_a, pygame.K_q): return "a" # q for AZERTY
-                if event.key == pygame.K_d: return "d"
+                if event.key in (pygame.K_w, pygame.K_z):
+                    return "w"  # z for AZERTY
+                if event.key == pygame.K_s:
+                    return "s"
+                if event.key in (pygame.K_a, pygame.K_q):
+                    return "a"  # q for AZERTY
+                if event.key == pygame.K_d:
+                    return "d"
 
                 # Simulation Control Keys
                 if event.key == pygame.K_p:
@@ -198,7 +203,7 @@ class PygameVisualizer:
     def __exit__(self):
         """Ensures Pygame is shut down cleanly on exit."""
         self.finish()
-    
+
     def _draw_background(self):
         """Draws the water background (tiled) or solid color."""
         if self.water_img:
@@ -215,12 +220,7 @@ class PygameVisualizer:
         Draws the isometric ground plane.
         """
         # Draw a solid base polygon first to hide gaps/cracks between tiles
-        points = [
-            self.world_to_screen(0, 0),
-            self.world_to_screen(self.battlefield.width, 0),
-            self.world_to_screen(self.battlefield.width, self.battlefield.height),
-            self.world_to_screen(0, self.battlefield.height),
-        ]
+        points = [self.world_to_screen(0, 0), self.world_to_screen(self.battlefield.width, 0), self.world_to_screen(self.battlefield.width, self.battlefield.height), self.world_to_screen(0, self.battlefield.height)]
         pygame.draw.polygon(self.screen, self.colors["ground"], points)
 
         # Draw tiles if texture is available
@@ -241,13 +241,8 @@ class PygameVisualizer:
                         self.screen.blit(tile_to_draw, (sx - half_w, sy))
 
         # Draw Map Border
-        points = [
-            self.world_to_screen(0, 0),
-            self.world_to_screen(self.battlefield.width, 0),
-            self.world_to_screen(self.battlefield.width, self.battlefield.height),
-            self.world_to_screen(0, self.battlefield.height),
-        ]
-        pygame.draw.polygon(self.screen, (0, 0, 0), points, 2) # Black border
+        points = [self.world_to_screen(0, 0), self.world_to_screen(self.battlefield.width, 0), self.world_to_screen(self.battlefield.width, self.battlefield.height), self.world_to_screen(0, self.battlefield.height)]
+        pygame.draw.polygon(self.screen, (0, 0, 0), points, 2)  # Black border
 
     def _draw_unit(self, unit):
         """
@@ -262,18 +257,18 @@ class PygameVisualizer:
 
         # Draw an ellipse for a 3D-like base
         ellipse_rect = pygame.Rect(screen_x - radius, screen_y - radius // 2, radius * 2, radius)
-        pygame.draw.ellipse(self.screen, (0,0,0), ellipse_rect, 2) # Black outline
+        pygame.draw.ellipse(self.screen, (0, 0, 0), ellipse_rect, 2)  # Black outline
         pygame.draw.ellipse(self.screen, color, ellipse_rect.inflate(int(-4 * self.scale_factor), int(-4 * self.scale_factor)))
 
         # Draw a vertical line to represent the unit's body
         body_height = int(30 * self.scale_factor)
-        line_width = int(4 * self.scale_factor) or 1 # Ensure line width is at least 1
+        line_width = int(4 * self.scale_factor) or 1  # Ensure line width is at least 1
         pygame.draw.line(self.screen, color, (screen_x, screen_y - body_height), (screen_x, screen_y), line_width)
 
         # Draw HP bar above the unit
         hp_ratio = unit.hp / unit.max_hp
         hp_bar_width = int(30 * self.scale_factor)
-        hp_bar_height = int(5 * self.scale_factor) or 1 # Ensure hp bar height is at least 1
+        hp_bar_height = int(5 * self.scale_factor) or 1  # Ensure hp bar height is at least 1
         hp_bar_x = screen_x - hp_bar_width // 2
         hp_bar_y = screen_y - body_height - int(10 * self.scale_factor)
 

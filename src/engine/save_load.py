@@ -18,11 +18,7 @@ from src.general.daft import GeneralDaft
 from src.general.GeneralSmart import GeneralSmart
 
 # Liste des classes de généraux
-GENERAL_CLASSES = {
-    "GeneralBraindead": GeneralBraindead,
-    "GeneralDaft": GeneralDaft,
-    "GeneralSmart": GeneralSmart
-}
+GENERAL_CLASSES = {"GeneralBraindead": GeneralBraindead, "GeneralDaft": GeneralDaft, "GeneralSmart": GeneralSmart}
 
 
 def get_save_dir() -> Path:
@@ -208,7 +204,7 @@ def save_game(simulation: Simulation):
         json.dump(data, f, indent=4)
 
 
-def load_game(filename: str | None  = None) -> Simulation:
+def load_game(filename: str | None = None) -> Simulation:
     """Charge l'état du jeu à partir d'un fichier JSON
     Si 'filename' est None (non spécifié), charge la sauvegarde la plus récente
     dans le répertoire de sauvegarde.
@@ -221,13 +217,13 @@ def load_game(filename: str | None  = None) -> Simulation:
 
         if not save_files:
             raise FileNotFoundError(f"Aucune sauvegarde trouvée dans le repertoire de sauvegarde {save_dir}")
-        
+
         # 2. Trier les fichiers par nom (le timestamp YYYYMMDD_HHMMSS assure le tri chronologique)
         latest_save_path = max(save_files)
         save_file = latest_save_path
 
     else:
-        #charger le fichier de sauvegarde spécifié
+        # charger le fichier de sauvegarde spécifié
         if not filename.lower().endswith(".json"):
             filename += ".json"
 

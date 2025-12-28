@@ -50,6 +50,10 @@ Examples:
     load_parser = subparsers.add_parser("load", help="Load a saved game")
     load_parser.add_argument("savefile", type=str, help="Save file path")
 
+    load_viz_group = load_parser.add_mutually_exclusive_group()
+    load_viz_group.add_argument("-gui", action="store_true", help="Use Pygame GUI visualizer.")
+    load_viz_group.add_argument("-t", "--terminal", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
+
     # --- COMMAND: tourney ---
     tourney_parser = subparsers.add_parser("tourney", help="Run tournament")
     tourney_parser.add_argument("-G", "--generals", nargs="+", choices=["braindead", "daft", "generalsmart", "generaltactician"], help="Generals to include in tournament")
@@ -222,18 +226,25 @@ def command_load(args):
         print(f"Error loading game: {e}")
         return
 
-    # Setup View (même logique que run_battle)
     width, height = simulation.battlefield.width, simulation.battlefield.height
-    visualizer = CLIVisualizer(width, height)  # Le chargement impose la vue Terminale (pour l'instant)
-    target_tps = 30  # Taux de rafraîchissement visuel standard
+
+    visualizer = None
+    if args.gui:
+        visualizer = PygameVisualizer(battlefield=simulation.battlefield)
+    else:  # use the terminal visualiser if nothing is passed
+        visualizer = CLIVisualizer(width, height)
+
+    target_tps = 30 if visualizer else 0
 
     print("\n Loading battle...\n")
 
     with ConsoleInputProvider() as inp:
         simulation.run(inp, visualizer=visualizer, target_tps=target_tps)
 
-    # 7. Results
-    simulation.battlefield.print_battle_result()
+    # Print results
+    full_output = simulation.battlefield.print_battle_result()
+    sys.stdout.write(full_output)
+    sys.stdout.flush()
 
 
 def run_battle(args):
