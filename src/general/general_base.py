@@ -319,39 +319,6 @@ class BaseGeneral(ABC):
         data = {"class": self.__class__.__name__, "player_id": self.player_id, "name": self.name}
         return data
 
-    def micro_ranged_unit_logic(self, unit: Unit, enemies: list[Unit], bf: Battlefield, critical_dist: float = 3.0) -> dict | None:
-        """
-        Logique standardisée pour les unités à distance (Hit & Run).
-        Retourne un Ordre (dict) si une action micro est requise, sinon None.
-        """
-        if not enemies:
-            return None
-
-        # 1. Analyse de la menace
-        nearest = min(enemies, key=lambda e: unit.dist_to(e))
-        dist_to_threat = unit.dist_to(nearest)
-
-        # Seuils
-        safe_dist = unit.attack_range * 0.85
-
-        is_threatened = dist_to_threat < safe_dist
-        is_critical = dist_to_threat < critical_dist
-        is_reloading = unit.reload_timer > 0
-
-        from src.engine.system import CombatSystem
-
-        # 2. DÉCISION : FUITE
-        if is_critical or (is_threatened and is_reloading):
-            return {"type": "move_to", "target": self._fuite_strategique(unit, enemies, bf)}
-        target = CombatSystem.choose_weakest_target(unit, enemies, bf)
-        if not target:
-            target = nearest
-
-        if target and unit.dist_to(target) <= unit.attack_range:
-            return {"type": "attack_unit", "target": target}
-
-        return None
-
     def is_threatened(self, unit: Unit, nearest: Unit, critical_dist: float = 3.0):
         """Permet de savoir si une unité est menacée.
         Renvoie un tuple de bool tq : (is_threatened, is_critical)"""
@@ -361,10 +328,11 @@ class BaseGeneral(ABC):
         is_critical = nearest and unit.dist_to(nearest) < critical_dist
 
         if is_threatened:
-            if is_critical:  # Cas 1 : DANGER IMMÉDIAT (Trop près) OU Cas 2 : JE RECHARGE (Pas prêt à tirer)
+            if is_critical:  # Cas 1 : DANGER IMMÉDIAT
                 return (True, True)
-            else:  # Cas 3 : DANGER MODÉRÉ + ARME PRÊTE
+            else:  # Cas 2 : DANGER MODÉRÉ
                 return (True, False)
+        # Cas 3 : PAS DE DANGER
         return (False, False)
 
     def _micro_archer(self, unit: Unit, enemies: list[Unit], target_pos: tuple, bf: Battlefield):

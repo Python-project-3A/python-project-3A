@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 class GeneralTactician(BaseGeneral):
     def __init__(self, player_id: int):
-        super().__init__(player_id, name="General TACTICIAN")
+        super().__init__(player_id, name="General Tactician")
         self.tick_counter = 0
 
     def update(self, bf: Battlefield, tick: int) -> None:
@@ -23,38 +23,37 @@ class GeneralTactician(BaseGeneral):
         if not enemies or not my_units:
             return
 
-        # 2. CALCUL DE LA GÉOMÉTRIE (Uniquement si nécessaire)
-        # On ne calcule l'arc que si on est en phase d'approche
+        # 2. CALCUL DE LA GÉOMÉTRIE
         orders = {}
 
-        # On sépare les unités
         melee_units = [u for u in my_units if u.attack_range <= 4.0]
         ranged_units = [u for u in my_units if u.attack_range > 4.0]
 
         # Calcul des positions idéales de l'arc
         if melee_units:
-            orders.update(self._get_concave_positions(melee_units, enemies, bf, 0.8))
+            orders.update(self._get_concave_positions(melee_units, enemies, bf, 0.6))
         if ranged_units:
             orders.update(self._get_concave_positions(ranged_units, enemies, bf, 1.2))
 
         # 3. LOGIQUE D'ENGAGEMENT
         for unit in my_units:
-            # PRIORITÉ 1 : Si engagé, on ne touche à rien
+            nearest = CombatSystem.choose_nearest_target(unit, enemies, bf)
             if self._is_unit_engaged(unit, enemies):
                 continue
 
-            if unit.attack_range > 4.0:
-                unit.current_order = self.micro_ranged_unit_logic(unit, enemies, bf)
-                if unit.current_order:
-                    return
+            if unit in ranged_units:
+                (is_threatened, is_critical) = self.is_threatened(unit, nearest)
+                if is_threatened:
+                    if is_critical or unit.reload_timer > 0:
+                        (move_target_x, move_target_y) = self._fuite_strategique(unit, enemies, bf)
+                        if not (move_target_x, move_target_y) == unit.position:
+                            unit.current_order = {"type": "move_to", "target": (move_target_x, move_target_y)}
+                            continue
 
-            # PRIORITÉ 2 : Si un ennemi est très proche, on charge (attack_unit)
+            # PRIORITÉ 2 : Si un ennemi est très proche, on l'attaque TODO : WARNING : vision range c'est pas très proche, voir si on garde ça ou si on donne la prio à la formation
             if enemies:  # Sécurité si enemies est vide
-                nearest_threat = min(enemies, key=lambda e: unit.dist_to(e))
-                engagement_range = unit.attack_range * 1.1
-
-                if unit.dist_to(nearest_threat) <= engagement_range:
-                    unit.current_order = {"type": "attack_unit", "target": nearest_threat}
+                if unit.dist_to(nearest) <= unit.vision_range:
+                    unit.current_order = {"type": "attack_unit", "target": nearest}
                     continue
 
             # PRIORITÉ 3 : Retour à la formation (attack_move)
@@ -77,7 +76,7 @@ class GeneralTactician(BaseGeneral):
                 # Là, on peut utiliser math.dist en toute sécurité
 
                 elif unit.current_order["type"] == "attack_move":
-                    if math.dist(unit.current_order["target"], (dest_x, dest_y)) > 2.0:
+                    if math.dist(unit.current_order["target"], (dest_x, dest_y)) > 1.0:  # TODO : reprendre ce bout de code et le mettre dans une fonction order movement opti
                         should_update_order = True
 
                 if should_update_order:
@@ -94,38 +93,38 @@ class GeneralTactician(BaseGeneral):
         dy = my_centroid[1] - enemy_centroid[1]
         dist_to_enemy = math.sqrt(dx**2 + dy**2)
         base_angle = math.atan2(dy, dx)
+        avg_range = sum(u.attack_range for u in units) / len(units)
 
         # 2. CAPACITÉ PHYSIQUE
-        avg_range = sum(u.attack_range for u in units) / len(units)
         is_melee = avg_range < 4.0
 
         circumference_needed = len(units) * unit_spacing
-        max_angle = math.pi * 0.8
+        max_angle = math.pi * 0.85
         min_radius_physic = circumference_needed / max_angle
-        expansion_factor = dist_to_enemy * 0.3
+        expansion_factor = dist_to_enemy * 0.4
 
         # 3. LE RAYON DE PRESSION
         if is_melee:
-            effective_radius = max(min_radius_physic * 0.8, expansion_factor)
+            effective_radius = max(min_radius_physic * 0.9, expansion_factor)
         else:
-            target_range = max(min_radius_physic, avg_range * 0.8)
+            target_range = max(min_radius_physic, avg_range * 0.85)
             effective_radius = max(target_range, expansion_factor)
 
-        # 4. TRI TOPOLOGIQUE (Correction du signe pour Y-Down)
+        # 4. TRI TOPOLOGIQUE
         def get_relative_position_score(u):
             """projection sur la perpendiculaire de la ligne d'attaque"""
-            return -dy * (u.position[0] - my_centroid[0]) + dx * (u.position[1] - my_centroid[1])
+            return -dy * (u.position[0] - my_centroid[0]) + (dx) * (u.position[1] - my_centroid[1])
 
         def get_angular_score(u):
             angle_to_center = math.atan2(u.position[1] - my_centroid[1], u.position[0] - my_centroid[0])
-            relative_angle = angle_to_center - base_angle
-            while relative_angle <= -math.pi:
-                relative_angle += 2 * math.pi
-            while relative_angle > math.pi:
-                relative_angle -= 2 * math.pi
-            return relative_angle
+            diff = angle_to_center - base_angle
+            while diff <= -math.pi:
+                diff += 2 * math.pi
+            while diff > math.pi:
+                diff -= 2 * math.pi
+            return diff
 
-        units_sorted = sorted(units, key=get_angular_score)
+        units_sorted = sorted(units, key=get_relative_position_score)
 
         # 5. GÉNÉRATION
         total_spread = circumference_needed / effective_radius
@@ -140,10 +139,7 @@ class GeneralTactician(BaseGeneral):
             # On utilise le centroid ennemi comme centre de rotation pour la symétrie
             tx = enemy_centroid[0] + math.cos(current_angle) * effective_radius
             ty = enemy_centroid[1] + math.sin(current_angle) * effective_radius
-
-            # Clamp
-            tx = max(1.0, min(tx, bf.width - 1.0))
-            ty = max(1.0, min(ty, bf.height - 1.0))
+            tx, ty = self._clamp_position((tx, ty), bf)
 
             assignments[unit.id] = (tx, ty)
 
