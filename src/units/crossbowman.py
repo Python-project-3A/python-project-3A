@@ -7,6 +7,3 @@ class Crossbowman(Unit):
 
     def __repr__(self):
         return f"<Crossbowman id={self.id} owner={self.owner} pos={self.position} hp={self.hp}>"
-
-    def __repr__(self):
-        return f"<Crossbowman id={self.id} owner={self.owner} pos={self.position} max_hp={self.max_hp}>"
