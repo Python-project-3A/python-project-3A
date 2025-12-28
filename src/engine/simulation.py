@@ -90,12 +90,13 @@ class Simulation:
 
             # --- TERMINAL INPUTS ---
             if not is_gui:
-                terminal_key = input_provider.get_key()
-                self.base_key_matching(terminal_key)
+                if input_provider:
+                    terminal_key = input_provider.get_key()
+                    self.base_key_matching(terminal_key)
 
-                if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
-                    step = 2
-                    self.direction_key_matching(terminal_key, step, visualizer=visualizer)
+                    if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
+                        step = 2
+                        self.direction_key_matching(terminal_key, step, visualizer=visualizer)
 
             # --- GUI INPUTS ---
             if is_gui:
