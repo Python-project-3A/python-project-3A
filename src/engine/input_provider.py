@@ -73,7 +73,7 @@ class ConsoleInputProvider:
                     try:
                         # Ajout : Gérer la touche ESC sur Windows si elle est lue comme un caractère simple
                         if key == b"\x1b":
-                            return "esc"
+                            return "escape"
                         return key.decode().lower()
                     except UnicodeDecodeError:
                         return None
@@ -84,6 +84,9 @@ class ConsoleInputProvider:
             r, _, _ = select.select([sys.stdin], [], [], 0)
             if r:
                 char = sys.stdin.read(1)
+
+                if char == "\t":
+                    return "tab"
 
                 if char == "\x1b":  # Début d'une séquence
                     fd = sys.stdin.fileno()
@@ -111,8 +114,6 @@ class ConsoleInputProvider:
                         return "F12"
                     elif sequence == "\x1b":
                         return "escape"
-                    elif sequence == "\t":
-                        return "tab"
 
                     # Autres séquences ignorées
                     return None

@@ -39,7 +39,11 @@ Examples:
     run_parser.add_argument("scenario", type=str, help="Scenario name (without .json)")
     run_parser.add_argument("general0", type=str, choices=["braindead", "daft", "generalsmart", "generaltactician"], help="General for player 0")
     run_parser.add_argument("general1", type=str, choices=["braindead", "daft", "generalsmart", "generaltactician"], help="General for player 1")
-    run_parser.add_argument("-t", "--terminal", action="store_true", help="Use terminal view instead of 2.5D (currently only terminal available)")
+
+    viz_group = run_parser.add_mutually_exclusive_group()
+    viz_group.add_argument("-gui", action="store_true", help="Use Pygame GUI visualizer.")
+    viz_group.add_argument("-t", "--terminal", action="store_true", help="Use terminal visualizer (default if no visualizer is specified).")
+
     run_parser.add_argument("--speed", type=float, default=0.1, help="Tick duration in seconds")
 
     # --- COMMAND: load ---
@@ -257,7 +261,7 @@ def run_battle(args):
 
     if args.gui:
         visualizer = PygameVisualizer(battlefield=bf)
-    elif args.t:
+    elif args.terminal:
         visualizer = CLIVisualizer(width, height)
 
     # 5. Run Simulation
@@ -273,9 +277,8 @@ def run_battle(args):
     print(f" Spawned {len(bf.units_by_owner(1))} units for Player 1")
     print("\n Starting battle...\n")
 
-    with ConsoleInputProvider() as input_sys:
-        # On injecte le système d'input dans la simulation
-        sim.run(input_provider=input_sys, visualizer=visualizer, target_tps=target_tps)
+    with ConsoleInputProvider() as inp:
+        sim.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
 
     # Print results
     full_output = bf.print_battle_result()
