@@ -11,7 +11,8 @@ from src.general.daft import GeneralDaft
 from src.general.GeneralTactician import GeneralTactician
 from src.general.GeneralSmart import GeneralSmart
 from src.scenarios.scenario_loader import ScenarioLoader
-from src.visualizer.pygame_visualizer import PygameVisualizer
+from src.pygame.pygame_visualizer import PygameVisualizer
+from src.pygame.pygame_input_provider import PygameInputProvider
 from src.engine.input_provider import ConsoleInputProvider
 from src.engine.save_load import save_game, load_game, get_save_dir
 from src.engine.html_snapshot import HTMLSnapshot
@@ -238,8 +239,12 @@ def command_load(args):
 
     print("\n Loading battle...\n")
 
-    with ConsoleInputProvider() as inp:
-        simulation.run(inp, visualizer=visualizer, target_tps=target_tps)
+    if args.gui:
+        with PygameInputProvider() as inp:
+            simulation.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
+    elif args.terminal:
+        with ConsoleInputProvider() as inp:
+            simulation.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
 
     # Print results
     full_output = simulation.battlefield.print_battle_result()
@@ -288,8 +293,12 @@ def run_battle(args):
     print(f" Spawned {len(bf.units_by_owner(1))} units for Player 1")
     print("\n Starting battle...\n")
 
-    with ConsoleInputProvider() as inp:
-        sim.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
+    if args.gui:
+        with PygameInputProvider() as inp:
+            sim.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
+    elif args.terminal:
+        with ConsoleInputProvider() as inp:
+            sim.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
 
     # Print results
     full_output = bf.print_battle_result()

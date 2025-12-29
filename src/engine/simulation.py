@@ -1,10 +1,10 @@
 import time
-import random
 from src.engine.battlefield import Battlefield
 from src.general.general_base import BaseGeneral
 from src.cli.cli import CLIVisualizer
 from src.map.game_map import GameMap
-from src.visualizer.pygame_visualizer import PygameVisualizer
+from src.pygame.pygame_visualizer import PygameVisualizer
+from src.pygame.pygame_input_provider import PygameInputProvider
 from .system import UnitController
 from .html_snapshot import HTMLSnapshot
 from .save_load import save_game, load_game
@@ -100,14 +100,15 @@ class Simulation:
 
             # --- GUI INPUTS ---
             if is_gui:
-                pygame_key = visualizer.get_key()
-                self.base_key_matching(pygame_key)
-                self.direction_key_matching(pygame_key, step, visualizer=visualizer)
-                match pygame_key:
-                    case "zoom_in":
-                        visualizer.zoom(1)
-                    case "zoom_out":
-                        visualizer.zoom(-1)
+                if input_provider:
+                    pygame_key = input_provider.get_key()
+                    self.base_key_matching(pygame_key)
+                    self.direction_key_matching(pygame_key, step, visualizer=visualizer)
+                    match pygame_key:
+                        case "zoom_in":
+                            visualizer.zoom(1)
+                        case "zoom_out":
+                            visualizer.zoom(-1)
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:

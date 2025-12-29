@@ -1,11 +1,8 @@
-import sys
 from pathlib import Path
 
 import pygame
 
 from src.engine.battlefield import Battlefield
-from src.map.game_map import GameMap
-from src.units.unit_base import Unit
 
 
 class PygameVisualizer:
@@ -32,7 +29,7 @@ class PygameVisualizer:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Age of Empires 2 - Simulation")
 
-        self.font = pygame.font.SysFont("Arial", 16)
+        self.font = pygame.font.SysFont("Inter", 28)
         self.colors = {
             0: (50, 50, 255),  # Blue for Player 0
             1: (255, 50, 50),  # Red for Player 1
@@ -44,11 +41,6 @@ class PygameVisualizer:
         self.load_assets()
 
         # Camera offset to center the map
-        # Calculate initial projected map dimensions without scaling
-        # The isometric projection of (0,0) is (0,0) relative to an unshifted origin.
-        # The isometric projection of (width,0) is (width * TILE_W/2, width * TILE_H/2)
-        # The isometric projection of (0,height) is (-height * TILE_W/2, height * TILE_H/2)
-        # The isometric projection of (width,height) is ((width-height)*TILE_W/2, (width+height)*TILE_H/2)
 
         projected_min_x_raw = -self.battlefield.height * (self.ISO_BASE_TILE_WIDTH / 2)
         projected_max_x_raw = self.battlefield.width * (self.ISO_BASE_TILE_WIDTH / 2)
@@ -85,25 +77,25 @@ class PygameVisualizer:
 
         self.update_tile_textures()
 
+    @staticmethod
+    def load_img(name):
+        texture_dir = Path(__file__).parent.parent / "data" / "textures"
+        try:
+            path = texture_dir / name
+            if path.exists():
+                return pygame.image.load(str(path)).convert_alpha()
+        except Exception as e:
+            print(f"Warning: Could not load {name}: {e}")
+        return None
+
     def load_assets(self):
         """Loads textures from data/textures."""
-        texture_dir = Path(__file__).parent.parent / "data" / "textures"
-
-        def load_img(name):
-            try:
-                path = texture_dir / name
-                if path.exists():
-                    return pygame.image.load(str(path)).convert_alpha()
-            except Exception as e:
-                print(f"Warning: Could not load {name}: {e}")
-            return None
-
-        self.water_img = load_img("g_wtr_00_color.png")
+        self.water_img = self.load_img("g_wtr_00_color.png")
 
         # Load multiple grass textures for variety to avoid a repetitive look
         self.grass_textures_raw = []
         # Using a single grass texture for consistency
-        img = load_img("g_gr2_00_color.png")
+        img = self.load_img("g_gr2_00_color.png")
         if img:
             self.grass_textures_raw.append(img)
 
@@ -155,46 +147,6 @@ class PygameVisualizer:
         screen_x = self.camera_offset_x + (world_x - world_y) * (self._tile_width / 2)
         screen_y = self.camera_offset_y + (world_x + world_y) * (self._tile_height / 2)
         return int(screen_x), int(screen_y)
-
-    def get_key(self):
-        """
-        Processes Pygame events to get user input.
-        Returns 'q' to quit, 'p' to pause.
-        """
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return "escape"
-            if event.type == pygame.MOUSEWHEEL:
-                if event.y > 0:
-                    return "zoom_in"
-                elif event.y < 0:
-                    return "zoom_out"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return "escape"
-                # Camera Movement Keys
-                if event.key in (pygame.K_w, pygame.K_z):
-                    return "w"  # z for AZERTY
-                if event.key == pygame.K_s:
-                    return "s"
-                if event.key in (pygame.K_a, pygame.K_q):
-                    return "a"  # q for AZERTY
-                if event.key == pygame.K_d:
-                    return "d"
-
-                # Simulation Control Keys
-                if event.key == pygame.K_p:
-                    return "p"
-                if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS:
-                    return "="
-                if event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS or event.key == pygame.K_6:
-                    return "-"
-                if event.key == pygame.K_r:
-                    return "r"
-                if event.key == pygame.K_TAB:
-                    return "tab"
-
-        return None
 
     def __enter__(self):
         """Allows the visualizer to be used as a context manager."""
