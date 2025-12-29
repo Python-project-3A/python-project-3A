@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional
 import math
 
 from src.general.general_base import BaseGeneral
@@ -12,18 +12,21 @@ if TYPE_CHECKING:
 class GeneralTactician(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="General TACTICIAN")
+
+        # --- ÉTAT INTERNE ---
         self.phase = "MARCH"
-        self.formation_orders = {}
+        self.formation_orders: Dict[int, tuple[float, float]] = {}
         self.reference_arrival_time = 0.0
 
     def update(self, bf: Battlefield, tick: int) -> None:
+        # 1. PERCEPTION
         my_units = self.get_my_units(bf)
         enemies = self.get_enemy_units(bf)
 
         if not my_units or not enemies:
             return
 
-        # 1. CLASSIFICATION ROBUSTE
+        # 2. CLASSIFICATION ROBUSTE
         pikemen = []
         crossbowmen = []
         knights = []
@@ -34,60 +37,72 @@ class GeneralTactician(BaseGeneral):
                 knights.append(u)
             elif "cross" in name_lower or u.attack_range >= 4.0:
                 crossbowmen.append(u)
-            elif "pike" in name_lower or "spear" in name_lower:
-                pikemen.append(u)
             else:
+                # Fallback par défaut (Piquiers)
                 pikemen.append(u)
 
-        # 2. KILL SWITCH
+        # 3. KILL SWITCH (Passage en phase combat)
         if self.phase == "MARCH":
             if self._check_charge_condition(my_units, enemies):
                 self.phase = "COMBAT"
                 self.formation_orders.clear()
 
-        # 3. LOGIQUE
+        # 4. EXÉCUTION LOGIQUE
         if self.phase == "COMBAT":
             self._execute_combat_logic(pikemen, knights, crossbowmen, enemies, bf)
         else:
             self._execute_march_logic(pikemen, knights, crossbowmen, enemies, bf, tick)
 
     # =========================================================================
-    # PHASE MARCHE
+    # PHASE 1 : MARCHE (TIME ON TARGET AVEC VITESSE VIRTUELLE)
     # =========================================================================
 
     def _execute_march_logic(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, tick: int):
-        # A. Recalcul périodique
+        # A. Recalcul périodique de la géométrie (tous les 5 ticks pour stabilité)
         if tick % 5 == 0 or not self.formation_orders:
             self._calculate_formation_geometry(pikemen, knights, crossbowmen, enemies, bf)
 
-        # B. Calcul Temps Référence (Robustesse 90eme percentile)
+        # B. Calcul du Temps de Référence (Robustesse 90ème percentile)
         all_infantry = pikemen + crossbowmen
         arrival_times = []
+
         for u in all_infantry:
             if u.id in self.formation_orders:
                 target = self.formation_orders[u.id]
                 dist = self.get_dist(u.position, target)
-                speed = u.speed if u.speed > 0.1 else 0.1
-                arrival_times.append(dist / speed)
+                safe_speed = u.speed if u.speed > 0.1 else 0.1
+                arrival_times.append(dist / safe_speed)
 
         if arrival_times:
             arrival_times.sort()
-            # On ignore les 10% les plus lents (bloqués ou loin)
-            cutoff = int(len(arrival_times) * 0.9)
-            cutoff = min(cutoff, len(arrival_times) - 1)
-            self.reference_arrival_time = arrival_times[cutoff]
+            # On ignore les 10% les plus lents (unités bloquées ou outliers)
+            cutoff_index = int(len(arrival_times) * 0.9)
+            cutoff_index = min(cutoff_index, len(arrival_times) - 1)
+            self.reference_arrival_time = arrival_times[cutoff_index]
         else:
             self.reference_arrival_time = 0.0
 
-        # C. Mouvement
-        # On remet tout le monde à 0.0 offset pour tester la fluidité maximale
-        self._apply_tot_movement(pikemen, self.reference_arrival_time, 0.0)
-        self._apply_tot_movement(crossbowmen, self.reference_arrival_time, 0.0)
-        self._apply_tot_movement(knights, self.reference_arrival_time, 0.0)
+        # C. Application du mouvement avec modulation de vitesse
+        # Offset 0.0 = Synchro parfaite.
+        # On pourrait mettre -1.0 aux Knights pour qu'ils arrivent 1s AVANT l'impact si voulu.
+        self._apply_virtual_speed_movement(pikemen, self.reference_arrival_time, 0.0)
+        self._apply_virtual_speed_movement(crossbowmen, self.reference_arrival_time, 0.0)
+        self._apply_virtual_speed_movement(knights, self.reference_arrival_time, 0.0)
 
-    def _apply_tot_movement(self, units: list[Unit], t_ref: float, time_offset: float):
+    def _apply_virtual_speed_movement(self, units: list[Unit], t_ref: float, time_offset: float):
+        """
+        Applique le mouvement en utilisant la technique de la 'Carotte' (Virtual Speed).
+        L'unité reçoit un ordre de mouvement court correspondant exactement à la distance
+        qu'elle doit parcourir ce tick-ci pour arriver à l'heure.
+        """
         target_time = t_ref + time_offset
-        sync_tolerance = 0.5
+
+        # On assume un dt (delta time) standard de 1/FPS.
+        # Si le jeu tourne à 60 FPS simulés (dt ~ 0.016) ou 10 FPS (dt ~ 0.1).
+        # Par sécurité, on prend une valeur arbitraire raisonnable pour le calcul du 'step',
+        # car l'API move_to fera le vrai calcul physique ensuite.
+        # On vise un horizon de projection de 0.2s pour lisser le mouvement.
+        projection_horizon = 0.2
 
         for unit in units:
             if unit.id not in self.formation_orders:
@@ -96,49 +111,72 @@ class GeneralTactician(BaseGeneral):
             dest = self.formation_orders[unit.id]
             dist = self.get_dist(unit.position, dest)
 
-            if dist < 0.5:
-                # Arrivé au poste : micro-mouvement pour rester actif
-                unit.current_order = {"type": "move_to", "target": unit.position}
-                continue
-
-            # --- LE RETOUR DE LA FLUIDITÉ ---
-            # Si on est loin (> 5m), ON COURT.
-            # On ignore complètement le timing. C'est ça qui manquait.
-            # Les unités vont avancer "ensemble" car elles ont toutes l'ordre de bouger.
-            if dist > 5.0:
+            # Si très proche, micro-ajustement
+            if dist < 0.2:
                 unit.current_order = {"type": "move_to", "target": dest}
                 continue
-            # --------------------------------
 
-            # Si on est proche (< 5m), on active le frein intelligent (ToT)
-            # pour que l'impact final soit synchronisé.
-            my_time_needed = dist / unit.speed if unit.speed > 0 else 0
-
-            if my_time_needed < (target_time - sync_tolerance):
-                # Trop en avance pour l'impact final -> On attend
-                unit.current_order = {"type": "move_to", "target": unit.position}
+            # 1. Calcul de la vitesse requise pour arriver à T_target
+            # Vitesse = Distance / Temps
+            if target_time <= 0.1:
+                # Retard ou temps écoulé : Vitesse Max
+                req_speed = unit.speed
             else:
-                # C'est le moment d'y aller
-                unit.current_order = {"type": "move_to", "target": dest}
+                req_speed = dist / target_time
+
+            # 2. Clamping (On ne peut pas dépasser la vitesse max physique)
+            final_speed = min(req_speed, unit.speed)
+
+            # 3. Minimum vital (pour éviter le freeze total sur des arrondis)
+            # On force une vitesse minimale de 10% sauf si on est vraiment arrivé
+            final_speed = max(final_speed, unit.speed * 0.1)
+
+            # 4. TECHNIQUE DE LA CAROTTE (Virtual Target Injection)
+            # Au lieu de viser 'dest' (loin), on vise un point intermédiaire.
+            # Ce point est à une distance = Vitesse_Voulue * Horizon
+            step_dist = final_speed * projection_horizon
+
+            # Si le pas dépasse la distance réelle, on vise la vraie cible
+            if step_dist >= dist:
+                virtual_target = dest
+            else:
+                # Projection vectorielle
+                dx = dest[0] - unit.position[0]
+                dy = dest[1] - unit.position[1]
+                # Normalisation
+                vx = dx / dist
+                vy = dy / dist
+
+                virtual_target = (unit.position[0] + vx * step_dist, unit.position[1] + vy * step_dist)
+
+            # 5. Envoi de l'ordre
+            # L'unité va essayer d'atteindre ce point proche à vitesse max,
+            # ce qui reviendra physiquement à avancer de 'step_dist'.
+            unit.current_order = {"type": "move_to", "target": virtual_target}
 
     # =========================================================================
-    # PHASE COMBAT
+    # PHASE 2 : COMBAT (OPTIMISÉE)
     # =========================================================================
 
     def _execute_combat_logic(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
-        melee = pikemen + knights
-        for unit in melee:
+        # Mêlée : Comportement agressif (Chien d'attaque)
+        melee_forces = pikemen + knights
+        for unit in melee_forces:
             if self._is_unit_engaged(unit, enemies):
                 continue
+
+            # Recherche locale optimisée via la méthode de Battlefield si accessible,
+            # sinon recherche globale brute (fallback sur min/dist)
             if enemies:
                 nearest = min(enemies, key=lambda e: self.get_dist(unit.position, e.position))
                 self._order_attack_opti(unit, nearest)
 
+        # Distance : Micro-gestion (Kiting)
         for unit in crossbowmen:
             self._micro_archer(unit, enemies, unit.position, bf)
 
     # =========================================================================
-    # GÉOMÉTRIE (TRI ANGULAIRE COMPLET)
+    # GÉOMÉTRIE (TRI ANGULAIRE & CALCULS)
     # =========================================================================
 
     def _calculate_formation_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
@@ -146,13 +184,11 @@ class GeneralTactician(BaseGeneral):
             return
 
         # Centroid Ennemi
-        ex_sum, ey_sum = 0, 0
-        for e in enemies:
-            ex_sum += e.position[0]
-            ey_sum += e.position[1]
+        ex_sum = sum(e.position[0] for e in enemies)
+        ey_sum = sum(e.position[1] for e in enemies)
         enemy_centroid = (ex_sum / len(enemies), ey_sum / len(enemies))
 
-        # Rayon Ennemi
+        # Rayon Ennemi (Bounding Circle)
         max_d = 0
         for e in enemies:
             d = self.get_dist(e.position, enemy_centroid)
@@ -174,11 +210,14 @@ class GeneralTactician(BaseGeneral):
         dy = enemy_centroid[1] - my
         attack_angle = math.atan2(dy, dx)
 
-        # Génération Arcs
+        # Génération Arcs (Triangulation Angulaire pour éviter les croisements)
+        # Piquiers : Contact strict (+1m)
         self._assign_arc_orders_angular(pikemen, enemy_centroid, enemy_radius + 2.0, attack_angle, bf)
+
+        # Arbalétriers : Seconde ligne (+8m)
         self._assign_arc_orders_angular(crossbowmen, enemy_centroid, enemy_radius + 9.0, attack_angle, bf)
 
-        # Knights : Impact Frontal
+        # Knights : Point de choc frontal
         if knights:
             kx = enemy_centroid[0] - math.cos(attack_angle) * (enemy_radius + 2.0)
             ky = enemy_centroid[1] - math.sin(attack_angle) * (enemy_radius + 2.0)
@@ -187,46 +226,59 @@ class GeneralTactician(BaseGeneral):
                 self.formation_orders[k.id] = k_pt
 
     def _assign_arc_orders_angular(self, units: list[Unit], center: tuple, radius: float, axis_angle: float, bf: Battlefield):
+        """
+        Assigne les positions sur l'arc en triant les unités et les cibles par angle polaire.
+        Garantit qu'il n'y a pas de croisement (L'unité la plus à gauche va à la cible la plus à gauche).
+        """
         if not units:
             return
         n = len(units)
+
+        # Arc de 140 degrés centré face à nous (donc opposé à l'ennemi)
         base_angle = axis_angle + math.pi
         arc_spread = math.radians(140)
 
-        # Densité
+        # Ajustement densité : Si trop d'unités, on élargit le rayon
         final_radius = max(radius, (n * 1.0) / arc_spread)
 
-        # 1. Slots cibles
+        # 1. Génération des Slots Cibles (triés par angle)
         target_slots = []
-        start = base_angle - (arc_spread / 2)
+        start_angle = base_angle - (arc_spread / 2)
+
         for i in range(n):
             t = i / (n - 1) if n > 1 else 0.5
-            ang = start + (t * arc_spread)
+            ang = start_angle + (t * arc_spread)
             tx = center[0] + math.cos(ang) * final_radius
             ty = center[1] + math.sin(ang) * final_radius
             target_slots.append({"angle": ang, "pos": self._clamp_position((tx, ty), bf)})
 
-        # 2. Slots unités
+        # 2. Analyse des Unités (triées par angle relatif)
         unit_slots = []
         for u in units:
             ang = math.atan2(u.position[1] - center[1], u.position[0] - center[0])
             unit_slots.append({"angle": ang, "unit": u})
 
-        # 3. Tri relatif
-        def rel_angle(a):
-            d = a - base_angle
-            return math.atan2(math.sin(d), math.cos(d))
+        # Fonction de tri relatif pour gérer la discontinuité -PI/PI
+        def relative_angle_diff(a):
+            diff = a - base_angle
+            return math.atan2(math.sin(diff), math.cos(diff))
 
-        target_slots.sort(key=lambda x: rel_angle(x["angle"]))
-        unit_slots.sort(key=lambda x: rel_angle(x["angle"]))
+        target_slots.sort(key=lambda x: relative_angle_diff(x["angle"]))
+        unit_slots.sort(key=lambda x: relative_angle_diff(x["angle"]))
 
-        # 4. Assignation
+        # 3. Assignation 1 pour 1
         for i in range(n):
-            self.formation_orders[unit_slots[i]["unit"].id] = target_slots[i]["pos"]
+            u_id = unit_slots[i]["unit"].id
+            pos = target_slots[i]["pos"]
+            self.formation_orders[u_id] = pos
 
     def _check_charge_condition(self, my_units: list[Unit], enemies: list[Unit]) -> bool:
+        """Déclenche la charge si le temps est écoulé ou si l'ennemi est trop proche."""
+        # 1. Temps écoulé (Impact imminent)
         if self.reference_arrival_time < 0.5 and self.reference_arrival_time > 0:
             return True
+
+        # 2. Ennemi au contact (Sécurité)
         for u in my_units:
             for e in enemies:
                 if self.get_dist(u.position, e.position) < 4.0:
