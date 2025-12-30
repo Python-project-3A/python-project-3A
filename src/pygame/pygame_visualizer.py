@@ -1,4 +1,5 @@
 from pathlib import Path
+from src.units.unit_base import Unit
 
 import pygame
 
@@ -71,7 +72,7 @@ class PygameVisualizer:
         return None
 
     def load_assets(self):
-        """Loads the map texture that will cover the entire world."""
+        """Loads the map texture and unit sprites."""
         # Load the grass texture that will cover everything
         self.grass_source = self.load_img("aoe-empty-map.png")
 
@@ -87,6 +88,9 @@ class PygameVisualizer:
                     self.base_map_surface.blit(self.grass_source, (x, y))
         else:
             self.base_map_surface = None
+
+        # Load unit sprites
+        self.unit_sprites = {"knight": self.load_img("knight.png"), "crossbowman": self.load_img("crossbowman.png"), "pikeman": self.load_img("pikeman.png")}
 
         # This will store the current zoomed version
         self.current_map_surface = None
@@ -176,38 +180,78 @@ class PygameVisualizer:
             # Fallback if texture didn't load
             self.screen.fill(self.colors["ground_fallback"])
 
-    def _draw_unit(self, unit):
+    def _draw_unit(self, unit: Unit):
         """
-        Draws a single unit on the screen at its isometric position.
+        Draws a single unit on the screen at its isometric position using sprites.
         """
         world_x, world_y = unit.position
         screen_x, screen_y = self.world_to_screen(world_x, world_y)
 
-        # Simple representation: a circle as the base
-        radius = int(unit.radius * self._tile_width / 2)
-        color = self.colors.get(unit.owner, (200, 200, 200))
+        # Draw team color ellipse under the unit
+        if unit.owner in self.colors:
+            ellipse_radius = int(16 * self.scale_factor)
+            ellipse_rect = pygame.Rect(screen_x - ellipse_radius, screen_y - ellipse_radius // 3, ellipse_radius * 2, int(ellipse_radius * 0.6))
+            player_color = self.colors[unit.owner]
+            pygame.draw.ellipse(self.screen, player_color, ellipse_rect)
+            pygame.draw.ellipse(self.screen, (0, 0, 0), ellipse_rect, 1)  # Black outline
 
-        # Draw an ellipse for a 3D-like base
-        ellipse_rect = pygame.Rect(screen_x - radius, screen_y - radius // 2, radius * 2, radius)
-        pygame.draw.ellipse(self.screen, (0, 0, 0), ellipse_rect, 2)  # Black outline
-        pygame.draw.ellipse(self.screen, color, ellipse_rect.inflate(int(-4 * self.scale_factor), int(-4 * self.scale_factor)))
+        # Get the appropriate sprite based on unit type
+        sprite = self.unit_sprites.get(unit.name.lower())
 
-        # Draw a vertical line to represent the unit's body
-        body_height = int(30 * self.scale_factor)
-        line_width = int(4 * self.scale_factor) or 1  # Ensure line width is at least 1
-        pygame.draw.line(self.screen, color, (screen_x, screen_y - body_height), (screen_x, screen_y), line_width)
+        if sprite:
+            # Scale sprite according to zoom level
+            base_unit_size = int(40 * self.scale_factor)
+
+            # Maintain aspect ratio
+            sprite_rect = sprite.get_rect()
+            aspect_ratio = sprite_rect.width / sprite_rect.height
+
+            if aspect_ratio > 1:
+                sprite_width = base_unit_size
+                sprite_height = int(base_unit_size / aspect_ratio)
+            else:
+                sprite_height = base_unit_size
+                sprite_width = int(base_unit_size * aspect_ratio)
+
+            scaled_sprite = pygame.transform.scale(sprite, (sprite_width, sprite_height))
+
+            # Check if unit is taking damage (flash red)
+            if hasattr(unit, "damage_flash_timer"):
+                # Create red flash overlay
+                flash_sprite = scaled_sprite.copy()
+                red_overlay = pygame.Surface((sprite_width, sprite_height), pygame.SRCALPHA)
+                # Strong red tint
+                red_overlay.fill((255, 0, 0, 150))
+                flash_sprite.blit(red_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+                scaled_sprite = flash_sprite
+
+            # Center the sprite on the unit position
+            sprite_rect = scaled_sprite.get_rect()
+            sprite_rect.centerx = screen_x
+            sprite_rect.bottom = screen_y
+
+            self.screen.blit(scaled_sprite, sprite_rect)
+        else:
+            # Fallback to simple representation if sprite not found
+            radius = int(unit.radius * self._tile_width / 2)
+            color = self.colors.get(unit.owner, (200, 200, 200))
+            ellipse_rect = pygame.Rect(screen_x - radius, screen_y - radius // 2, radius * 2, radius)
+            pygame.draw.ellipse(self.screen, color, ellipse_rect)
 
         # Draw HP bar above the unit
         hp_ratio = unit.hp / unit.max_hp
         hp_bar_width = int(30 * self.scale_factor)
-        hp_bar_height = int(5 * self.scale_factor) or 1  # Ensure hp bar height is at least 1
+        hp_bar_height = int(5 * self.scale_factor) or 1
+
+        # Position HP bar above the sprite
+        body_height = int(40 * self.scale_factor)
         hp_bar_x = screen_x - hp_bar_width // 2
         hp_bar_y = screen_y - body_height - int(10 * self.scale_factor)
 
         # Background of HP bar
         pygame.draw.rect(self.screen, (100, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height))
         # Foreground of HP bar
-        pygame.draw.rect(self.screen, (0, 200, 0), (hp_bar_x, hp_bar_y, hp_bar_width * hp_ratio, hp_bar_height))
+        pygame.draw.rect(self.screen, (0, 200, 0), (hp_bar_x, hp_bar_y, int(hp_bar_width * hp_ratio), hp_bar_height))
         # Border of HP bar
         pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
