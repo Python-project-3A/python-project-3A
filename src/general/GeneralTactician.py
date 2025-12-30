@@ -81,19 +81,21 @@ class GeneralTactician(BaseGeneral):
         if not infantry or not enemies:
             return
 
+        if infantry:
+            min_speed = min(u.speed for u in infantry)
+            formation_speed = min_speed * 0.95
+        else:
+            formation_speed = 1.0
+
         my_center = self._get_centroid(infantry)
         en_center = self._get_centroid(enemies)
         total_dist = math.dist(my_center, en_center)
 
-        if total_dist < 5.0:
+        if total_dist < 2.0:
             self.march_progression = 1.0
             return
 
-        # TODO : changer la vitesse arbitraire de l'arc
-        # Vitesse d'avancée de l'arc (arbitraire ou basée sur l'unité moyenne)
-        # Disons 1.2 m/s (vitesse standard infanterie)
-        arc_speed = 1.2
-        advance = (arc_speed * dt) / total_dist
+        advance = (formation_speed * dt) / total_dist
         self.march_progression += advance
         self.march_progression = min(self.march_progression, 1.0)
 
