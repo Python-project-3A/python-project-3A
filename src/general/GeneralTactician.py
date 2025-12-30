@@ -16,6 +16,7 @@ class GeneralTactician(BaseGeneral):
         # --- ÉTAT INTERNE ---
         self.phase = "MARCH"
         self.formation_orders: Dict[int, tuple[float, float]] = {}
+        self.march_progression = 0.0  # Pour l'arc de cerle glissant
         self.reference_arrival_time = 0.0
 
     def update(self, bf: Battlefield, tick: int) -> None:
@@ -26,24 +27,25 @@ class GeneralTactician(BaseGeneral):
         if not my_units or not enemies:
             return
 
-        # 2. CLASSIFICATION ROBUSTE
+        # 2. CLASSIFICATION
         pikemen = []
         crossbowmen = []
         knights = []
 
         for u in my_units:
             name_lower = u.name.lower()
-            if "knight" in name_lower or "cavalry" in name_lower or u.speed > 1.5:
+            if "knight" in name_lower:
                 knights.append(u)
-            elif "cross" in name_lower or u.attack_range >= 4.0:
+            elif "crossbowman" in name_lower:
                 crossbowmen.append(u)
-            else:
-                # Fallback par défaut (Piquiers)
+            elif "pikeman" in name_lower:
                 pikemen.append(u)
+            else:
+                assert False, f"Unknown unit type : {u.name} : A IMPLEMENTER"
 
         # 3. KILL SWITCH (Passage en phase combat)
         if self.phase == "MARCH":
-            if self._check_charge_condition(my_units, enemies):
+            if self._check_charge_condition(my_units, enemies) or self.march_progression >= 0.95:
                 self.phase = "COMBAT"
                 self.formation_orders.clear()
 
@@ -51,12 +53,15 @@ class GeneralTactician(BaseGeneral):
         if self.phase == "COMBAT":
             self._execute_combat_logic(pikemen, knights, crossbowmen, enemies, bf)
         else:
-            self._execute_march_logic(pikemen, knights, crossbowmen, enemies, bf, tick)
+            # APPEL V2
+            # self._execute_march_logic(pikemen, knights, crossbowmen, enemies, bf, tick)
+            self._execute_sliding_march_logic(pikemen, knights, crossbowmen, enemies, bf, tick)
 
     # =========================================================================
-    # PHASE 1 : MARCHE (TIME ON TARGET AVEC VITESSE VIRTUELLE)
+    # PHASE 1 : MARCHE (SLIDING ARC)
     # =========================================================================
 
+    # Fonction V2
     def _execute_march_logic(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, tick: int):
         # A. Recalcul périodique de la géométrie (tous les 5 ticks pour stabilité)
         if tick % 5 == 0 or not self.formation_orders:
@@ -89,6 +94,7 @@ class GeneralTactician(BaseGeneral):
         self._apply_virtual_speed_movement(crossbowmen, self.reference_arrival_time, 0.0)
         self._apply_virtual_speed_movement(knights, self.reference_arrival_time, 0.0)
 
+    # Fonction V2
     def _apply_virtual_speed_movement(self, units: list[Unit], t_ref: float, time_offset: float):
         """
         Applique le mouvement en utilisant la technique de la 'Carotte' (Virtual Speed).
@@ -154,6 +160,88 @@ class GeneralTactician(BaseGeneral):
             # ce qui reviendra physiquement à avancer de 'step_dist'.
             unit.current_order = {"type": "move_to", "target": virtual_target}
 
+    # Fonction V3
+    def _execute_sliding_march_logic(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, tick: int):
+        # 1. Mise à jour de la progression de l'arc
+        self._update_march_progression(pikemen + crossbowmen, enemies)
+
+        # 2. Calcul de la géométrie SUR L'ARC INTERPOLÉ
+        self._calculate_sliding_geometry(pikemen, knights, crossbowmen, enemies, bf)
+
+        # 3. Application du mouvement avec la nouvelle fonction système
+        self._apply_controlled_movement(pikemen, bf)
+        self._apply_controlled_movement(crossbowmen, bf)
+        self._apply_controlled_movement(knights, bf)
+
+    # Fonction V3
+    def _update_march_progression(self, infantry: list[Unit], enemies: list[Unit]):
+        """
+        Fait avancer le curseur de progression (0.0 -> 1.0)
+        """
+        if not infantry or not enemies:
+            return
+
+        # Barycentres
+        my_center = self._get_centroid(infantry)
+        en_center = self._get_centroid(enemies)
+
+        total_dist = math.dist(my_center, en_center)
+
+        if total_dist < 5.0:
+            self.march_progression = 1.0
+            return
+
+        # Vitesse d'avancée de l'arc (arbitraire ou basée sur l'unité moyenne)
+        # Disons 1.2 m/s (vitesse standard infanterie)
+        arc_speed = 1.2
+
+        # Progression ajoutée ce tick (dt ~ 1/60eme si 60fps, adapte selon ton moteur)
+        # Supposons dt = 0.1 pour être safe ou passons le dt en paramètre si possible
+        dt = 1 / 30
+
+        advance = (arc_speed * dt) / total_dist
+
+        self.march_progression += advance
+        self.march_progression = min(self.march_progression, 1.0)
+
+    # Fonction V3
+    def _apply_controlled_movement(self, units: list[Unit], bf: Battlefield):
+        # Pour l'instant, on laisse les unités aller à fond vers l'arc glissant
+        # car l'arc lui-même sert de régulateur de vitesse.
+        dt = 0.1  # À récupérer proprement du moteur si possible
+
+        for unit in units:
+            if unit.id not in self.formation_orders:
+                continue
+
+            target = self.formation_orders[unit.id]
+
+            # Utilisation de la nouvelle fonction système (propre !)
+            # On met speed_limit = unit.speed (à fond) car l'arc est proche.
+            # Si on voulait ralentir pour attendre, on réduirait ici.
+
+            # TRICK : On injecte l'ordre directement pour le tick suivant
+            # Mais comme ton system.py gère l'ordre via unit.current_order, on adapte :
+
+            # Option A : Si ton moteur appelle process_movement automatiquement :
+            # On ne peut pas passer speed_limit dans le dict current_order standard sans modif engine.
+            # SI TU AS MODIFIÉ system.py, tu peux créer un nouveau type d'ordre :
+
+            unit.current_order = {
+                "type": "move_to_controlled",  # Nouveau type à gérer dans UnitController si tu veux
+                "target": target,
+                "speed_limit": unit.speed,
+            }
+
+            # ATTENTION : Si tu ne veux pas modifier UnitController dans system.py,
+            # Tu dois faire le mouvement "manuel" ici (hacky mais utilise la fonction propre).
+            # MovementSystem.move_to_position_with_speed(unit, target[0], target[1], dt, bf, unit.speed)
+            # unit.current_order = None # Pour pas que le moteur interfère
+
+            # RECOMMANDATION : Utilise le move_to standard pour l'instant
+            # car l'arc glissant gère déjà le positionnement.
+            unit.current_order = {"type": "move_to", "target": target}
+
     # =========================================================================
     # PHASE 2 : COMBAT (OPTIMISÉE)
     # =========================================================================
@@ -179,6 +267,7 @@ class GeneralTactician(BaseGeneral):
     # GÉOMÉTRIE (TRI ANGULAIRE & CALCULS)
     # =========================================================================
 
+    # Fonction V2
     def _calculate_formation_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
         if not enemies:
             return
@@ -221,6 +310,69 @@ class GeneralTactician(BaseGeneral):
         if knights:
             kx = enemy_centroid[0] - math.cos(attack_angle) * (enemy_radius + 2.0)
             ky = enemy_centroid[1] - math.sin(attack_angle) * (enemy_radius + 2.0)
+            k_pt = self._clamp_position((kx, ky), bf)
+            for k in knights:
+                self.formation_orders[k.id] = k_pt
+
+    # Fonction V3
+    def _calculate_sliding_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
+        if not enemies:
+            return
+
+        # 1. Définition des ancres (Départ et Arrivée)
+        my_infantry = pikemen + crossbowmen
+        if not my_infantry:
+            my_infantry = knights
+
+        start_center = self._get_centroid(my_infantry)
+        end_center = self._get_centroid(enemies)  # Ennemi actuel
+
+        # 2. Calcul du Centre Virtuel de l'Arc (Interpolation)
+        # T = progression. Si T=0, on est sur nous. Si T=1, sur l'ennemi.
+        # On ajoute un offset pour que l'arc soit toujours un peu "devant" la position théorique
+        # pour forcer les unités à avancer.
+        lead_distance = 5.0  # L'arc est projeté 5m devant la progression actuelle
+
+        vec_x = end_center[0] - start_center[0]
+        vec_y = end_center[1] - start_center[1]
+        dist_tot = math.hypot(vec_x, vec_y)
+
+        if dist_tot > 0.1:
+            dir_x = vec_x / dist_tot
+            dir_y = vec_y / dist_tot
+        else:
+            dir_x, dir_y = 1, 0
+
+        # Position actuelle idéale + Avance
+        current_dist = dist_tot * self.march_progression
+        target_dist = min(current_dist + lead_distance, dist_tot)  # On ne dépasse pas l'ennemi
+
+        virtual_center_x = start_center[0] + dir_x * target_dist
+        virtual_center_y = start_center[1] + dir_y * target_dist
+        virtual_center = (virtual_center_x, virtual_center_y)
+
+        # 3. Rayon et Angle
+        # Angle : Toujours vers l'ennemi
+        attack_angle = math.atan2(vec_y, vec_x)
+
+        # Rayon : On peut commencer petit et grandir, ou rester fixe.
+        # Restons fixe sur le rayon final pour simplifier.
+        max_d = 0
+        for e in enemies:
+            d = self.get_dist(e.position, end_center)
+            if d > max_d:
+                max_d = d
+        enemy_radius = max_d
+
+        # 4. Génération (On utilise ta méthode angulaire symétrique qui marche bien)
+        self._assign_arc_orders_angular(pikemen, virtual_center, enemy_radius + 2.0, attack_angle, bf)
+        self._assign_arc_orders_angular(crossbowmen, virtual_center, enemy_radius + 9.0, attack_angle, bf)
+
+        if knights:
+            # Les chevaliers peuvent viser directement l'impact final pour contourner
+            # ou suivre l'arc. Suivons l'arc pour l'instant.
+            kx = virtual_center[0] - math.cos(attack_angle) * (enemy_radius + 2.0)
+            ky = virtual_center[1] - math.sin(attack_angle) * (enemy_radius + 2.0)
             k_pt = self._clamp_position((kx, ky), bf)
             for k in knights:
                 self.formation_orders[k.id] = k_pt
