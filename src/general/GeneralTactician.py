@@ -74,17 +74,15 @@ class GeneralTactician(BaseGeneral):
         self._apply_controlled_movement(knights, bf, dt)
 
     # Fonction V3
-    def _update_march_progression(self, infantry: list[Unit], enemies: list[Unit], dt=1 / 30):
+    def _update_march_progression(self, infantry: list[Unit], enemies: list[Unit], dt):
         """
         Fait avancer le curseur de progression (0.0 -> 1.0)
         """
         if not infantry or not enemies:
             return
 
-        # Barycentres
         my_center = self._get_centroid(infantry)
         en_center = self._get_centroid(enemies)
-
         total_dist = math.dist(my_center, en_center)
 
         if total_dist < 5.0:
@@ -104,8 +102,6 @@ class GeneralTactician(BaseGeneral):
         for unit in units:
             if unit.id not in self.formation_orders:
                 continue
-            from src.engine.system import MovementSystem
-
             target = self.formation_orders[unit.id]
             unit.current_order = {"type": "move_controlled", "target": target, "speed_limit": unit.speed}
 
@@ -115,7 +111,7 @@ class GeneralTactician(BaseGeneral):
 
     # Fonction V2 &V3
     def _execute_combat_logic(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
-        """ """
+        """execute combat logic for all units"""
         melee_forces = pikemen + knights
         for unit in melee_forces:
             if self._is_unit_engaged(unit, enemies):
@@ -133,7 +129,7 @@ class GeneralTactician(BaseGeneral):
 
     # Fonction V3
     def _calculate_sliding_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
-        """"""
+        """calculate the geometry of the arc for the sliding march"""
         if not enemies:
             return
 
@@ -175,9 +171,18 @@ class GeneralTactician(BaseGeneral):
                 max_d = d
         enemy_radius = max_d
 
+        # Calcul dynamique des rayons
+        radius_frontline = enemy_radius + 1.5
+        pikemen_depth = 0.0
+        if pikemen:
+            arc_len = radius_frontline * 2.44  # 2.44 = 140 degrés en radians
+            pikemen_depth = len(pikemen) / max(1.0, arc_len)
+            pikemen_depth += 2.0
+        radius_backline = radius_frontline + pikemen_depth + 1.0
+
         # 4. Génération de l'arc
-        self._assign_arc_orders_angular(pikemen, virtual_center, enemy_radius + 2.0, attack_angle, bf)
-        self._assign_arc_orders_angular(crossbowmen, virtual_center, enemy_radius + 9.0, attack_angle, bf)
+        self._assign_arc_orders_angular(pikemen, virtual_center, radius_frontline, attack_angle, bf)
+        self._assign_arc_orders_angular(crossbowmen, virtual_center, radius_backline, attack_angle, bf)
 
         if knights:
             kx = virtual_center[0] - math.cos(attack_angle) * (enemy_radius + 2.0)
