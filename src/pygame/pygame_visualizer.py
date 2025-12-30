@@ -73,12 +73,12 @@ class PygameVisualizer:
     def load_assets(self):
         """Loads the map texture that will cover the entire world."""
         # Load the grass texture that will cover everything
-        self.grass_source = self.load_img("g_gr4_00_color.png")
+        self.grass_source = self.load_img("aoe-empty-map.png")
 
         if self.grass_source:
-            # Pre-create a very large tiled surface that we'll zoom into
-            # This ensures high quality at any zoom level
-            base_size = 4096  # Large base texture size
+            # Pre-create a very large tiled surface that we'll use as base
+            # This ensures we never run out of texture when zooming out
+            base_size = 8192  # Very large base texture size
             self.base_map_surface = pygame.Surface((base_size, base_size))
 
             grass_w, grass_h = self.grass_source.get_size()
@@ -92,18 +92,22 @@ class PygameVisualizer:
         self.current_map_surface = None
         self.map_offset_x = 0
         self.map_offset_y = 0
+        self.base_texture_size = 8192
 
     def update_map_texture(self):
         """
         Scales the base map surface according to current zoom level.
-        This makes the texture zoom along with the battlefield.
+        Ensures texture is always large enough to cover the screen.
         """
         if not self.base_map_surface:
             return
 
-        # Scale the base surface according to zoom level
-        base_size = self.base_map_surface.get_width()
-        scaled_size = int(base_size * self.scale_factor)
+        # Calculate minimum size needed to cover the screen with plenty of margin
+        min_size_needed = max(self.screen_width, self.screen_height) * 4
+
+        # Scale the base surface, but never smaller than what's needed to cover screen
+        scaled_size = int(self.base_texture_size * self.scale_factor)
+        scaled_size = max(scaled_size, int(min_size_needed))
 
         self.current_map_surface = pygame.transform.scale(self.base_map_surface, (scaled_size, scaled_size))
 
@@ -211,9 +215,10 @@ class PygameVisualizer:
         """
         Renders the entire scene.
         1. Fills the background.
-        2. Sorts all units by their Y-coordinate (Painter's Algorithm).
-        3. Draws each unit in the sorted order.
-        4. Updates the display.
+        2. Draws the ground (large tiled texture).
+        3. Sorts all units by their Y-coordinate (Painter's Algorithm).
+        4. Draws each unit in the sorted order.
+        5. Updates the display.
         """
         self._draw_background()
 
