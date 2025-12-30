@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from src.units.unit_base import Unit
 
 
+# TODO : implémenter la gestion des Knights : attaque au centre au lieu des bords de l'arc
 class GeneralTactician(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="General TACTICIAN")
@@ -130,65 +131,77 @@ class GeneralTactician(BaseGeneral):
     # =========================================================================
 
     # Fonction V3
-    def _calculate_sliding_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, angle=140):
-        """calculate the geometry of the arc for the sliding march"""
+    def _calculate_sliding_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, angle_deg=140):
+        """
+        Calcule la géométrie de l'arc glissant avec un ancrage
+        et un rayon adaptatif qui ne rétrécit pas sous le seuil physique des unités.
+        """
         if not enemies:
             return
 
-        # 1. Définition des ancres (Départ et Arrivée)
-        my_infantry = pikemen + crossbowmen
-        if not my_infantry:
-            my_infantry = knights
+        # --- CONSTANTES DE CONFIGURATION ---
+        UNIT_DIAMETER = 1.0  # TODO : remplacer cette constante
+        CONTACT_BUFFER = 2.0  # TODO : remplacer cette constante
+        PIKEMEN_BACK_BUFFER = 2.0  # TODO : Remplacer cette constante
+        LEAD_PROJECTION = 5.0  # Distance de projection de l'arc
+        OVERSHOOT_MARGIN = 5.0  # TODO : Remplacer cette constante (Rayon de l'arc ?)
 
+        # 1. Analyse des Centres
+        my_infantry = pikemen + crossbowmen or knights
         start_center = self._get_centroid(my_infantry)
-        end_center = self._get_centroid(enemies)  # Ennemi actuel
-
-        # 2. Calcul du Centre Virtuel de l'Arc (Interpolation)
-        lead_distance = 5.0
+        end_center = self._get_centroid(enemies)
 
         vec_x = end_center[0] - start_center[0]
         vec_y = end_center[1] - start_center[1]
-        dist_tot = math.hypot(vec_x, vec_y)
+        dist_to_enemy = math.hypot(vec_x, vec_y)
 
-        if dist_tot > 0.1:
-            dir_x = vec_x / dist_tot
-            dir_y = vec_y / dist_tot
+        if dist_to_enemy > 0.01:
+            dir_x, dir_y = vec_x / dist_to_enemy, vec_y / dist_to_enemy
         else:
-            dir_x, dir_y = 1, 0
+            dir_x, dir_y = 1, 0  # Fallback
 
-        # Position actuelle idéale + Avance
-        current_dist = dist_tot * self.march_progression
-        target_dist = min(current_dist + lead_distance, dist_tot)  # On ne dépasse pas l'ennemi
-
-        virtual_center_x = start_center[0] + dir_x * target_dist
-        virtual_center_y = start_center[1] + dir_y * target_dist
-        virtual_center = (virtual_center_x, virtual_center_y)
-
-        # 3. Rayon et Angle
-        attack_angle = math.atan2(vec_y, vec_x)
-        max_d = 0
+        # 3. Calcul du Rayon Ennemi (Bounding Circle)
+        enemy_radius = 0.0
         for e in enemies:
             d = self.get_dist(e.position, end_center)
-            if d > max_d:
-                max_d = d
-        enemy_radius = max_d
+            if d > enemy_radius:
+                enemy_radius = d
 
-        # Calcul dynamique des rayons
-        radius_frontline = enemy_radius + 1.5
-        pikemen_depth = 0.0
+        # 4. Calcul du Rayon de Formation
+        count_frontline = len(pikemen)
+        if count_frontline == 0:
+            count_frontline = len(crossbowmen)
+
+        arc_angle_rad = math.radians(angle_deg)
+        required_arc_length = count_frontline * UNIT_DIAMETER
+        min_density_radius = required_arc_length / arc_angle_rad
+        radius_frontline = max(enemy_radius + CONTACT_BUFFER, min_density_radius)
+
+        # 5. Calcul de l'Ancrage
+        overshoot_dist = radius_frontline + OVERSHOOT_MARGIN
+        total_maneuver_dist = dist_to_enemy + overshoot_dist
+        current_travel = (total_maneuver_dist * self.march_progression) + LEAD_PROJECTION
+        target_dist = min(current_travel, total_maneuver_dist)
+        virtual_center = (start_center[0] + dir_x * target_dist, start_center[1] + dir_y * target_dist)
+
+        # 6. Calcul de la Ligne Arrière
         if pikemen:
-            arc_len = radius_frontline * math.radians(angle)
-            pikemen_depth = len(pikemen) / max(1.0, arc_len)
-            pikemen_depth += 2.0
-        radius_backline = radius_frontline + pikemen_depth + 1.0
+            actual_arc_len = radius_frontline * arc_angle_rad
+            total_pikemen_area = len(pikemen) * (UNIT_DIAMETER * 1.2)  # 1.2 = facteur profondeur
+            pikemen_depth = total_pikemen_area / max(1.0, actual_arc_len)
+            radius_backline = radius_frontline + pikemen_depth + PIKEMEN_BACK_BUFFER
 
-        # 4. Génération de l'arc
-        self._assign_arc_orders_angular(pikemen, virtual_center, radius_frontline, attack_angle, bf, angle)
-        self._assign_arc_orders_angular(crossbowmen, virtual_center, radius_backline, attack_angle, bf, angle)
+        attack_angle = math.atan2(vec_y, vec_x)
 
+        # 7. Génération des ordres
+        self._assign_arc_orders_angular(pikemen, virtual_center, radius_frontline, attack_angle, bf, angle_deg)
+        self._assign_arc_orders_angular(crossbowmen, virtual_center, radius_backline, attack_angle, bf, angle_deg)
+
+        # Knights : Protection des flancs extérieurs
         if knights:
-            kx = virtual_center[0] - math.cos(attack_angle) * (enemy_radius + 2.0)
-            ky = virtual_center[1] - math.sin(attack_angle) * (enemy_radius + 2.0)
+            k_radius = radius_frontline + 2.0
+            kx = virtual_center[0] - math.cos(attack_angle) * k_radius
+            ky = virtual_center[1] - math.sin(attack_angle) * k_radius
             k_pt = self._clamp_position((kx, ky), bf)
             for k in knights:
                 self.formation_orders[k.id] = k_pt
