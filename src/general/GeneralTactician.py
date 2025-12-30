@@ -66,7 +66,7 @@ class GeneralTactician(BaseGeneral):
         self._update_march_progression(pikemen + crossbowmen, enemies, dt)
 
         # 2. Calcul de la géométrie SUR L'ARC INTERPOLÉ
-        self._calculate_sliding_geometry(pikemen, knights, crossbowmen, enemies, bf)
+        self._calculate_sliding_geometry(pikemen, knights, crossbowmen, enemies, bf, 180)
 
         # 3. Application du mouvement avec la nouvelle fonction système
         self._apply_controlled_movement(pikemen, bf, dt)
@@ -130,7 +130,7 @@ class GeneralTactician(BaseGeneral):
     # =========================================================================
 
     # Fonction V3
-    def _calculate_sliding_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield):
+    def _calculate_sliding_geometry(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, angle=140):
         """calculate the geometry of the arc for the sliding march"""
         if not enemies:
             return
@@ -177,14 +177,14 @@ class GeneralTactician(BaseGeneral):
         radius_frontline = enemy_radius + 1.5
         pikemen_depth = 0.0
         if pikemen:
-            arc_len = radius_frontline * 2.44  # 2.44 = 140 degrés en radians
+            arc_len = radius_frontline * math.radians(angle)
             pikemen_depth = len(pikemen) / max(1.0, arc_len)
             pikemen_depth += 2.0
         radius_backline = radius_frontline + pikemen_depth + 1.0
 
         # 4. Génération de l'arc
-        self._assign_arc_orders_angular(pikemen, virtual_center, radius_frontline, attack_angle, bf)
-        self._assign_arc_orders_angular(crossbowmen, virtual_center, radius_backline, attack_angle, bf)
+        self._assign_arc_orders_angular(pikemen, virtual_center, radius_frontline, attack_angle, bf, angle)
+        self._assign_arc_orders_angular(crossbowmen, virtual_center, radius_backline, attack_angle, bf, angle)
 
         if knights:
             kx = virtual_center[0] - math.cos(attack_angle) * (enemy_radius + 2.0)
@@ -194,7 +194,7 @@ class GeneralTactician(BaseGeneral):
                 self.formation_orders[k.id] = k_pt
 
     # Fonction V2 & V3
-    def _assign_arc_orders_angular(self, units: list[Unit], center: tuple, radius: float, axis_angle: float, bf: Battlefield):
+    def _assign_arc_orders_angular(self, units: list[Unit], center: tuple, radius: float, axis_angle: float, bf: Battlefield, angle):
         """
         Assigne les positions sur l'arc en triant les unités et les cibles par angle polaire.
         Garantit qu'il n'y a pas de croisement.
@@ -203,7 +203,7 @@ class GeneralTactician(BaseGeneral):
             return
         n = len(units)
         base_angle = axis_angle + math.pi
-        arc_spread = math.radians(140)
+        arc_spread = math.radians(angle)
 
         # Ajustement densité : Si trop d'unités, on élargit le rayon
         final_radius = max(radius, (n * 1.0) / arc_spread)
