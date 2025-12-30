@@ -20,7 +20,7 @@ class BaseGeneral(ABC):
         self.name = name
 
     @abstractmethod
-    def update(self, battlefield: Battlefield, tick: int) -> None:
+    def update(self, battlefield: Battlefield, tick: int, dt) -> None:
         """
         Called every tick by the simulation.
         General analyzes the battlefield and gives orders to units.

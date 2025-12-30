@@ -33,7 +33,7 @@ class Simulation:
 
         # 1. Les généraux réfléchissent
         for general in self.generals:
-            general.update(self.battlefield, self.tick_count)
+            general.update(self.battlefield, self.tick_count, dt)
 
         all_units = self.battlefield.get_all_units()
 

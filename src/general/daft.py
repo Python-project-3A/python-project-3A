@@ -21,7 +21,7 @@ class GeneralDaft(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="Major DAFT")
 
-    def update(self, bf: "Battlefield", tick: int) -> None:
+    def update(self, bf: "Battlefield", tick: int, dt) -> None:
         """
         DAFT: Agressivité totale.
         - Utilise la vision globale du Général.

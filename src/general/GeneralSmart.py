@@ -30,7 +30,7 @@ class GeneralSmart(BaseGeneral):
         self.squads = {"FLANKER": Squad([], "FLANKER"), "DPS": Squad([], "DPS"), "TANK": Squad([], "TANK")}
         self._squads_initialized = False
 
-    def update(self, bf: Battlefield, tick: int) -> None:
+    def update(self, bf: Battlefield, tick: int, dt) -> None:
         self.tick_counter = tick
         enemies = bf.get_enemy_units(self.player_id)
         if not enemies:
