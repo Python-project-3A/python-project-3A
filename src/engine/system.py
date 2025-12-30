@@ -457,6 +457,13 @@ class UnitController:
             if reached:
                 unit.current_order = None
 
+        elif order["type"] == "move_controlled":
+            target = order["target"]
+            speed_limit = order.get("speed_limit", unit.speed)
+            MovementSystem.move_to_position_with_speed(unit, target[0], target[1], dt, battlefield, speed_limit)
+            if unit.dist_to_point(target) < 0.1:
+                unit.current_order = None
+
         # --- CAS 2 : ATTACK MOVE (Avancer jusqu'à trouver un ennemi) ---
         elif order["type"] == "attack_move":
             # Scan local rapide pour voir si on doit s'arrêter

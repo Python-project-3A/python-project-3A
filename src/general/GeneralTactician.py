@@ -107,8 +107,7 @@ class GeneralTactician(BaseGeneral):
             from src.engine.system import MovementSystem
 
             target = self.formation_orders[unit.id]
-            MovementSystem.move_to_position_with_speed(unit, target[0], target[1], dt, bf, speed_limit=unit.speed)
-            # unit.current_order = {"type": "move_to", "target": target}
+            unit.current_order = {"type": "move_controlled", "target": target, "speed_limit": unit.speed}
 
     # =========================================================================
     # PHASE 2 : COMBAT (OPTIMISÉE)
