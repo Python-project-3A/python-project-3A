@@ -59,7 +59,7 @@ class GeneralTactician(BaseGeneral):
 
     def _execute_march_logic(self, pikemen: list[Unit], knights: list[Unit], crossbowmen: list[Unit], enemies: list[Unit], bf: Battlefield, tick: int):
         # A. Recalcul périodique de la géométrie (tous les 5 ticks pour stabilité)
-        if tick % 5 == 0 or not self.formation_orders:
+        if tick % 2 == 0 or not self.formation_orders:
             self._calculate_formation_geometry(pikemen, knights, crossbowmen, enemies, bf)
 
         # B. Calcul du Temps de Référence (Robustesse 90ème percentile)
@@ -91,17 +91,18 @@ class GeneralTactician(BaseGeneral):
 
     def _apply_virtual_speed_movement(self, units: list[Unit], t_ref: float, time_offset: float):
         """
-        Applique le mouvement en utilisant la technique de la 'Carotte' (Virtual Speed).
-        L'unité reçoit un ordre de mouvement court correspondant exactement à la distance
-        qu'elle doit parcourir ce tick-ci pour arriver à l'heure.
+        Stratégie "Rush & Wait" (Sprint Total) :
+        On court à vitesse maximale jusqu'à être quasiment sur le point (0.5m).
+        On ne ralentit JAMAIS avant d'être arrivé.
+        Cela garantit que toute l'armée bouge instantanément, même ceux qui sont près.
         """
         target_time = t_ref + time_offset
 
-        # On assume un dt (delta time) standard de 1/FPS.
-        # Si le jeu tourne à 60 FPS simulés (dt ~ 0.016) ou 10 FPS (dt ~ 0.1).
-        # Par sécurité, on prend une valeur arbitraire raisonnable pour le calcul du 'step',
-        # car l'API move_to fera le vrai calcul physique ensuite.
-        # On vise un horizon de projection de 0.2s pour lisser le mouvement.
+        # On réduit la zone de synchro au strict minimum (un pas)
+        # Tant qu'on est à plus de 50cm, on considère qu'on est en voyage.
+        FINAL_APPROACH_DIST = 0.5
+
+        # Horizon de projection pour éviter les vibrations à l'arrivée
         projection_horizon = 0.2
 
         for unit in units:
@@ -111,47 +112,47 @@ class GeneralTactician(BaseGeneral):
             dest = self.formation_orders[unit.id]
             dist = self.get_dist(unit.position, dest)
 
-            # Si très proche, micro-ajustement
-            if dist < 0.2:
+            # --- CAS 1 : SPRINT ABSOLU ---
+            # C'est la modification radicale.
+            # Peu importe le timing, peu importe les autres.
+            # Si tu n'es pas "sur" ton point, tu fonces.
+            if dist > FINAL_APPROACH_DIST:
                 unit.current_order = {"type": "move_to", "target": dest}
                 continue
 
-            # 1. Calcul de la vitesse requise pour arriver à T_target
-            # Vitesse = Distance / Temps
+            # --- CAS 2 : ARRIVÉE & ATTENTE (Le "Luxe") ---
+            # On est à moins de 50cm. On est techniquement "en place".
+            # C'est MAINTENANT qu'on regarde la montre.
+
+            # Si on est arrivé mais qu'il reste du temps (les copains du Nord arrivent),
+            # on ralentit/s'arrête pour maintenir la formation serrée.
+
+            if dist < 0.1:
+                # Pile dessus : On garde la position (micro-correction)
+                unit.current_order = {"type": "move_to", "target": dest}
+                continue
+
+            # On est dans la zone de 10cm à 50cm.
+            # On utilise la vitesse virtuelle pour "glisser" doucement vers le point exact
+            # en attendant l'heure H.
+
             if target_time <= 0.1:
-                # Retard ou temps écoulé : Vitesse Max
                 req_speed = unit.speed
             else:
                 req_speed = dist / target_time
 
-            # 2. Clamping (On ne peut pas dépasser la vitesse max physique)
+            # On clamp pour éviter les arrêts complets bizarres
             final_speed = min(req_speed, unit.speed)
+            final_speed = max(final_speed, unit.speed * 0.05)  # 5% min pour finir le glissement
 
-            # 3. Minimum vital (pour éviter le freeze total sur des arrondis)
-            # On force une vitesse minimale de 10% sauf si on est vraiment arrivé
-            final_speed = max(final_speed, unit.speed * 0.1)
-
-            # 4. TECHNIQUE DE LA CAROTTE (Virtual Target Injection)
-            # Au lieu de viser 'dest' (loin), on vise un point intermédiaire.
-            # Ce point est à une distance = Vitesse_Voulue * Horizon
+            # Application "Carotte" courte portée
             step_dist = final_speed * projection_horizon
 
-            # Si le pas dépasse la distance réelle, on vise la vraie cible
-            if step_dist >= dist:
-                virtual_target = dest
-            else:
-                # Projection vectorielle
-                dx = dest[0] - unit.position[0]
-                dy = dest[1] - unit.position[1]
-                # Normalisation
-                vx = dx / dist
-                vy = dy / dist
+            # Projection simple
+            dx = dest[0] - unit.position[0]
+            dy = dest[1] - unit.position[1]
+            virtual_target = (unit.position[0] + (dx / dist) * step_dist, unit.position[1] + (dy / dist) * step_dist)
 
-                virtual_target = (unit.position[0] + vx * step_dist, unit.position[1] + vy * step_dist)
-
-            # 5. Envoi de l'ordre
-            # L'unité va essayer d'atteindre ce point proche à vitesse max,
-            # ce qui reviendra physiquement à avancer de 'step_dist'.
             unit.current_order = {"type": "move_to", "target": virtual_target}
 
     # =========================================================================

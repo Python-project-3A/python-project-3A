@@ -2,8 +2,8 @@
   "name": "Concave strategy test",
   "description": "Test the strategy of the general tactician to form a concave arc",
   "map": {
-    "width": 60,
-    "height": 40
+    "width": 100,
+    "height": 100
   },
   "armies": [
     {
@@ -14,7 +14,7 @@
           "type": "Pikeman",
           "count": 20,
           "formation": "block",
-          "start_x": 5,
+          "start_x": 2,
           "start_y": 15,
           "spacing": 1
         }
@@ -28,7 +28,7 @@
           "type": "Pikeman",
           "count": 20,
           "formation": "block",
-          "start_x": 40,
+          "start_x": 50,
           "start_y": 15,
           "spacing": 1
         },
@@ -36,7 +36,7 @@
           "type": "Crossbowman",
           "count": 20,
           "formation": "block",
-          "start_x": 50,
+          "start_x": 60,
           "start_y": 15,
           "spacing": 1
         }
