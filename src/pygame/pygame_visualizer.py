@@ -33,49 +33,31 @@ class PygameVisualizer:
         self.colors = {
             0: (50, 50, 255),  # Blue for Player 0
             1: (255, 50, 50),  # Red for Player 1
-            "bg": (24, 116, 205),  # A deep blue for the "sea"
-            "ground": (107, 142, 35),  # Olive Drab for the ground
+            "ground_fallback": (107, 142, 35),  # Olive Drab for the ground
         }
 
         # Load Textures
         self.load_assets()
 
-        # Camera offset to center the map
+        # Calculate initial scale factor to fit map on screen
+        total_projected_width = (self.battlefield.width + self.battlefield.height) * (self.ISO_BASE_TILE_WIDTH / 2)
+        total_projected_height = (self.battlefield.width + self.battlefield.height) * (self.ISO_BASE_TILE_HEIGHT / 2)
 
-        projected_min_x_raw = -self.battlefield.height * (self.ISO_BASE_TILE_WIDTH / 2)
-        projected_max_x_raw = self.battlefield.width * (self.ISO_BASE_TILE_WIDTH / 2)
-        total_projected_width_raw = projected_max_x_raw - projected_min_x_raw
-
-        projected_min_y_raw = 0  # The top-most point is (0,0) or (width,0) or (0,height)
-        projected_max_y_raw = (self.battlefield.width + self.battlefield.height) * (self.ISO_BASE_TILE_HEIGHT / 2)
-        total_projected_height_raw = projected_max_y_raw - projected_min_y_raw
-
-        # Determine scaling factor if map is too large for the screen
         self.scale_factor = 1.0
         padding_ratio = 0.9  # Use 90% of screen for map to leave some margin
-        self.base_scale_factor = 1.0  # To keep the initial fit-to-screen scale
-        if total_projected_width_raw > self.screen_width * padding_ratio or total_projected_height_raw > self.screen_height * padding_ratio:
-            scale_x = (self.screen_width * padding_ratio) / total_projected_width_raw
-            scale_y = (self.screen_height * padding_ratio) / total_projected_height_raw
+        if total_projected_width > self.screen_width * padding_ratio or total_projected_height > self.screen_height * padding_ratio:
+            scale_x = (self.screen_width * padding_ratio) / total_projected_width
+            scale_y = (self.screen_height * padding_ratio) / total_projected_height
             self.scale_factor = min(scale_x, scale_y)
 
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
 
-        # Recalculate projected dimensions with scaling applied
-        projected_min_x = -self.battlefield.height * (self._tile_width / 2)
-        projected_max_x = self.battlefield.width * (self._tile_width / 2)
-        total_projected_width = projected_max_x - projected_min_x
+        # Calculate camera offset to center the map
+        self.camera_offset_x = self.screen_width / 2
+        self.camera_offset_y = self.screen_height / 2
 
-        projected_min_y = 0
-        projected_max_y = (self.battlefield.width + self.battlefield.height) * (self._tile_height / 2)
-        total_projected_height = projected_max_y - projected_min_y
-
-        # Calculate camera offset to center the entire projected map
-        self.camera_offset_x = (self.screen_width / 2) - (projected_min_x + total_projected_width / 2)
-        self.camera_offset_y = (self.screen_height / 2) - (projected_min_y + total_projected_height / 2)
-
-        self.update_tile_textures()
+        self.update_map_texture()
 
     @staticmethod
     def load_img(name):
@@ -89,34 +71,50 @@ class PygameVisualizer:
         return None
 
     def load_assets(self):
-        """Loads textures from data/textures."""
-        self.water_img = self.load_img("g_wtr_00_color.png")
+        """Loads the map texture that will cover the entire world."""
+        # Load the grass texture that will cover everything
+        self.grass_source = self.load_img("g_gr4_00_color.png")
 
-        # Load multiple grass textures for variety to avoid a repetitive look
-        self.grass_textures_raw = []
-        # Using a single grass texture for consistency
-        img = self.load_img("g_gr2_00_color.png")
-        if img:
-            self.grass_textures_raw.append(img)
+        if self.grass_source:
+            # Pre-create a very large tiled surface that we'll zoom into
+            # This ensures high quality at any zoom level
+            base_size = 4096  # Large base texture size
+            self.base_map_surface = pygame.Surface((base_size, base_size))
 
-        # Keep high-resolution rotated versions of each texture
-        # Scaling will be done from these sources, ensuring quality at any zoom level
-        self.grass_iso_rotated_imgs = []
-        if self.grass_textures_raw:
-            for img_raw in self.grass_textures_raw:
-                self.grass_iso_rotated_imgs.append(pygame.transform.rotate(img_raw, 45))
+            grass_w, grass_h = self.grass_source.get_size()
+            for x in range(0, base_size, grass_w):
+                for y in range(0, base_size, grass_h):
+                    self.base_map_surface.blit(self.grass_source, (x, y))
+        else:
+            self.base_map_surface = None
 
-        self.current_grass_tiles = []
+        # This will store the current zoomed version
+        self.current_map_surface = None
+        self.map_offset_x = 0
+        self.map_offset_y = 0
 
-    def update_tile_textures(self):
-        """Rescales tile sprites based on current zoom level."""
-        self.current_grass_tiles = []
-        if self.grass_iso_rotated_imgs:
-            for rotated_img in self.grass_iso_rotated_imgs:
-                # Scale from the high-res rotated source to the target size for rendering
-                # This ensures textures look good even when zoomed in
-                scaled_tile = pygame.transform.scale(rotated_img, (int(self._tile_width), int(self._tile_height)))
-                self.current_grass_tiles.append(scaled_tile)
+    def update_map_texture(self):
+        """
+        Scales the base map surface according to current zoom level.
+        This makes the texture zoom along with the battlefield.
+        """
+        if not self.base_map_surface:
+            return
+
+        # Scale the base surface according to zoom level
+        base_size = self.base_map_surface.get_width()
+        scaled_size = int(base_size * self.scale_factor)
+
+        self.current_map_surface = pygame.transform.scale(self.base_map_surface, (scaled_size, scaled_size))
+
+        # Calculate offset to center this surface on the battlefield
+        center_world_x = self.battlefield.width / 2
+        center_world_y = self.battlefield.height / 2
+        screen_center_x, screen_center_y = self.world_to_screen(center_world_x, center_world_y)
+
+        # Position the surface so its center aligns with battlefield center
+        self.map_offset_x = screen_center_x - scaled_size / 2
+        self.map_offset_y = screen_center_y - scaled_size / 2
 
     def zoom(self, direction: int):
         """
@@ -131,7 +129,7 @@ class PygameVisualizer:
 
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
-        self.update_tile_textures()
+        self.update_map_texture()
 
     def move_camera(self, dx: int, dy: int):
         """
@@ -139,6 +137,13 @@ class PygameVisualizer:
         """
         self.camera_offset_x -= dx
         self.camera_offset_y -= dy
+        # Update map position when camera moves
+        if self.current_map_surface:
+            center_world_x = self.battlefield.width / 2
+            center_world_y = self.battlefield.height / 2
+            screen_center_x, screen_center_y = self.world_to_screen(center_world_x, center_world_y)
+            self.map_offset_x = screen_center_x - self.current_map_surface.get_width() / 2
+            self.map_offset_y = screen_center_y - self.current_map_surface.get_height() / 2
 
     def world_to_screen(self, world_x, world_y):
         """
@@ -157,44 +162,15 @@ class PygameVisualizer:
         self.finish()
 
     def _draw_background(self):
-        """Draws the water background (tiled) or solid color."""
-        if self.water_img:
-            w, h = self.water_img.get_size()
-            # Simple tiling
-            for x in range(0, self.screen_width, w):
-                for y in range(0, self.screen_height, h):
-                    self.screen.blit(self.water_img, (x, y))
+        """
+        Draws the large tiled grass texture that covers everything.
+        No distinction between background and ground - it's all one seamless texture.
+        """
+        if self.current_map_surface:
+            self.screen.blit(self.current_map_surface, (self.map_offset_x, self.map_offset_y))
         else:
-            self.screen.fill(self.colors["bg"])
-
-    def _draw_ground(self):
-        """
-        Draws the isometric ground plane.
-        """
-        # Draw a solid base polygon first to hide gaps/cracks between tiles
-        points = [self.world_to_screen(0, 0), self.world_to_screen(self.battlefield.width, 0), self.world_to_screen(self.battlefield.width, self.battlefield.height), self.world_to_screen(0, self.battlefield.height)]
-        pygame.draw.polygon(self.screen, self.colors["ground"], points)
-
-        # Draw tiles if texture is available
-        if self.current_grass_tiles:
-            half_w = int(self._tile_width / 2)
-            num_textures = len(self.current_grass_tiles)
-            # Iterate over all map tiles
-            for x in range(self.battlefield.width):
-                for y in range(self.battlefield.height):
-                    sx, sy = self.world_to_screen(x, y)
-                    # Simple culling to avoid drawing off-screen tiles
-                    if -self._tile_width < sx < self.screen_width + self._tile_width and -self._tile_height < sy < self.screen_height + self._tile_height:
-                        # Choose a texture based on tile position for variety, creating a non-uniform, more natural look.
-                        # Using prime numbers in the hash helps to break up patterns.
-                        texture_index = (x * 7 + y * 13) % num_textures
-                        tile_to_draw = self.current_grass_tiles[texture_index]
-                        # Center the sprite horizontally (sx is the top vertex x, which is the center of the tile's width)
-                        self.screen.blit(tile_to_draw, (sx - half_w, sy))
-
-        # Draw Map Border
-        points = [self.world_to_screen(0, 0), self.world_to_screen(self.battlefield.width, 0), self.world_to_screen(self.battlefield.width, self.battlefield.height), self.world_to_screen(0, self.battlefield.height)]
-        pygame.draw.polygon(self.screen, (0, 0, 0), points, 2)  # Black border
+            # Fallback if texture didn't load
+            self.screen.fill(self.colors["ground_fallback"])
 
     def _draw_unit(self, unit):
         """
@@ -235,13 +211,11 @@ class PygameVisualizer:
         """
         Renders the entire scene.
         1. Fills the background.
-        2. Draws the ground.
-        3. Sorts all units by their Y-coordinate (Painter's Algorithm).
-        4. Draws each unit in the sorted order.
-        5. Updates the display.
+        2. Sorts all units by their Y-coordinate (Painter's Algorithm).
+        3. Draws each unit in the sorted order.
+        4. Updates the display.
         """
         self._draw_background()
-        self._draw_ground()
 
         # --- Y-SORTING (PAINTER'S ALGORITHM) ---
         # Get all units and sort them by their world Y-coordinate.
