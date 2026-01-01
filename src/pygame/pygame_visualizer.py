@@ -1,3 +1,4 @@
+from screeninfo import get_monitors
 from pathlib import Path
 from src.units.unit_base import Unit
 
@@ -15,7 +16,9 @@ class PygameVisualizer:
     ISO_BASE_TILE_WIDTH = 64
     ISO_BASE_TILE_HEIGHT = 32
 
-    def __init__(self, battlefield: Battlefield, screen_width=1280, screen_height=720):
+    monitor = get_monitors()[0]
+
+    def __init__(self, battlefield: Battlefield, screen_width=monitor.width if monitor else 1280, screen_height=monitor.height if monitor else 720):
         """
         Initializes Pygame, the screen, and visualizer settings.
         """
@@ -51,13 +54,32 @@ class PygameVisualizer:
             scale_y = (self.screen_height * padding_ratio) / total_projected_height
             self.scale_factor = min(scale_x, scale_y)
 
+        # Apply additional zoom to start closer to the action
+        self.scale_factor *= 2.25
+
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
 
-        # Calculate camera offset to center the map
-        self.camera_offset_x = self.screen_width / 2
-        self.camera_offset_y = self.screen_height / 2
+        # Calculate camera offset to center on the units
+        # Find the center point between all units
+        all_units = list(battlefield.get_all_units())
 
+        if all_units:
+            # Calculate average position of all units
+            avg_x = sum(u.position[0] for u in all_units) / len(all_units)
+            avg_y = sum(u.position[1] for u in all_units) / len(all_units)
+
+            # Convert to screen coordinates
+            target_screen_x = (avg_x - avg_y) * (self._tile_width / 2)
+            target_screen_y = (avg_x + avg_y) * (self._tile_height / 2)
+
+            # Set camera offset to center this point on screen
+            self.camera_offset_x = self.screen_width / 2 - target_screen_x
+            self.camera_offset_y = self.screen_height / 2 - target_screen_y
+        else:
+            # Fallback: center on battlefield
+            self.camera_offset_x = self.screen_width / 2
+            self.camera_offset_y = self.screen_height / 2
         self.update_map_texture()
 
     @staticmethod
