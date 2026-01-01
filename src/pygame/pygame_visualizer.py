@@ -208,7 +208,7 @@ class PygameVisualizer:
         # Draw team color ellipse under the unit
         if unit.owner in self.colors:
             ellipse_radius = int(16 * self.scale_factor)
-            ellipse_rect = pygame.Rect(screen_x - ellipse_radius, screen_y - ellipse_radius // 3, ellipse_radius * 2, int(ellipse_radius * 0.6))
+            ellipse_rect = pygame.Rect(screen_x - ellipse_radius, screen_y - ellipse_radius // 3, ellipse_radius * 2.5, int(ellipse_radius * 0.6))
             player_color = self.colors[unit.owner]
             pygame.draw.ellipse(self.screen, player_color, ellipse_rect)
             pygame.draw.ellipse(self.screen, (0, 0, 0), ellipse_rect, 1)  # Black outline
@@ -275,7 +275,7 @@ class PygameVisualizer:
         # Background of HP bar
         pygame.draw.rect(self.screen, (100, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height))
         # Foreground of HP bar
-        pygame.draw.rect(self.screen, (0, 200, 0), (hp_bar_x, hp_bar_y, int(hp_bar_width * hp_ratio), hp_bar_height))
+        pygame.draw.rect(self.screen, (0, 200, 0) if unit.hp > unit.max_hp * 0.2 else (200, 0, 0), (hp_bar_x, hp_bar_y, int(hp_bar_width * hp_ratio), hp_bar_height))
         # Border of HP bar
         pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
