@@ -92,6 +92,9 @@ class PygameVisualizer:
         # Load unit sprites
         self.unit_sprites = {"knight": self.load_img("knight.png"), "crossbowman": self.load_img("crossbowman.png"), "pikeman": self.load_img("pikeman.png")}
 
+        # Track unit HP to detect damage (for flash effect)
+        self.unit_hp_tracker = {}
+
         # This will store the current zoomed version
         self.current_map_surface = None
         self.map_offset_x = 0
@@ -187,6 +190,21 @@ class PygameVisualizer:
         world_x, world_y = unit.position
         screen_x, screen_y = self.world_to_screen(world_x, world_y)
 
+        current_hp = unit.hp
+
+        if unit.id not in self.unit_hp_tracker:
+            self.unit_hp_tracker[unit.id] = [current_hp, 0]
+        else:
+            last_hp, flash_timer = self.unit_hp_tracker[unit.id]
+
+            if current_hp < last_hp:
+                flash_timer = 5
+
+            if flash_timer > 0:
+                flash_timer -= 1
+
+            self.unit_hp_tracker[unit.id] = [current_hp, flash_timer]
+
         # Draw team color ellipse under the unit
         if unit.owner in self.colors:
             ellipse_radius = int(16 * self.scale_factor)
@@ -215,14 +233,20 @@ class PygameVisualizer:
 
             scaled_sprite = pygame.transform.scale(sprite, (sprite_width, sprite_height))
 
-            # Check if unit is taking damage (flash red)
-            if hasattr(unit, "damage_flash_timer"):
-                # Create red flash overlay
+            _, flash_timer = self.unit_hp_tracker[unit.id]
+            if flash_timer > 0:
+                # red flash overlay
                 flash_sprite = scaled_sprite.copy()
                 red_overlay = pygame.Surface((sprite_width, sprite_height), pygame.SRCALPHA)
-                # Strong red tint
-                red_overlay.fill((255, 0, 0, 150))
-                flash_sprite.blit(red_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+                red_overlay.fill((255, 0, 0, 180))  # Red with opacity
+
+                # apply red tint to non-transparent pixels
+                flash_sprite.blit(red_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                # Then add brightness to make it pop
+                bright_overlay = pygame.Surface((sprite_width, sprite_height), pygame.SRCALPHA)
+                bright_overlay.fill((100, 0, 0, 100))
+                flash_sprite.blit(bright_overlay, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
                 scaled_sprite = flash_sprite
 
             # Center the sprite on the unit position
