@@ -103,56 +103,32 @@ class PygameVisualizer:
         # Load the grass texture that will cover everything
         self.grass_source = self.load_img("aoe-empty-map.png")
 
-        if self.grass_source:
-            # Pre-create a very large tiled surface that we'll use as base
-            # This ensures we never run out of texture when zooming out
-            base_size = 8192  # Very large base texture size
-            self.base_map_surface = pygame.Surface((base_size, base_size))
-
-            grass_w, grass_h = self.grass_source.get_size()
-            for x in range(0, base_size, grass_w):
-                for y in range(0, base_size, grass_h):
-                    self.base_map_surface.blit(self.grass_source, (x, y))
-        else:
-            self.base_map_surface = None
-
         # Load unit sprites
         self.unit_sprites = {"knight": self.load_img("knight.png"), "crossbowman": self.load_img("crossbowman.png"), "pikeman": self.load_img("pikeman.png")}
 
         # Track unit HP to detect damage (for flash effect)
         self.unit_hp_tracker = {}
 
-        # This will store the current zoomed version
-        self.current_map_surface = None
-        self.map_offset_x = 0
-        self.map_offset_y = 0
-        self.base_texture_size = 8192
+        # This will store the current zoomed version of the single tile
+        self.scaled_grass = None
 
     def update_map_texture(self):
         """
-        Scales the base map surface according to current zoom level.
-        Ensures texture is always large enough to cover the screen.
+        Scales the grass texture according to current zoom level.
         """
-        if not self.base_map_surface:
+        if not self.grass_source:
             return
 
-        # Calculate minimum size needed to cover the screen with plenty of margin
-        min_size_needed = max(self.screen_width, self.screen_height) * 4
+        # Scale the single grass tile instead of a giant map
+        w, h = self.grass_source.get_size()
+        new_w = int(w * self.scale_factor)
+        new_h = int(h * self.scale_factor)
+        
+        # Ensure at least 1x1
+        new_w = max(1, new_w)
+        new_h = max(1, new_h)
 
-        # Scale the base surface, but never smaller than what's needed to cover screen
-        scaled_size = int(self.base_texture_size * self.scale_factor)
-        scaled_size = max(scaled_size, int(min_size_needed))
-
-        self.current_map_surface = pygame.transform.scale(self.base_map_surface, (scaled_size, scaled_size))
-
-        # Calculate offset to center this surface on the battlefield
-        center_world_x = self.battlefield.width / 2
-        center_world_y = self.battlefield.height / 2
-        screen_center_x, screen_center_y = self.world_to_screen(center_world_x, center_world_y)
-
-        # Position the surface so its center aligns with battlefield center
-        self.map_offset_x = screen_center_x - scaled_size / 2
-        self.map_offset_y = screen_center_y - scaled_size / 2
+        self.scaled_grass = pygame.transform.scale(self.grass_source, (new_w, new_h))
 
     def zoom(self, direction: int):
         """
@@ -175,13 +151,6 @@ class PygameVisualizer:
         """
         self.camera_offset_x -= dx
         self.camera_offset_y -= dy
-        # Update map position when camera moves
-        if self.current_map_surface:
-            center_world_x = self.battlefield.width / 2
-            center_world_y = self.battlefield.height / 2
-            screen_center_x, screen_center_y = self.world_to_screen(center_world_x, center_world_y)
-            self.map_offset_x = screen_center_x - self.current_map_surface.get_width() / 2
-            self.map_offset_y = screen_center_y - self.current_map_surface.get_height() / 2
 
     def world_to_screen(self, world_x, world_y):
         """
@@ -204,8 +173,17 @@ class PygameVisualizer:
         Draws the large tiled grass texture that covers everything.
         No distinction between background and ground - it's all one seamless texture.
         """
-        if self.current_map_surface:
-            self.screen.blit(self.current_map_surface, (self.map_offset_x, self.map_offset_y))
+        if self.scaled_grass:
+            tile_w = self.scaled_grass.get_width()
+            tile_h = self.scaled_grass.get_height()
+            
+            # Calculate offset to keep texture pinned to world space
+            start_x = int(self.camera_offset_x) % tile_w
+            start_y = int(self.camera_offset_y) % tile_h
+            
+            for x in range(start_x - tile_w, self.screen_width, tile_w):
+                for y in range(start_y - tile_h, self.screen_height, tile_h):
+                    self.screen.blit(self.scaled_grass, (x, y))
         else:
             # Fallback if texture didn't load
             self.screen.fill(self.colors["ground_fallback"])
