@@ -16,6 +16,9 @@ class PygameVisualizer:
     ISO_BASE_TILE_WIDTH = 64
     ISO_BASE_TILE_HEIGHT = 32
 
+    MIN_ZOOM = 0.2
+    MAX_ZOOM = 5.0
+
     monitor = get_monitors()[0]
 
     def __init__(self, battlefield: Battlefield, screen_width=monitor.width if monitor else 1280, screen_height=monitor.height if monitor else 720):
@@ -140,6 +143,9 @@ class PygameVisualizer:
             self.scale_factor *= 1 + zoom_step
         else:
             self.scale_factor *= 1 - zoom_step
+
+        # Clamp zoom level to prevent infinite zooming
+        self.scale_factor = max(self.MIN_ZOOM, min(self.scale_factor, self.MAX_ZOOM))
 
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
