@@ -40,6 +40,11 @@ class PygameVisualizer:
             "ground_fallback": (107, 142, 35),  # Olive Drab for the ground
         }
 
+        # Minimap settings
+        self.minimap_size = 200
+        self.minimap_padding = 20
+        self.minimap_position = (self.screen_width - self.minimap_size - self.minimap_padding, self.screen_height - self.minimap_size - self.minimap_padding)
+
         # Load Textures
         self.load_assets()
 
@@ -205,6 +210,108 @@ class PygameVisualizer:
             # Fallback if texture didn't load
             self.screen.fill(self.colors["ground_fallback"])
 
+    def world_to_minimap(self, world_x: float, world_y: float, left: tuple[float, float], top: tuple[float, float], diamond_width: int, diamond_height: int):
+        # Normalize world coordinates (0 to 1)
+        norm_x = world_x / self.battlefield.width
+        norm_y = world_y / self.battlefield.height
+
+        horizontal = (norm_x + (1 - norm_y)) / 2
+
+        vertical = (norm_x + norm_y) / 2
+
+        # Map to diamond on minimap
+        map_x = left[0] + horizontal * diamond_width
+        map_y = top[1] + vertical * diamond_height
+
+        return int(map_x), int(map_y)
+
+    def _draw_minimap(self, battlefield: Battlefield):
+        """
+        Draws a minimap showing the entire battlefield and unit positions.
+        """
+        minimap_x, minimap_y = self.minimap_position
+
+        # Create minimap surface with extra space for the diamond shape
+        minimap_surface = pygame.Surface((self.minimap_size, self.minimap_size), pygame.SRCALPHA)
+        minimap_surface.fill((0, 0, 0, 0))
+
+        # Calculate diamond dimensions
+        diamond_width = self.minimap_size
+        diamond_height = self.minimap_size // 2
+
+        # Center the diamond in the minimap surface
+        center_x = self.minimap_size // 2
+        center_y = self.minimap_size // 2
+
+        # Diamond corner points
+        top = (center_x, center_y - diamond_height // 2)
+        right = (center_x + diamond_width // 2, center_y)
+        bottom = (center_x, center_y + diamond_height // 2)
+        left = (center_x - diamond_width // 2, center_y)
+
+        # Draw the minimap background
+        bg_rect = pygame.Rect(0, top[1], self.minimap_size, self.minimap_size // 2)
+        pygame.draw.rect(minimap_surface, (201, 152, 104), bg_rect)
+
+        diamond_points = [top, right, bottom, left]
+        if self.grass_source:
+            # Create a temporary surface for the textured diamond
+            tex_surface = pygame.Surface((diamond_width, diamond_height), pygame.SRCALPHA)
+
+            # Scale a portion of the grass source to the diamond's size
+            crop_size = min(self.grass_source.get_size())
+            sub_grass = self.grass_source.subsurface((0, 0, crop_size, crop_size))
+            scaled_grass = pygame.transform.scale(sub_grass, (diamond_width, diamond_height))
+
+            # Create a mask in the shape of a diamond
+            mask_surface = pygame.Surface((diamond_width, diamond_height), pygame.SRCALPHA)
+            mask_surface.fill((0, 0, 0, 0))
+            # Local diamond points relative to the tex_surface
+            local_diamond = [(diamond_width // 2, 0), (diamond_width, diamond_height // 2), (diamond_width // 2, diamond_height), (0, diamond_height // 2)]
+            pygame.draw.polygon(mask_surface, (255, 255, 255, 255), local_diamond)
+
+            # Blit the grass onto the mask using BLEND_RGBA_MIN to "cut out" the diamond shape
+            tex_surface.blit(scaled_grass, (0, 0))
+            tex_surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+
+            # Blit the resulting textured diamond onto the minimap
+            minimap_surface.blit(tex_surface, (0, top[1]))
+        else:
+            # Fallback to solid color if texture is missing
+            pygame.draw.polygon(minimap_surface, (107, 142, 35), diamond_points)
+        # Draw diamond border
+        pygame.draw.polygon(minimap_surface, (154, 133, 90), diamond_points, 5)
+
+        # Draw units as colored dots
+        all_units = battlefield.get_all_units()
+        for unit in all_units:
+            if unit.is_alive():
+                unit_x, unit_y = self.world_to_minimap(unit.position[0], unit.position[1], left, top, diamond_width, diamond_height)
+
+                color = self.colors.get(unit.owner, (200, 200, 200))
+                pygame.draw.circle(minimap_surface, color, (unit_x, unit_y), 3)
+
+        # Find the world coordinates of the screen center
+        sum_coords = (self.screen_height / 2 - self.camera_offset_y) / (self._tile_height / 2)
+        diff_coords = (self.screen_width / 2 - self.camera_offset_x) / (self._tile_width / 2)
+        camera_center_world_x = (sum_coords + diff_coords) / 2
+        camera_center_world_y = (sum_coords - diff_coords) / 2
+
+        # Get the screen center point on the minimap
+        cam_x, cam_y = self.world_to_minimap(camera_center_world_x, camera_center_world_y, left, top, diamond_width, diamond_height)
+
+        # Calculate rectangle dimensions relative to the minimap scale
+        rect_w = int(self.minimap_size * 0.3 * (self.screen_width / (self.battlefield.width * self._tile_width)))
+        rect_h = int((self.minimap_size // 2) * 0.3 * (self.screen_height / (self.battlefield.height * self._tile_height)))
+
+        camera_rect = pygame.Rect(0, 0, rect_w, rect_h)
+        camera_rect.center = (cam_x, cam_y)
+
+        pygame.draw.rect(minimap_surface, (255, 255, 255), camera_rect, 1)
+
+        # Blit minimap to screen
+        self.screen.blit(minimap_surface, (minimap_x, minimap_y))
+
     def _draw_unit(self, unit: Unit):
         """
         Draws a single unit on the screen at its isometric position using sprites.
@@ -321,6 +428,9 @@ class PygameVisualizer:
         for unit in sorted_units:
             if unit.is_alive():
                 self._draw_unit(unit)
+
+        # Draw minimap
+        self._draw_minimap(battlefield)
 
         # Display status text
         status_str = f"Tick: {tick_count} | Speed: x{speed:.1f}"
