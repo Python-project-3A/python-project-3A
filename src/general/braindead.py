@@ -23,7 +23,7 @@ class GeneralBraindead(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="Captain BRAINDEAD")
 
-    def update(self, battlefield: Battlefield, tick: int) -> None:
+    def update(self, battlefield: "Battlefield", tick: int, dt) -> None:
         """
         BRAINDEAD: Stratégie purement réactive.
         - Ne bouge jamais.

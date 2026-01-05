@@ -135,6 +135,32 @@ class MovementSystem:
     """Handles all unit movement logic"""
 
     @staticmethod
+    def move_to_position_with_speed(unit: "Unit", target_x: float, target_y: float, dt: float, battlefield: "Battlefield", speed_limit: float) -> bool:
+        """
+        Déplace l'unité vers (target_x, target_y) en respectant une vitesse limite imposée.
+        """
+        x, y = unit.position
+        dist = math.dist((x, y), (target_x, target_y))
+
+        # On prend la plus petite vitesse entre la capacité physique de l'unité et la consigne du général
+        effective_speed = min(unit.speed, speed_limit)
+
+        if dist == 0 or effective_speed <= 0 or dt == 0:
+            return False
+
+        # Calcul du pas physique pour ce tick
+        step = min(effective_speed * dt, dist)
+
+        dx = target_x - x
+        dy = target_y - y
+
+        # Déplacement
+        new_x = x + (dx / dist * step)
+        new_y = y + (dy / dist * step)
+
+        return battlefield.move_unit_on_map(unit, new_x, new_y)
+
+    @staticmethod
     def move_towards(unit: "Unit", target: "Unit", dt: float, battlefield: "Battlefield") -> bool:
         """
         Déplace l'unité vers l'unité cible en intégrant la répulsion des alliés (fluidité).
@@ -415,6 +441,13 @@ class UnitController:
         if order["type"] == "move_to":
             reached = UnitController._follow_path(unit, order["target"], order, battlefield, dt)
             if reached:
+                unit.current_order = None
+
+        elif order["type"] == "move_controlled":
+            target = order["target"]
+            speed_limit = order.get("speed_limit", unit.speed)
+            MovementSystem.move_to_position_with_speed(unit, target[0], target[1], dt, battlefield, speed_limit)
+            if unit.dist_to_point(target) < 0.1:
                 unit.current_order = None
 
         # --- CAS 2 : ATTACK MOVE (Avancer jusqu'à trouver un ennemi) ---

@@ -29,14 +29,13 @@ class Simulation:
         self.snapshot_utility = HTMLSnapshot(battlefield)
         self.LOGICAL_DT = 1.0 / 30.0
 
-    def tick(self, dt, should_update_logic):
+    def tick(self, dt):
         """Exécute un tick unique."""
         self.tick_count += 1
 
         # 1. Les généraux réfléchissent
-        if should_update_logic:
-            for general in self.generals:
-                general.update(self.battlefield, self.tick_count)
+        for general in self.generals:
+            general.update(self.battlefield, self.tick_count, dt)
 
         all_units = self.battlefield.get_all_units()
 
@@ -85,7 +84,6 @@ class Simulation:
         step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
 
         while self.is_running and self.tick_count < max_ticks:
-            should_update_logic = self.tick_count % 10 == 0
             loop_start = time.time()
 
             # --- TERMINAL INPUTS ---
@@ -112,7 +110,7 @@ class Simulation:
 
             # --- LOGIQUE (TPS) ----
             if not self.paused:
-                self.tick(self.LOGICAL_DT * self.game_speed, should_update_logic)
+                self.tick(self.LOGICAL_DT * self.game_speed)
 
                 # STATS DE PERFORMANCE
                 frames_this_second += 1
