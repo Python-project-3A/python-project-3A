@@ -108,6 +108,11 @@ class Simulation:
                         case "zoom_out":
                             visualizer.zoom(-1)
 
+                    if hasattr(input_provider, "get_camera_drag"):
+                        drag_dx, drag_dy = input_provider.get_camera_drag()
+                        if drag_dx != 0 or drag_dy != 0:
+                            visualizer.move_camera(drag_dx, drag_dy)
+
             # --- LOGIQUE (TPS) ----
             if not self.paused:
                 self.tick(self.LOGICAL_DT * self.game_speed)
