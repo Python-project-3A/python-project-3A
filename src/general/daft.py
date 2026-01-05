@@ -8,7 +8,7 @@ from .general_base import BaseGeneral
 
 class GeneralDaft(BaseGeneral):
     """
-    Major DAFT - Dumb as a rock.
+    Major DAFT - Dumb as fuck.
 
     Strategy: ATTACK NEAREST ENEMY
     - Every unit attacks the nearest enemy
@@ -16,9 +16,6 @@ class GeneralDaft(BaseGeneral):
     - No tactics
     - No counter-type considerations
     - Pure mindless aggression
-
-    This is slightly better than BRAINDEAD because units
-    actively seek and chase enemies.
     """
 
     def __init__(self, player_id: int):
@@ -30,17 +27,19 @@ class GeneralDaft(BaseGeneral):
         """
         my_units = self.get_my_units(battlefield)
         enemies = self.get_enemy_units(battlefield)
-
         if not enemies:
-            # No enemies left, we won!
             return
 
         for unit in my_units:
             if not unit.is_alive():
                 continue
 
-            # Find nearest enemy to THIS unit
-            target = CombatSystem.choose_nearest_target(unit, enemies)
+            # --- CORRECTION : PERSISTENCE ---
+            # Si on a déjà une cible vivante, on continue de la focus (sauf si daft doit être plus intelligent et changer de cible, mais a priori non)
+            if unit.current_order and unit.current_order["type"] == "attack_unit" and unit.current_order["target"].is_alive():
+                continue
+            # -------------------------------
 
+            target = CombatSystem.choose_nearest_target(unit, enemies)
             if target:
                 unit.current_order = {"type": "attack_unit", "target": target}

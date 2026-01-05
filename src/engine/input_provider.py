@@ -2,6 +2,8 @@
 import sys
 import os
 
+# NE PAS ESSAYER DE GERER les "is not defined" => Normal car ils sont dans un else et python les importe ssi nécessaire. NE BUG PAS.
+
 # Détection OS
 if os.name == "nt":
     import msvcrt
