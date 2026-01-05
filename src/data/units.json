@@ -3,6 +3,7 @@
     "hp": 55,
     "armor_melee": 0,
     "armor_pierce": 0,
+    "armor_spearmen": 0,
     "damage_melee": 4,
     "damage_cavalry": 22,
     "attack_range": 0.5,
