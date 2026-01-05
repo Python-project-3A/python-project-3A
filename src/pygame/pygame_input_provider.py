@@ -63,3 +63,16 @@ class PygameInputProvider:
                     return "F12"
 
         return None
+
+    def get_camera_drag(self) -> tuple[int, int]:
+        """
+        Returns the relative mouse movement if the left mouse button is held down
+        Returns (0, 0) otherwise
+        """
+        if pygame.mouse.get_pressed()[0]:  # Left click held
+            dx, dy = pygame.mouse.get_rel()
+            # Inverted signs: dragging mouse right (positive dx) should move camera left (negative dx) to simulate "grabbing" the ground
+            return -dx, -dy
+        else:
+            pygame.mouse.get_rel()  # Reset relative movement
+            return 0, 0

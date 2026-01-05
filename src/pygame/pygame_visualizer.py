@@ -138,6 +138,9 @@ class PygameVisualizer:
         Adjusts the zoom level.
         `direction` > 0 for zoom in, < 0 for zoom out.
         """
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        old_scale = self.scale_factor
+
         zoom_step = 0.1
         if direction > 0:
             self.scale_factor *= 1 + zoom_step
@@ -146,6 +149,11 @@ class PygameVisualizer:
 
         # Clamp zoom level to prevent infinite zooming
         self.scale_factor = max(self.MIN_ZOOM, min(self.scale_factor, self.MAX_ZOOM))
+
+        # Adjust camera offset to zoom towards the mouse cursor
+        scale_ratio = self.scale_factor / old_scale
+        self.camera_offset_x = mouse_x - (mouse_x - self.camera_offset_x) * scale_ratio
+        self.camera_offset_y = mouse_y - (mouse_y - self.camera_offset_y) * scale_ratio
 
         self._tile_width = self.ISO_BASE_TILE_WIDTH * self.scale_factor
         self._tile_height = self.ISO_BASE_TILE_HEIGHT * self.scale_factor
