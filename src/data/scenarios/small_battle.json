@@ -17,6 +17,14 @@
           "start_x": 5,
           "start_y": 10,
           "spacing": 1.5
+        },
+        {
+          "type": "Tree",
+          "count": 3,
+          "formation": "block",
+          "start_x": 20,
+          "start_y": 20,
+          "spacing": 3.0
         }
       ]
     },
