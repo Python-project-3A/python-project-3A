@@ -13,7 +13,7 @@
         {
           "type": "Knight",
           "count": 20,
-          "formation": "line",
+          "formation": "block",
           "start_x": 10,
           "start_y": 15,
           "spacing": 2.0
