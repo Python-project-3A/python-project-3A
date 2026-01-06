@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 import math
 
 if TYPE_CHECKING:
@@ -242,6 +242,23 @@ class BaseGeneral(ABC):
         if target.is_alive():  # and unit.dist_to(target) <= unit.attack_range * 1.2:
             return True
         return False
+
+    def _get_best_target(self, unit: Unit, preferred_list: list[Unit], fallback_list: list[Unit]) -> Optional[Unit]:
+        """
+        Cherche la cible la plus proche dans la liste préférée.
+        Si vide, cherche dans la liste fallback.
+        """
+        if preferred_list:
+            return self._get_nearest(unit, preferred_list)
+        if fallback_list:
+            return self._get_nearest(unit, fallback_list)
+        return None
+
+    def _get_nearest(self, unit: Unit, candidates: list[Unit]) -> Optional[Unit]:
+        """Helper local pour trouver le plus proche."""
+        if not candidates:
+            return None
+        return min(candidates, key=lambda e: unit.dist_to(e))
 
     # --- COMPORTEMENTS GENERIQUES ---
 

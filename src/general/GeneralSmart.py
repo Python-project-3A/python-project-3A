@@ -14,27 +14,21 @@ class Squad:
 
     def __init__(self, units: list[Unit], role: str):
         self.units = units
-        self.role = role  # "MAIN_ASSAULT", "FLANK_LEFT", "PROTECTION"
+        self.role = role
         self.target_position = (0, 0)
-        self.target_cluster = None  # Groupe d'ennemis visé
 
 
 class GeneralSmart(BaseGeneral):
     def __init__(self, player_id: int):
         super().__init__(player_id, name="General SMART")
-        # self.squads: list[Squad] = []
-        self.tick_counter = 0
-        # Paramètres de personnalité (pour faire varier les IA plus tard)
-        self.aggressiveness = 0.5
-        self.formation_spacing = 1.5
-        self.squads = {"FLANKER": Squad([], "FLANKER"), "DPS": Squad([], "DPS"), "TANK": Squad([], "TANK")}
+        self.squads = {"FRONTLINE": Squad([], "FRONTLINE"), "BACKLINE": Squad([], "BACKLINE"), "FLANKERS": Squad([], "FLANKERS"), "ROAMERS": Squad([], "ROAMERS")}
         self._squads_initialized = False
 
-    def update(self, bf: Battlefield, tick: int, dt) -> None:
-        self.tick_counter = tick
+    def update(self, bf: Battlefield, tick: int, dt: float) -> None:
         enemies = bf.get_enemy_units(self.player_id)
         if not enemies:
             return
+
         if not self._squads_initialized:
             self._initialize_squads(bf)
             self._squads_initialized = True
@@ -43,6 +37,7 @@ class GeneralSmart(BaseGeneral):
         # 1. PERCEPTION (Macro)
         if tick % 15 == 0:
             self._macro_strategy(enemies, bf)
+            self._maintain_squads()
 
         # 3. TACTIQUE & MICRO (Exécution par unité)
         for squad in self.squads.values():
@@ -50,78 +45,258 @@ class GeneralSmart(BaseGeneral):
                 continue
             self._execute_squad_tactics(squad, enemies, bf)
 
-    # --- PHASE 1: PERCEPTION --- --> Dans general_base.py
-
-    # --- PHASE 2: STRATÉGIE ---
-
-    def _macro_strategy(self, enemies, bf: Battlefield):
-        """Regroupe toute la réflexion lente."""
-        enemy_clusters = self._analyze_enemy_clusters(enemies)
-        self._maintain_squads()
-
-        my_units = bf.get_my_units(self.player_id)
-        if not my_units:
-            return
-        self._manage_squads(my_units, enemy_clusters)
-
+    # --- PHASE 1. INITIALISATION & MACRO ---
     def _initialize_squads(self, bf: Battlefield):
-        """
-        Scan complet de l'armée pour remplir les escouades.
-        """
-        my_units = bf.get_my_units(self.player_id)
+        """Scan complet de l'armée pour remplir les 4 escouades."""
+        my_units = self.get_my_units(bf)
 
         for unit in my_units:
             name = unit.name.lower()
-            if name == "knight":
-                self.squads["FLANKER"].units.append(unit)
-            elif name == "crossbowman":
-                self.squads["DPS"].units.append(unit)
-            elif name == "pikeman":
-                self.squads["TANK"].units.append(unit)
+
+            # --- FRONTLINE ---
+            if name in ["pikeman", "longswordsman", "cappedram"]:
+                self.squads["FRONTLINE"].units.append(unit)
+
+            # --- BACKLINE ---
+            elif name in ["crossbowman", "eliteskirmisher", "onager", "scorpion"]:
+                self.squads["BACKLINE"].units.append(unit)
+
+            # --- FLANKERS ---
+            elif name in ["knight", "lightcavalry"]:
+                self.squads["FLANKERS"].units.append(unit)
+
+            # --- ROAMERS ---
+            elif name in ["cavalryarcher"]:
+                self.squads["ROAMERS"].units.append(unit)
+
+            else:
+                assert False, f"Unknown unit type : {unit.name} : A IMPLEMENTER"
 
     def _maintain_squads(self):
-        """
-        Supprime les morts des listes. (O(N_vivants)).
-        """
+        """Supprime les morts des listes. (O(N_vivants))."""
         for squad in self.squads.values():
             if squad.units:
                 squad.units = [u for u in squad.units if u.is_alive()]
 
-    def _manage_squads(self, my_units: list[Unit], enemy_clusters):
-        # CIBLAGE
-        if enemy_clusters:
-            for squad in self.squads.values():
-                squad.target_position = enemy_clusters[0]["center"]
+    def _macro_strategy(self, enemies, bf: Battlefield):
+        """Définit la cible globale de chaque squad."""
+        # enemy_clusters = self._analyze_enemy_clusters(enemies)
+        ennemy_center = self._get_centroid(enemies)
+        my_units = bf.get_my_units(self.player_id)
+        if not my_units:
+            return
+        for squad in self.squads.values():
+            squad.target_position = ennemy_center
 
-    # --- PHASE 3 & 4: TACTIQUE & MICRO ---
+    # --- PHASE 2. DISPATCHER TACTIQUE ---
     def _execute_squad_tactics(self, squad: Squad, all_enemies: list[Unit], bf: Battlefield):
-        target_pos = squad.target_position
-
         for unit in squad.units:
             if not unit.is_alive():
                 continue
 
-            # --- COMPORTEMENT SPÉCIFIQUE PAR RÔLE ---
+            name = unit.name.lower()
 
-            if squad.role == "DPS":
-                self._micro_archer(unit, all_enemies, target_pos, bf)
+            # --- LOGIQUE FRONTLINE ---
+            if name == "cappedram":
+                self._micro_ram_tank(unit, all_enemies)
+            elif name == "pikeman":
+                backline_units = self.squads["BACKLINE"].units
+                protect_pos = self._get_centroid(backline_units) if backline_units else unit.position
+                # self._micro_pikeman_protector(unit, all_enemies, protect_pos)
+                self._micro_pikeman_protector(unit, all_enemies, protect_pos, squad.target_position, bf)
+            elif name == "longswordsman":
+                self._micro_swordsman_charger(unit, all_enemies, bf)
 
-            elif squad.role == "TANK":
-                my_archers = [s for s in self.squads.values() if s.role == "DPS"]
-                if my_archers and my_archers[0].units:
-                    protect_position = self._get_centroid(my_archers[0].units)
-                    self._micro_pikeman_protector(unit, all_enemies, protect_position, target_pos, bf)
-                else:
-                    self._micro_generic_attack(unit, all_enemies, bf)
+            # --- LOGIQUE BACKLINE ---
+            elif name == "eliteskirmisher":
+                self._micro_skirmisher_counter(unit, all_enemies, bf)
+            elif name == "crossbowman":
+                self._micro_crossbow_sniper(unit, all_enemies, bf)
+            elif name == "onager":
+                self._micro_onager_artillery(unit, all_enemies, bf)
+            elif name == "scorpion":
+                self._micro_scorpion_support(unit, all_enemies, bf)
 
-            elif squad.role == "FLANKER":
-                self._micro_knight_flanker(unit, all_enemies, target_pos, bf)
+            # --- LOGIQUE FLANKERS ---
+            elif name == "knight":
+                # self._micro_knight_brawler(unit, all_enemies, bf)
+                self._micro_knight_flanker(unit, all_enemies, squad.target_position, bf)
+            elif name == "lightcavalry":
+                self._micro_lightcav_assassin(unit, all_enemies, bf)
 
-    # --- MICRO-GESTION UNITAIRE ---
+            # --- LOGIQUE ROAMERS ---
+            elif name == "cavalryarcher":
+                self._micro_cavalry_archer_kiter(unit, all_enemies, bf)
+
+            else:
+                # Comportement générique (Fallback)
+                self._micro_generic_attack(unit, all_enemies, bf)
+
+    # --- 3. MICRO-GESTION SPÉCIFIQUE ---
+
+    # --- FRONTLINE ---
+
+    def _micro_ram_tank(self, unit: Unit, enemies: list[Unit]):
+        """avance vers les archers pour tanker."""
+        # Cible prioritaire : Archers et Sièges
+        targets = self._filter_enemies(enemies, ["crossbowman", "eliteskirmisher", "cavalryarcher", "scorpion"])
+        if not targets:
+            targets = enemies  # Sinon n'importe qui
+
+        # Il n'attaque pas (Dmg 3), il MOVE sur eux
+        target = self._get_nearest(unit, targets)
+        if target:
+            unit.current_order = {"type": "move_to", "target": target.position}
+
+    def _micro_swordsman_charger(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Charge l'infanterie adverse."""
+        # Appétence : Piquiers, autres épéistes
+        infantry = self._filter_enemies(enemies, ["pikeman", "longswordsman", "skirmisher"])
+        target = self._get_best_target(unit, infantry, enemies)
+
+        if target:
+            self._order_attack_opti(unit, target)
+
+    def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
+        """Logique : S'interposer entre la menace et les protégés. + Focus cavalerie"""
+        # 1. CIBLAGE
+        knights = self._filter_enemies(enemies, ["knight", "lightcavalry", "cavalryarcher"])
+        threats = knights if knights else [e for e in enemies if e.is_alive()]
+
+        if not threats:
+            unit.current_order = {"type": "attack_move", "target": default_target_pos}
+            return
+
+        # 2. PROJECTION DU MOUVEMENT
+        dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
+        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 10.0)  # On projette x mètres devant le groupe
+
+        # 3. INTERCEPTION DE LA MENACE
+        nearest_threat = min(threats, key=lambda e: (e.position[0] - proj_ax) ** 2 + (e.position[1] - proj_ay) ** 2)
+        is_fast_threat = nearest_threat.name.lower() in ["knight"]
+
+        # Calcul du point de blocage
+        dx, dy = self.soustract_vec(nearest_threat.position, (proj_ax, proj_ay))
+        dist_threat = (dx**2 + dy**2) ** 0.5
+
+        # --- LOGIQUE D'INTERCEPTION ---
+        if is_fast_threat:
+            # CAS 1 : CONTRE CAVALERIE
+            if dist_threat > 15.0:
+                ratio = 0.2
+            else:
+                ratio = 0.6  # On va chercher l'ennemi à 60% du chemin (Agressif)
+        else:
+            # CAS 2 : CONTRE INFANTERIE
+            ratio = 0.1  # On ne s'avance que de 10% vers l'ennemi (Défensif)
+
+        block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), ratio)
+
+        # --- ACTION ---
+        if unit.dist_to(nearest_threat) < unit.attack_range + 0.5:
+            self._order_attack_opti(unit, nearest_threat)
+        else:
+            if dist_threat < 8.0:
+                unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
+            else:
+                unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
+
+    # --- BACKLINE ---
+    def _micro_skirmisher_counter(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Se place DEVANT les archers. Focus Archers."""
+        # 1. Appétence : CavArcher > Crossbow > Skirmisher
+        priority_targets = self._filter_enemies(enemies, ["cavalryarcher", "crossbowman", "eliteskirmisher"])
+        target = self._get_best_target(unit, priority_targets, enemies)
+
+        # Fuite stratégique si menacé
+        nearest = self._get_nearest(unit, enemies)
+        if nearest:
+            (_, is_critical) = self.is_threatened(unit, nearest)
+            if is_critical:  # On ne fuit que si critique (Skirmisher doit/peut tanker un peu)
+                self._do_kiting_move(unit, enemies, bf)
+                return
+
+        if target:
+            self._order_attack_opti(unit, target)
+
+    def _micro_crossbow_sniper(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Reste loin. Focus Armure Lourde."""
+        # Appétence : Knights, Swordsman
+        heavy_targets = self._filter_enemies(enemies, ["knight", "longswordsman"])
+        target = self._get_best_target(unit, heavy_targets, enemies)
+        nearest = self._get_nearest(unit, enemies)
+        if nearest:
+            (is_threatened, _) = self.is_threatened(unit, nearest)
+            if is_threatened:
+                self._do_kiting_move(unit, enemies, bf)
+                return
+
+        if target:
+            self._order_attack_opti(unit, target)
+
+    def _micro_onager_artillery(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Tir de zone. Sécurité distance min."""
+        # Sécurité Min Range (3m)
+        nearest = self._get_nearest(unit, enemies)
+        if nearest and unit.dist_to(nearest) < 4.0:  # Marge de 1m
+            self._do_kiting_move(unit, nearest, bf)
+            return
+
+        center_mass = self._get_centroid(enemies)  # Vise le tas
+        # On trouve l'ennemi le plus proche du centre de masse
+        best_target = min(enemies, key=lambda e: math.dist(e.position, center_mass))
+
+        self._order_attack_opti(unit, best_target)
+
+    def _micro_scorpion_support(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Comme l'arbalétrier mais fuit plus vite."""
+        nearest = self._get_nearest(unit, enemies)
+        if nearest and unit.dist_to(nearest) < 8.0:  # Très fragile
+            self._do_kiting_move(unit, nearest, bf)
+            return
+
+        target = CombatSystem.choose_nearest_target(unit, enemies, bf)
+        if target:
+            self._order_attack_opti(unit, target)
+
+    # --- FLANKERS ---*
+    def _micro_knight_brawler(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Tape fort. Focus Cavalerie ou Infanterie."""
+        # Appétence : Knights > Infanterie
+        # Évite les béliers (perte de temps)
+        valid_enemies = [e for e in enemies if e.name.lower() != "cappedram"]
+        priorities = self._filter_enemies(valid_enemies, ["knight", "cavalryarcher", "longswordsman"])
+
+        target = self._get_best_target(unit, priorities, valid_enemies)
+        if target:
+            self._order_attack_opti(unit, target)
+
+    def _micro_lightcav_assassin(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Contourne les Piquiers. Focus Siège/Archers."""
+        # 1. Évitement des Piquiers (Champ de potentiel simplifié)
+        pikes = self._filter_enemies(enemies, ["pikeman", "halberdier"])
+        nearest_pike = self._get_nearest(unit, pikes)
+
+        if nearest_pike and unit.dist_to(nearest_pike) < 6.0:
+            # Vecteur de fuite par rapport au piquier
+            self._do_kiting_move(unit, enemies, bf)
+            return
+
+        # 2. Cibles : Siège > Archers
+        targets = self._filter_enemies(enemies, ["onager", "scorpion", "crossbowman", "eliteskirmisher"])
+        target = self._get_best_target(unit, targets, enemies)
+
+        if target:
+            # On utilise move_to si on est loin pour utiliser la vitesse, attack si proche
+            if unit.dist_to(target) > 2.0:
+                unit.current_order = {"type": "move_to", "target": target.position}
+            else:
+                self._order_attack_opti(unit, target)
 
     def _micro_knight_flanker(self, unit: Unit, enemies: list["Unit"], target_pos: tuple, bf: Battlefield):
         # 1. Identifier les Cibles et les Menaces
-        priority_targets = self._filter_enemies(enemies, ["crossbowman"])  # , "skirmisher"
+        valid_enemies = [e for e in enemies if e.name.lower() != "cappedram"]
+        priority_targets = self._filter_enemies(valid_enemies, ["knight", "cavalryarcher", "longswordsman"])
         if not priority_targets:
             self._micro_generic_attack(unit, enemies, bf)
             return
@@ -192,49 +367,22 @@ class GeneralSmart(BaseGeneral):
         else:
             unit.current_order = {"type": "attack_unit", "target": primary_target}
 
-    def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
-        """Logique : S'interposer entre la menace et les protégés."""
-        # 1. CIBLAGE
-        knights = self._filter_enemies(enemies, ["knight"])
-        threats = knights if knights else [e for e in enemies if e.is_alive()]
+    # --- ROAMERS ---
+    def _micro_cavalry_archer_kiter(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Hit & Run avec Fuite Stratégique."""
+        nearest = self._get_nearest(unit, enemies)
 
-        if not threats:
-            unit.current_order = {"type": "attack_move", "target": default_target_pos}
-            return
+        if nearest:
+            (is_threatened, _) = self.is_threatened(unit, nearest)
+            if is_threatened:
+                self._do_kiting_move(unit, enemies, bf)
+                return
 
-        # 2. PROJECTION DU MOUVEMENT
-        dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
-        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 10.0)  # On projette x mètres devant le groupe
+        target = CombatSystem.choose_weakest_target(unit, enemies, bf)
+        if target:
+            self._order_attack_opti(unit, target)
 
-        # 3. INTERCEPTION DE LA MENACE
-        nearest_threat = min(threats, key=lambda e: (e.position[0] - proj_ax) ** 2 + (e.position[1] - proj_ay) ** 2)
-        is_fast_threat = nearest_threat.name.lower() in ["knight"]
-
-        # Calcul du point de blocage
-        dx, dy = self.soustract_vec(nearest_threat.position, (proj_ax, proj_ay))
-        dist_threat = (dx**2 + dy**2) ** 0.5
-
-        # --- LOGIQUE D'INTERCEPTION ---
-        if is_fast_threat:
-            # CAS 1 : CONTRE CAVALERIE
-            if dist_threat > 15.0:
-                ratio = 0.2
-            else:
-                ratio = 0.6  # On va chercher l'ennemi à 60% du chemin (Agressif)
-        else:
-            # CAS 2 : CONTRE INFANTERIE
-            ratio = 0.1  # On ne s'avance que de 10% vers l'ennemi (Défensif)
-
-        block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), ratio)
-
-        # --- ACTION ---
-        if unit.dist_to(nearest_threat) < unit.attack_range + 0.5:
-            self._order_attack_opti(unit, nearest_threat)
-        else:
-            if dist_threat < 8.0:
-                unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
-            else:
-                unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
+    # --- UTILS ---
 
     def _micro_generic_attack(self, unit: Unit, enemies: list["Unit"], bf: Battlefield):
         """
@@ -258,3 +406,9 @@ class GeneralSmart(BaseGeneral):
             return
         else:
             self._order_regroup(unit, bf)
+
+    def _do_kiting_move(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        """Wrapper qui appelle la fonction _fuite_strategique et applique l'ordre."""
+        (mx, my) = self._fuite_strategique(unit, enemies, bf)
+        if (mx, my) != unit.position:
+            unit.current_order = {"type": "move_to", "target": (mx, my)}
