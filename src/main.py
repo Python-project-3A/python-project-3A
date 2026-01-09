@@ -242,7 +242,7 @@ def command_load(args):
     visualizer = None
     if args.gui:
         visualizer = PygameVisualizer(battlefield=simulation.battlefield)
-    else:  # use the terminal visualiser if nothing is passed
+    elif args.terminal:
         visualizer = CLIVisualizer(width, height)
 
     target_tps = 30 if visualizer else 0
@@ -362,6 +362,8 @@ def run_battle(args):
     elif args.terminal:
         with ConsoleInputProvider() as inp:
             sim.run(input_provider=inp, visualizer=visualizer, target_tps=target_tps)
+    else:
+        sim.run(input_provider=None, visualizer=None, target_tps=0)
 
     # Print results
     full_output = bf.print_battle_result()
