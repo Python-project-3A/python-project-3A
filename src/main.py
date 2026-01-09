@@ -2,6 +2,7 @@ import argparse
 import sys
 import time
 import itertools
+import matplotlib.pyplot as plt
 
 from src.cli.cli import CLIVisualizer
 from src.engine.battlefield import Battlefield
@@ -16,6 +17,7 @@ from src.pygame.pygame_input_provider import PygameInputProvider
 from src.engine.input_provider import ConsoleInputProvider
 from src.engine.save_load import save_game, load_game, get_save_dir
 from src.engine.html_snapshot import HTMLSnapshot
+from src.data.scenarios.lanchester import create_lanchester_scenario
 
 
 def parse_args():
@@ -27,6 +29,7 @@ Examples:
   python -m src.main run small_battle daft braindead
   python -m src.main run knights_vs_pikemen smart daft -t
   python -m src.main list
+  python -m src.main plot Pikeman 10 50 5
         """,
     )
 
@@ -61,6 +64,13 @@ Examples:
     tourney_parser.add_argument("-S", "--scenarios", nargs="+", help="Scenarios to use")
     tourney_parser.add_argument("-N", type=int, default=10, help="Number of rounds per matchup")
     tourney_parser.add_argument("-na", action="store_true", help="Don't alternate player positions")
+
+    # --- COMMAND: Lanchester ---
+    plot_parser = subparsers.add_parser("plot", help="Plot Lanchester curves")
+    plot_parser.add_argument("unit_type", type=str, help="Unit type (e.g., Knight)")
+    plot_parser.add_argument("min_n", type=int, help="Start N")
+    plot_parser.add_argument("max_n", type=int, help="End N")
+    plot_parser.add_argument("step", type=int, help="Step size")
 
     return parser.parse_args()
 
@@ -251,6 +261,59 @@ def command_load(args):
     sys.stdout.write(full_output)
     sys.stdout.flush()
 
+def run_lanchester_plot(args):
+    unit_type = args.unit_type
+    n_values = range(args.min_n, args.max_n + 1, args.step)
+    
+    results_n = []
+    results_casualties = [] 
+
+    print(f"Starting Lanchester Plot for {unit_type}...")
+
+    for n in n_values:
+        print(f"Simulating N={n} vs {2*n}...", end="", flush=True)
+        
+        # 3. Génération Dynamique du Scénario
+        scenario_data = create_lanchester_scenario(unit_type, n)
+        
+        # 4. Mise en place du champ du battlefield
+        width = scenario_data["map"]["width"]
+        height = scenario_data["map"]["height"]
+        bf = Battlefield(width, height)
+        
+        ScenarioLoader.spawn_scenario(scenario_data, bf)
+        
+        sim = Simulation(bf.game_map, bf.generals, bf)
+        
+        with ConsoleInputProvider() as inp:
+            sim.run(inp, visualizer=None, target_tps=0, max_ticks=5000)
+            
+        # 6. Collecte des Données (Après la bataille)
+        survivors_p2 = len(bf.units_by_owner(0))
+        survivors_p1 = len(bf.units_by_owner(1))
+        initial_p1 = 2 * n
+        casualties = initial_p1 - survivors_p1
+        
+        results_n.append(n)
+        results_casualties.append(casualties)
+        
+        print(f"nombre de survivants P1: {survivors_p1}")
+        print(f"nombre de survivant P2: {survivors_p2}")
+        print(f" Done. Casualties: {casualties}")
+
+    # 7. Tracé du Graphique (Matplotlib)
+    plt.figure(figsize=(10, 6))
+    
+    plt.plot(results_n, results_casualties, marker='o', linestyle='-', color='b', label=f'{unit_type}')
+    
+    plt.title(f"Lois de Lanchester : {unit_type} (N vs 2N)")
+    plt.xlabel("N (Taille de l'armée perdante)")
+    plt.ylabel("Pertes du Vainqueur (Armée 2N)")
+    plt.grid(True)
+    plt.legend()
+    
+    # Affichage de la fenêtre graphique
+    plt.show()
 
 def run_battle(args):
     """Run a battle scenario"""
@@ -314,6 +377,9 @@ def main():
 
     elif args.command == "run":
         run_battle(args)
+
+    elif args.command == "plot":
+        run_lanchester_plot(args)
 
     elif args.command == "load":
         command_load(args)

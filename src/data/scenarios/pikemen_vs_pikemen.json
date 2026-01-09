@@ -26,7 +26,7 @@
       "units": [
         {
           "type": "Pikeman",
-          "count": 20,
+          "count": 40,
           "formation": "block",
           "start_x": 40,
           "start_y": 15,
