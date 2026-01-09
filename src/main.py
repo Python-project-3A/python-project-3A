@@ -280,13 +280,21 @@ def run_lanchester_plot(args):
         width = scenario_data["map"]["width"]
         height = scenario_data["map"]["height"]
         bf = Battlefield(width, height)
+
+        p1_ai = "daft" 
+        p2_ai = "daft"
         
-        ScenarioLoader.spawn_scenario(scenario_data, bf)
+        bf.generals = [create_general(p1_ai, 0), create_general(p2_ai, 1)]
+        
+        # On passe les overrides au loader au cas où il en a besoin pour l'initialisation
+        overrides = {0: p1_ai, 1: p2_ai}
+        
+        ScenarioLoader.spawn_scenario(scenario_data, bf, overrides)
         
         sim = Simulation(bf.game_map, bf.generals, bf)
         
         with ConsoleInputProvider() as inp:
-            sim.run(inp, visualizer=None, target_tps=0, max_ticks=5000)
+            sim.run(inp, visualizer=None, target_tps=0, max_ticks=10000)
             
         # 6. Collecte des Données (Après la bataille)
         survivors_p2 = len(bf.units_by_owner(0))
