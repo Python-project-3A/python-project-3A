@@ -51,6 +51,12 @@ class ConsoleInputProvider:
         if self.os_type != "nt" and self.old_settings:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
 
+    def is_shift_pressed(self):
+        """
+        Terminal mode doesn't easily detect shift state.
+        """
+        return False
+
     def get_key(self):
         """Renvoie la touche pressée ou None."""
         if self.os_type == "nt":

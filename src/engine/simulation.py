@@ -11,6 +11,9 @@ from .html_snapshot import HTMLSnapshot
 from .save_load import save_game, load_game
 
 
+CAMERA_SPEED_MULTIPLIER = 2
+
+
 class Simulation:
     """
     Boucle de temps du jeu.
@@ -82,7 +85,7 @@ class Simulation:
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         is_gui = isinstance(visualizer, PygameVisualizer)
-        step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
+        base_step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
 
         while self.is_running and self.tick_count < max_ticks:
             loop_start = time.time()
@@ -105,11 +108,11 @@ class Simulation:
                         input_provider.__enter__()
 
                         is_gui = True
-                        step = 20
+                        base_step = 20
                         continue
 
                     if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
-                        step = 2
+                        step = base_step * CAMERA_SPEED_MULTIPLIER if input_provider.is_shift_pressed() else base_step
                         self.direction_key_matching(terminal_key, step, visualizer=visualizer)
 
             # --- GUI INPUTS ---
@@ -131,8 +134,11 @@ class Simulation:
                         input_provider.__enter__()
 
                         is_gui = False
-                        step = 2
+                        base_step = 2
                         continue
+
+                    # Calculate step with shift modifier
+                    step = base_step * CAMERA_SPEED_MULTIPLIER if input_provider.is_shift_pressed() else base_step
 
                     self.direction_key_matching(pygame_key, step, visualizer=visualizer)
                     match pygame_key:
