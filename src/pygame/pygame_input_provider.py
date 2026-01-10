@@ -77,8 +77,8 @@ class PygameInputProvider:
                     return "r"
                 if event.key == pygame.K_TAB:
                     return "tab"
-                if event.key == pygame.K_v:
-                    return "v"
+                if event.key == pygame.K_F9:
+                    return "F9"
                 if event.key == pygame.K_F11:
                     return "F11"
                 if event.key == pygame.K_F12:

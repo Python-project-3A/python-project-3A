@@ -186,7 +186,7 @@ class Simulation:
                 self.game_speed = 1
             case "tab":
                 self.snapshot_utility.save_and_open_html_file(self.tick_count)
-            case "v":
+            case "F9":
                 return "switch_visualizer"
             case "F11":
                 # autoriser d'autres noms de fichier de sauvegarde plus tard
