@@ -1,4 +1,6 @@
 import pygame
+import sys
+import os
 
 
 class PygameInputProvider:
@@ -20,6 +22,24 @@ class PygameInputProvider:
         if self.pygame_initialized:
             pygame.quit()
             self.pygame_initialized = False
+
+            # Restore terminal to normal mode
+            if os.name != "nt":  # Unix-like systems (Linux, macOS)
+                import termios
+                import tty
+
+                try:
+                    # Reset terminal to sane state
+                    fd = sys.stdin.fileno()
+                    # Get current settings
+                    old_settings = termios.tcgetattr(fd)
+                    # Reset to default
+                    tty.setcbreak(fd)
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                    # Also explicitly restore echo
+                    os.system("stty sane")
+                except:
+                    pass
 
     def get_key(self):
         """
@@ -57,6 +77,8 @@ class PygameInputProvider:
                     return "r"
                 if event.key == pygame.K_TAB:
                     return "tab"
+                if event.key == pygame.K_v:
+                    return "v"
                 if event.key == pygame.K_F11:
                     return "F11"
                 if event.key == pygame.K_F12:
