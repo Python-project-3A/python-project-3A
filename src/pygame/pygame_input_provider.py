@@ -1,6 +1,7 @@
 import pygame
 import sys
 import os
+import atexit
 
 
 class PygameInputProvider:
@@ -15,6 +16,13 @@ class PygameInputProvider:
             # Enable key repeat: (delay_ms, interval_ms)
             pygame.key.set_repeat(500, 50)
             self.pygame_initialized = True
+
+        # This cleans up the terminal because pygame sometimes leaves it in a broken state
+        # especially on unix like systems. The terminal no longer shows the characters you type
+        # so we have to reset it with the `stty sane` command
+        if os.name != "nt":
+            atexit.register(lambda: os.system("stty sane"))
+
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -22,24 +30,6 @@ class PygameInputProvider:
         if self.pygame_initialized:
             pygame.quit()
             self.pygame_initialized = False
-
-            # Restore terminal to normal mode
-            if os.name != "nt":  # Unix-like systems (Linux, macOS)
-                import termios
-                import tty
-
-                try:
-                    # Reset terminal to sane state
-                    fd = sys.stdin.fileno()
-                    # Get current settings
-                    old_settings = termios.tcgetattr(fd)
-                    # Reset to default
-                    tty.setcbreak(fd)
-                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-                    # Also explicitly restore echo
-                    os.system("stty sane")
-                except:
-                    pass
 
     def get_key(self):
         """
