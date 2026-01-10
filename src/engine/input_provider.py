@@ -20,6 +20,7 @@ WINDOWS_F11_CODE = b"\x85"
 WINDOWS_F12_CODE = b"\x86"
 
 # Séquences XTERM/Linux
+UNIX_F9_SEQUENCE = "\x1b[20~"
 UNIX_F11_SEQUENCE = "\x1b[23~"
 UNIX_F12_SEQUENCE = "\x1b[24~"
 
@@ -108,6 +109,8 @@ class ConsoleInputProvider:
 
                     sequence = char + rest
 
+                    if sequence == UNIX_F9_SEQUENCE:
+                        return "F9"
                     if sequence == UNIX_F11_SEQUENCE:
                         return "F11"
                     elif sequence == UNIX_F12_SEQUENCE:

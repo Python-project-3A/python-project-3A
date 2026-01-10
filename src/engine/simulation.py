@@ -5,6 +5,7 @@ from src.cli.cli import CLIVisualizer
 from src.map.game_map import GameMap
 from src.pygame.pygame_visualizer import PygameVisualizer
 from src.pygame.pygame_input_provider import PygameInputProvider
+from src.engine.input_provider import ConsoleInputProvider
 from .system import UnitController
 from .html_snapshot import HTMLSnapshot
 from .save_load import save_game, load_game
@@ -90,7 +91,22 @@ class Simulation:
             if not is_gui:
                 if input_provider:
                     terminal_key = input_provider.get_key()
-                    self.base_key_matching(terminal_key)
+                    switch_signal = self.base_key_matching(terminal_key)
+
+                    if switch_signal == "switch_visualizer":
+                        if visualizer:
+                            visualizer.finish()
+                        if input_provider:
+                            input_provider.__exit__(None, None, None)
+
+                        # Switch to GUI
+                        visualizer = PygameVisualizer(battlefield=self.battlefield)
+                        input_provider = PygameInputProvider()
+                        input_provider.__enter__()
+
+                        is_gui = True
+                        step = 20
+                        continue
 
                     if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
                         step = 2
@@ -100,7 +116,24 @@ class Simulation:
             if is_gui:
                 if input_provider:
                     pygame_key = input_provider.get_key()
-                    self.base_key_matching(pygame_key)
+                    switch_signal = self.base_key_matching(pygame_key)
+
+                    if switch_signal == "switch_visualizer":
+                        # Clean up current visualizer
+                        if visualizer:
+                            visualizer.finish()
+                        if input_provider:
+                            input_provider.__exit__(None, None, None)
+
+                        # Switch to CLI
+                        visualizer = CLIVisualizer(self.battlefield.width, self.battlefield.height)
+                        input_provider = ConsoleInputProvider()
+                        input_provider.__enter__()
+
+                        is_gui = False
+                        step = 2
+                        continue
+
                     self.direction_key_matching(pygame_key, step, visualizer=visualizer)
                     match pygame_key:
                         case "zoom_in":
@@ -153,6 +186,8 @@ class Simulation:
                 self.game_speed = 1
             case "tab":
                 self.snapshot_utility.save_and_open_html_file(self.tick_count)
+            case "F9":
+                return "switch_visualizer"
             case "F11":
                 # autoriser d'autres noms de fichier de sauvegarde plus tard
                 save_game(self)

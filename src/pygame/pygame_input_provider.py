@@ -1,4 +1,7 @@
 import pygame
+import sys
+import os
+import atexit
 
 
 class PygameInputProvider:
@@ -13,6 +16,13 @@ class PygameInputProvider:
             # Enable key repeat: (delay_ms, interval_ms)
             pygame.key.set_repeat(500, 50)
             self.pygame_initialized = True
+
+        # This cleans up the terminal because pygame sometimes leaves it in a broken state
+        # especially on unix like systems. The terminal no longer shows the characters you type
+        # so we have to reset it with the `stty sane` command
+        if os.name != "nt":
+            atexit.register(lambda: os.system("stty sane"))
+
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -57,6 +67,8 @@ class PygameInputProvider:
                     return "r"
                 if event.key == pygame.K_TAB:
                     return "tab"
+                if event.key == pygame.K_F9:
+                    return "F9"
                 if event.key == pygame.K_F11:
                     return "F11"
                 if event.key == pygame.K_F12:

@@ -141,3 +141,9 @@ class CLIVisualizer:
         sys.stdout.flush()
 
         self.lines_printed = len(lines) + 1  # +1 pour le dernier \n
+
+    def finish(self):
+        """
+        Cleans up the CLI visualizer.
+        """
+        print("\nCLI Visualizer shutting down.")
