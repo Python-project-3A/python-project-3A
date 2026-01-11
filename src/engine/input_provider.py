@@ -1,4 +1,3 @@
-# src/utils/input_provider.py
 import sys
 import os
 
@@ -16,6 +15,7 @@ else:
 
 # Codes des touches F11 et F12 pour différents environnements
 # MSVCRT (Windows)
+WINDOWS_F9_CODE = b"\x83"
 WINDOWS_F11_CODE = b"\x85"
 WINDOWS_F12_CODE = b"\x86"
 
@@ -34,6 +34,7 @@ class ConsoleInputProvider:
     def __init__(self):
         self.os_type = os.name
         self.old_settings = None
+        self.last_key_was_shifted = False  # Track if last key press had shift
 
     def __enter__(self):
         """Appelé quand on fait 'with provider:'"""
@@ -51,8 +52,17 @@ class ConsoleInputProvider:
         if self.os_type != "nt" and self.old_settings:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
 
+    def is_shift_pressed(self):
+        """
+        Terminal mode doesn't easily detect shift state.
+        """
+        return self.last_key_was_shifted
+
     def get_key(self):
         """Renvoie la touche pressée ou None."""
+        # Reset shift state by default
+        self.last_key_was_shifted = False
+
         if self.os_type == "nt":
             if msvcrt.kbhit():
                 key = msvcrt.getch()
@@ -62,6 +72,8 @@ class ConsoleInputProvider:
                     # Lire le deuxième octet (le code étendu)
                     extended_key = msvcrt.getch()
 
+                    if extended_key == WINDOWS_F9_CODE:
+                        return "F9"
                     if extended_key == WINDOWS_F11_CODE:
                         return "F11"
                     if extended_key == WINDOWS_F12_CODE:
@@ -75,7 +87,13 @@ class ConsoleInputProvider:
                         # Ajout : Gérer la touche ESC sur Windows si elle est lue comme un caractère simple
                         if key == b"\x1b":
                             return "escape"
-                        return key.decode().lower()
+                        decoded = key.decode()
+
+                        # Check if uppercase letter (indicates Shift was pressed)
+                        if decoded.isupper() and decoded.isalpha():
+                            self.last_key_was_shifted = True
+
+                        return decoded.lower()
                     except UnicodeDecodeError:
                         return None
             return None
@@ -120,6 +138,10 @@ class ConsoleInputProvider:
 
                     # Autres séquences ignorées
                     return None
+
+                # Caractère simple - check if uppercase (Shift pressed)
+                if char.isupper() and char.isalpha():
+                    self.last_key_was_shifted = True
 
                 # Caractère simple
                 return char.lower()

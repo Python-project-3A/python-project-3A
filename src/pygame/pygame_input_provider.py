@@ -31,6 +31,13 @@ class PygameInputProvider:
             pygame.quit()
             self.pygame_initialized = False
 
+    def is_shift_pressed(self):
+        """
+        Check if either shift key is currently pressed.
+        """
+        keys = pygame.key.get_pressed()
+        return keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+
     def get_key(self):
         """
         Processes Pygame events to get user input.
