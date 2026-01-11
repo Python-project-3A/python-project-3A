@@ -126,7 +126,7 @@ class PygameVisualizer:
         w, h = self.grass_source.get_size()
         new_w = int(w * self.scale_factor)
         new_h = int(h * self.scale_factor)
-        
+
         # Ensure at least 1x1
         new_w = max(1, new_w)
         new_h = max(1, new_h)
@@ -187,20 +187,51 @@ class PygameVisualizer:
         Draws the large tiled grass texture that covers everything.
         No distinction between background and ground - it's all one seamless texture.
         """
-        if self.scaled_grass:
-            tile_w = self.scaled_grass.get_width()
-            tile_h = self.scaled_grass.get_height()
-            
-            # Calculate offset to keep texture pinned to world space
-            start_x = int(self.camera_offset_x) % tile_w
-            start_y = int(self.camera_offset_y) % tile_h
-            
-            for x in range(start_x - tile_w, self.screen_width, tile_w):
-                for y in range(start_y - tile_h, self.screen_height, tile_h):
-                    self.screen.blit(self.scaled_grass, (x, y))
-        else:
-            # Fallback if texture didn't load
-            self.screen.fill(self.colors["ground_fallback"])
+        self.screen.fill((0, 0, 0))  # Fill the "void" with black
+
+    def _draw_ground(self):
+        """
+        Draws the tiled grass texture ONLY within the isometric battlefield boundaries.
+        """
+        if not self.scaled_grass:
+            return
+
+        # 1. Define the battlefield corner points in screen coordinates
+        corners = [self.world_to_screen(0, 0), self.world_to_screen(self.battlefield.width, 0), self.world_to_screen(self.battlefield.width, self.battlefield.height), self.world_to_screen(0, self.battlefield.height)]
+
+        # 2. Create a clipping region for the diamond shape
+        # We use a polygon mask to ensure grass doesn't bleed into the black void
+        tile_w = self.scaled_grass.get_width()
+        tile_h = self.scaled_grass.get_height()
+
+        # Calculate bounding box of the diamond to optimize tiling loops
+        min_x = min(p[0] for p in corners)
+        max_x = max(p[0] for p in corners)
+        min_y = min(p[1] for p in corners)
+        max_y = max(p[1] for p in corners)
+
+        # We create a temporary surface to act as a mask
+        mask_surf = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        pygame.draw.polygon(mask_surf, (255, 255, 255, 255), corners)
+
+        # Calculate offset to keep texture pinned to world space
+        offset_x = int(self.camera_offset_x) % tile_w
+        offset_y = int(self.camera_offset_y) % tile_h
+
+        # Tile only within the bounding box of the battlefield
+        for x in range(int(min_x // tile_w * tile_w) + offset_x - tile_w, int(max_x) + tile_w, tile_w):
+            for y in range(int(min_y // tile_h * tile_h) + offset_y - tile_h, int(max_y) + tile_h, tile_h):
+                self.screen.blit(self.scaled_grass, (x, y))
+
+        # Black out everything outside the diamond (the "void")
+        # We do this by creating a surface with a hole in it
+        void_mask = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        void_mask.fill((0, 0, 0, 255))
+        pygame.draw.polygon(void_mask, (0, 0, 0, 0), corners)  # Cut the diamond out
+        self.screen.blit(void_mask, (0, 0))
+
+        # Optional: Draw a subtle border around the map
+        pygame.draw.polygon(self.screen, (50, 50, 50), corners, 2)
 
     def world_to_minimap(self, world_x: float, world_y: float, left: tuple[float, float], top: tuple[float, float], diamond_width: int, diamond_height: int):
         # Normalize world coordinates (0 to 1)
@@ -410,6 +441,7 @@ class PygameVisualizer:
         5. Updates the display.
         """
         self._draw_background()
+        self._draw_ground()
 
         # --- Y-SORTING (PAINTER'S ALGORITHM) ---
         # Get all units and sort them by their world Y-coordinate.
