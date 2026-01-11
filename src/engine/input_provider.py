@@ -15,6 +15,7 @@ else:
 
 # Codes des touches F11 et F12 pour différents environnements
 # MSVCRT (Windows)
+WINDOWS_F9_CODE = b"\x83"
 WINDOWS_F11_CODE = b"\x85"
 WINDOWS_F12_CODE = b"\x86"
 
@@ -71,6 +72,8 @@ class ConsoleInputProvider:
                     # Lire le deuxième octet (le code étendu)
                     extended_key = msvcrt.getch()
 
+                    if extended_key == WINDOWS_F9_CODE:
+                        return "F9"
                     if extended_key == WINDOWS_F11_CODE:
                         return "F11"
                     if extended_key == WINDOWS_F12_CODE:
