@@ -15,7 +15,8 @@ else:
 
 # Codes des touches F11 et F12 pour différents environnements
 # MSVCRT (Windows)
-WINDOWS_F9_CODE = b"\x83"
+WINDOWS_PREFIXES = (b"\x00", b"\xe0")
+WINDOWS_F9_CODE = b"\x43"
 WINDOWS_F11_CODE = b"\x85"
 WINDOWS_F12_CODE = b"\x86"
 
@@ -68,7 +69,7 @@ class ConsoleInputProvider:
                 key = msvcrt.getch()
 
                 # \x00 (0) ou \xe0 (224) indiquent le début d'une touche spéciale
-                if key in (b"\x00", b"\xe0"):
+                if key in WINDOWS_PREFIXES:
                     # Lire le deuxième octet (le code étendu)
                     extended_key = msvcrt.getch()
 
