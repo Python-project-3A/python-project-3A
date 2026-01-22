@@ -126,7 +126,7 @@ class PygameVisualizer:
         w, h = self.grass_source.get_size()
         new_w = int(w * self.scale_factor)
         new_h = int(h * self.scale_factor)
-        
+
         # Ensure at least 1x1
         new_w = max(1, new_w)
         new_h = max(1, new_h)
@@ -187,20 +187,51 @@ class PygameVisualizer:
         Draws the large tiled grass texture that covers everything.
         No distinction between background and ground - it's all one seamless texture.
         """
-        if self.scaled_grass:
-            tile_w = self.scaled_grass.get_width()
-            tile_h = self.scaled_grass.get_height()
-            
-            # Calculate offset to keep texture pinned to world space
-            start_x = int(self.camera_offset_x) % tile_w
-            start_y = int(self.camera_offset_y) % tile_h
-            
-            for x in range(start_x - tile_w, self.screen_width, tile_w):
-                for y in range(start_y - tile_h, self.screen_height, tile_h):
-                    self.screen.blit(self.scaled_grass, (x, y))
-        else:
-            # Fallback if texture didn't load
-            self.screen.fill(self.colors["ground_fallback"])
+        self.screen.fill((0, 0, 0))  # Fill the "void" with black
+
+    def _draw_ground(self):
+        """
+        Draws the tiled grass texture ONLY within the isometric battlefield boundaries.
+        """
+        if not self.scaled_grass:
+            return
+
+        # 1. Define the battlefield corner points in screen coordinates
+        corners = [self.world_to_screen(0, 0), self.world_to_screen(self.battlefield.width, 0), self.world_to_screen(self.battlefield.width, self.battlefield.height), self.world_to_screen(0, self.battlefield.height)]
+
+        # 2. Create a clipping region for the diamond shape
+        # We use a polygon mask to ensure grass doesn't bleed into the black void
+        tile_w = self.scaled_grass.get_width()
+        tile_h = self.scaled_grass.get_height()
+
+        # Calculate bounding box of the diamond to optimize tiling loops
+        min_x = min(p[0] for p in corners)
+        max_x = max(p[0] for p in corners)
+        min_y = min(p[1] for p in corners)
+        max_y = max(p[1] for p in corners)
+
+        # We create a temporary surface to act as a mask
+        mask_surf = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        pygame.draw.polygon(mask_surf, (255, 255, 255, 255), corners)
+
+        # Calculate offset to keep texture pinned to world space
+        offset_x = int(self.camera_offset_x) % tile_w
+        offset_y = int(self.camera_offset_y) % tile_h
+
+        # Tile only within the bounding box of the battlefield
+        for x in range(int(min_x // tile_w * tile_w) + offset_x - tile_w, int(max_x) + tile_w, tile_w):
+            for y in range(int(min_y // tile_h * tile_h) + offset_y - tile_h, int(max_y) + tile_h, tile_h):
+                self.screen.blit(self.scaled_grass, (x, y))
+
+        # Black out everything outside the diamond (the "void")
+        # We do this by creating a surface with a hole in it
+        void_mask = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        void_mask.fill((0, 0, 0, 255))
+        pygame.draw.polygon(void_mask, (0, 0, 0, 0), corners)  # Cut the diamond out
+        self.screen.blit(void_mask, (0, 0))
+
+        # Optional: Draw a subtle border around the map
+        pygame.draw.polygon(self.screen, (50, 50, 50), corners, 2)
 
     def world_to_minimap(self, world_x: float, world_y: float, left: tuple[float, float], top: tuple[float, float], diamond_width: int, diamond_height: int):
         # Normalize world coordinates (0 to 1)
@@ -400,6 +431,97 @@ class PygameVisualizer:
         # Border of HP bar
         pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
+    def _draw_game_over(self):
+        # Darken the battlefield
+        overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        self.screen.blit(overlay, (0, 0))
+
+        # Results Box (Main Parchment Container)
+        w, h = 800, 520
+        x, y = (self.screen_width - w) // 2, (self.screen_height - h) // 2
+        pygame.draw.rect(self.screen, (30, 30, 30), (x, y, w, h), border_radius=12)
+        pygame.draw.rect(self.screen, (201, 152, 104), (x, y, w, h), 3, border_radius=12)
+
+        # Title
+        title_font = pygame.font.SysFont("Inter", 40, bold=True)
+        title_surf = title_font.render("BATTLE SUMMARY", True, (201, 152, 104))
+        self.screen.blit(title_surf, (x + (w - title_surf.get_width()) // 2, y + 30))
+
+        # Data processing
+        survivors = {0: [], 1: []}
+        for u in self.battlefield.get_all_units():
+            if u.is_alive():
+                survivors[u.owner].append(u)
+
+        # Draw Centered Columns with Borders
+        center_x = x + w // 2
+        col_width = 280
+        col_height = 220
+        spacing = 30
+
+        for p_id in [0, 1]:
+            color = self.colors[p_id]
+            gen = self.battlefield.generals[p_id]
+            units = survivors[p_id]
+            hp = sum(u.hp for u in units)
+
+            # Position the column box
+            if p_id == 0:
+                col_x = center_x - col_width - spacing
+            else:
+                col_x = center_x + spacing
+
+            col_y = y + 100
+
+            # Fill the column background slightly differently to pop
+            pygame.draw.rect(self.screen, (40, 40, 40), (col_x, col_y, col_width, col_height), border_radius=8)
+            # Draw the colored border (2px thickness)
+            pygame.draw.rect(self.screen, color, (col_x, col_y, col_width, col_height), 2, border_radius=8)
+
+            # Text positions inside the column
+            text_x = col_x + 20
+            curr_y = col_y + 20
+
+            # Header
+            header_surf = self.font.render(f"{gen.name}", True, color)
+            self.screen.blit(header_surf, (text_x, curr_y))
+            curr_y += 60
+
+            # Stats
+            stat_font = pygame.font.SysFont("Inter", 22, bold=True)
+            lines = [f"Survivors: {len(units)}", f"Total HP: {hp:.1f}", f"Avg HP: {(hp / len(units)) if units else 0.0:.1f}"]
+            for line in lines:
+                self.screen.blit(stat_font.render(line, True, (220, 220, 220)), (text_x, curr_y))
+                curr_y += 40
+
+        # Split-Color Victory Banner (centered below columns)
+        banner_font = pygame.font.SysFont("Inter", 38, bold=True)
+
+        if len(survivors[0]) > 0 and len(survivors[1]) == 0:
+            prefix, winner_name, winner_color = "VICTORY FOR ", self.battlefield.generals[0].name.upper(), self.colors[0]
+        elif len(survivors[1]) > 0 and len(survivors[0]) == 0:
+            prefix, winner_name, winner_color = "VICTORY FOR ", self.battlefield.generals[1].name.upper(), self.colors[1]
+        else:
+            prefix, winner_name, winner_color = "DRAW - MUTUAL DESTRUCTION", "", (255, 255, 255)
+
+        prefix_surf = banner_font.render(prefix, True, (255, 255, 255))
+        winner_surf = banner_font.render(winner_name, True, winner_color)
+        excl_surf = banner_font.render("!", True, (255, 255, 255))
+
+        total_msg_width = prefix_surf.get_width() + winner_surf.get_width() + (excl_surf.get_width() if winner_name else 0)
+        msg_x = x + (w - total_msg_width) // 2
+        msg_y = y + h - 130
+
+        self.screen.blit(prefix_surf, (msg_x, msg_y))
+        self.screen.blit(winner_surf, (msg_x + prefix_surf.get_width(), msg_y))
+        if winner_name:
+            self.screen.blit(excl_surf, (msg_x + prefix_surf.get_width() + winner_surf.get_width(), msg_y))
+
+        # Bottom Hint
+        hint_surf = pygame.font.SysFont("Inter", 18).render("PRESS ESCAPE TO EXIT", True, (120, 120, 120))
+        self.screen.blit(hint_surf, (x + (w - hint_surf.get_width()) // 2, y + h - 45))
+
     def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False):
         """
         Renders the entire scene.
@@ -410,6 +532,7 @@ class PygameVisualizer:
         5. Updates the display.
         """
         self._draw_background()
+        self._draw_ground()
 
         # --- Y-SORTING (PAINTER'S ALGORITHM) ---
         # Get all units and sort them by their world Y-coordinate.
@@ -431,6 +554,10 @@ class PygameVisualizer:
 
         tick_text = self.font.render(status_str, True, (255, 255, 255))
         self.screen.blit(tick_text, (10, 10))
+
+        # we draw the game over screen if the battle is over
+        if battlefield.is_battle_over():
+            self._draw_game_over()
 
         pygame.display.flip()
 
