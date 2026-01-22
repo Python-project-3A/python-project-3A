@@ -36,7 +36,13 @@ class PygameVisualizer:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Age of Empires 2 - Simulation")
 
+        # game perf stats
+        self.show_perf_stats = True
+
         self.font = pygame.font.SysFont("Inter", 28)
+        # monospace font for stats to avoid jittery effect
+        self.mono_font = pygame.font.SysFont("Consolas", 24, bold=True)
+
         self.colors = {
             0: (50, 50, 255),  # Blue for Player 0
             1: (255, 50, 50),  # Red for Player 1
@@ -548,12 +554,25 @@ class PygameVisualizer:
         self._draw_minimap(battlefield)
 
         # Display status text
-        status_str = f"Tick: {tick_count} | Speed: x{speed:.1f}"
-        if paused:
-            status_str += " [PAUSED]"
+        if self.show_perf_stats:
+            panel_w = 380
+            panel_h = 30
+            panel_rect = pygame.Rect(15, 1, panel_w, panel_h)
 
-        tick_text = self.font.render(status_str, True, (255, 255, 255))
-        self.screen.blit(tick_text, (10, 10))
+            # Draw the panel (Dark background + Parchment border)
+            pygame.draw.rect(self.screen, (20, 20, 20, 200), panel_rect, border_radius=5)
+            pygame.draw.rect(self.screen, (201, 152, 104), panel_rect, 1, border_radius=5)
+
+            status_str = f"Tick: {str(tick_count).zfill(5)} | Speed: x{speed:.1f}"
+            if paused:
+                status_str += " [PAUSED]"
+
+            text_surf = self.mono_font.render(status_str, True, (255, 255, 255))
+
+            # Center the text INSIDE the fixed panel
+            text_rect = text_surf.get_rect(center=panel_rect.center)
+
+            self.screen.blit(text_surf, text_rect)
 
         # we draw the game over screen if the battle is over
         if battlefield.is_battle_over():

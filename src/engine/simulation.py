@@ -156,6 +156,8 @@ class Simulation:
                             visualizer.zoom(1)
                         case "zoom_out":
                             visualizer.zoom(-1)
+                        case "F1":
+                            visualizer.show_perf_stats = not visualizer.show_perf_stats
 
                     if hasattr(input_provider, "get_camera_drag"):
                         drag_dx, drag_dy = input_provider.get_camera_drag()
