@@ -432,64 +432,95 @@ class PygameVisualizer:
         pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
     def _draw_game_over(self):
-        # 1. Darken the battlefield
+        # Darken the battlefield
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 160))
         self.screen.blit(overlay, (0, 0))
 
-        # 2. Results Box (Parchment style)
-        w, h = 700, 450
+        # Results Box (Main Parchment Container)
+        w, h = 800, 520
         x, y = (self.screen_width - w) // 2, (self.screen_height - h) // 2
         pygame.draw.rect(self.screen, (30, 30, 30), (x, y, w, h), border_radius=12)
         pygame.draw.rect(self.screen, (201, 152, 104), (x, y, w, h), 3, border_radius=12)
 
-        # 3. Title
+        # Title
         title_font = pygame.font.SysFont("Inter", 40, bold=True)
         title_surf = title_font.render("BATTLE SUMMARY", True, (201, 152, 104))
-        self.screen.blit(title_surf, (x + (w - title_surf.get_width()) // 2, y + 25))
+        self.screen.blit(title_surf, (x + (w - title_surf.get_width()) // 2, y + 30))
 
-        # 4. Process Data
+        # Data processing
         survivors = {0: [], 1: []}
         for u in self.battlefield.get_all_units():
             if u.is_alive():
                 survivors[u.owner].append(u)
 
-        # 5. Draw Columns for Player 0 and Player 1
+        # Draw Centered Columns with Borders
+        center_x = x + w // 2
+        col_width = 280
+        col_height = 220
+        spacing = 30
+
         for p_id in [0, 1]:
             color = self.colors[p_id]
             gen = self.battlefield.generals[p_id]
             units = survivors[p_id]
             hp = sum(u.hp for u in units)
 
-            start_x = x + 60 if p_id == 0 else x + 380
-            curr_y = y + 100
+            # Position the column box
+            if p_id == 0:
+                col_x = center_x - col_width - spacing
+            else:
+                col_x = center_x + spacing
 
-            # Name & Team
-            self.screen.blit(self.font.render(f"{gen.name}", True, color), (start_x, curr_y))
-            curr_y += 45
+            col_y = y + 100
 
-            # Stats lines
-            stat_font = pygame.font.SysFont("Inter", 22)
-            lines = [f"Survivors: {len(units)}", f"Total HP: {hp:.1f}", f"Avg HP: {(hp / len(units)) if units else 0:.1f}"]
+            # Fill the column background slightly differently to pop
+            pygame.draw.rect(self.screen, (40, 40, 40), (col_x, col_y, col_width, col_height), border_radius=8)
+            # Draw the colored border (2px thickness)
+            pygame.draw.rect(self.screen, color, (col_x, col_y, col_width, col_height), 2, border_radius=8)
+
+            # Text positions inside the column
+            text_x = col_x + 20
+            curr_y = col_y + 20
+
+            # Header
+            header_surf = self.font.render(f"{gen.name}", True, color)
+            self.screen.blit(header_surf, (text_x, curr_y))
+            curr_y += 60
+
+            # Stats
+            stat_font = pygame.font.SysFont("Inter", 22, bold=True)
+            lines = [f"Survivors: {len(units)}", f"Total HP: {hp:.1f}", f"Avg HP: {(hp / len(units)) if units else 0.0:.1f}"]
             for line in lines:
-                self.screen.blit(stat_font.render(line, True, (200, 200, 200)), (start_x + 10, curr_y))
-                curr_y += 35
+                self.screen.blit(stat_font.render(line, True, (220, 220, 220)), (text_x, curr_y))
+                curr_y += 40
 
-        # 6. Victory Banner
-        banner_font = pygame.font.SysFont("Inter", 32, bold=True)
+        # Split-Color Victory Banner (centered below columns)
+        banner_font = pygame.font.SysFont("Inter", 38, bold=True)
+
         if len(survivors[0]) > 0 and len(survivors[1]) == 0:
-            msg, m_color = f"VICTORY FOR {self.battlefield.generals[0].name.upper()}!", self.colors[0]
+            prefix, winner_name, winner_color = "VICTORY FOR ", self.battlefield.generals[0].name.upper(), self.colors[0]
         elif len(survivors[1]) > 0 and len(survivors[0]) == 0:
-            msg, m_color = f"VICTORY FOR {self.battlefield.generals[1].name.upper()}!", self.colors[1]
+            prefix, winner_name, winner_color = "VICTORY FOR ", self.battlefield.generals[1].name.upper(), self.colors[1]
         else:
-            msg, m_color = "DRAW - MUTUAL DESTRUCTION", (255, 215, 0)
+            prefix, winner_name, winner_color = "DRAW - MUTUAL DESTRUCTION", "", (255, 255, 255)
 
-        msg_surf = banner_font.render(msg, True, m_color)
-        self.screen.blit(msg_surf, (x + (w - msg_surf.get_width()) // 2, y + h - 110))
+        prefix_surf = banner_font.render(prefix, True, (255, 255, 255))
+        winner_surf = banner_font.render(winner_name, True, winner_color)
+        excl_surf = banner_font.render("!", True, (255, 255, 255))
 
-        # 7. Exit instruction
-        exit_surf = pygame.font.SysFont("Inter", 18).render("PRESS ESCAPE TO EXIT", True, (100, 100, 100))
-        self.screen.blit(exit_surf, (x + (w - exit_surf.get_width()) // 2, y + h - 40))
+        total_msg_width = prefix_surf.get_width() + winner_surf.get_width() + (excl_surf.get_width() if winner_name else 0)
+        msg_x = x + (w - total_msg_width) // 2
+        msg_y = y + h - 130
+
+        self.screen.blit(prefix_surf, (msg_x, msg_y))
+        self.screen.blit(winner_surf, (msg_x + prefix_surf.get_width(), msg_y))
+        if winner_name:
+            self.screen.blit(excl_surf, (msg_x + prefix_surf.get_width() + winner_surf.get_width(), msg_y))
+
+        # Bottom Hint
+        hint_surf = pygame.font.SysFont("Inter", 18).render("PRESS ESCAPE TO EXIT", True, (120, 120, 120))
+        self.screen.blit(hint_surf, (x + (w - hint_surf.get_width()) // 2, y + h - 45))
 
     def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False):
         """
