@@ -194,10 +194,11 @@ class Simulation:
                 self.snapshot_utility.save_and_open_html_file(self.tick_count)
             case "F9":
                 return "switch_visualizer"
-            case "F11":
+            case "F11" | "k":
                 # autoriser d'autres noms de fichier de sauvegarde plus tard
                 save_game(self)
-            case "F12":
+                # print("\n[GAME SAVED]")
+            case "F12" | "l":
                 # Quick Load
                 try:
                     # Remplacer la simulation actuelle par la version chargée
