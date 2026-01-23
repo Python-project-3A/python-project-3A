@@ -288,6 +288,11 @@ class CombatSystem:
         # 5. FORMULE FINALE & ARRONDIS
         final_damage_float = raw_damage * elevation_mult * accuracy_mult
 
+        if attacker.name.lower() == "crossbowman":
+            # If the battlefield or simulation has a visualizer attached
+            if hasattr(battlefield, "visual_callback") and battlefield.visual_callback:
+                battlefield.visual_callback(attacker, defender)
+
         final_damage = int(max(1, round(final_damage_float)))  # "The minimum damage done in one hit is 1"
 
         # 6. APPLICATION (Résolution Simultanée)

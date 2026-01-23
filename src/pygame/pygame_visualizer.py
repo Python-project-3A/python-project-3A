@@ -1,9 +1,10 @@
 from screeninfo import get_monitors
 from pathlib import Path
 from src.units.unit_base import Unit
-
+from .visual_projectile import VisualProjectile
+from math import atan2, sin, cos
 import pygame
-
+from collections.abc import MutableSequence
 from src.engine.battlefield import Battlefield
 
 
@@ -48,6 +49,10 @@ class PygameVisualizer:
             1: (255, 50, 50),  # Red for Player 1
             "ground_fallback": (107, 142, 35),  # Olive Drab for the ground
         }
+
+        self.projectiles: MutableSequence[VisualProjectile] = []
+        # Register the callback in the battlefield so the CombatSystem can find it
+        self.battlefield.visual_callback = self.spawn_projectile
 
         # Minimap settings
         self.minimap_size = 200
@@ -448,6 +453,33 @@ class PygameVisualizer:
         # Border of HP bar
         pygame.draw.rect(self.screen, (0, 0, 0), (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), int(1 * self.scale_factor) or 1)
 
+    def spawn_projectile(self, attacker, target):
+        """Callback function triggered by CombatSystem."""
+        new_arrow = VisualProjectile(attacker.position, target)
+        self.projectiles.append(new_arrow)
+
+    def _draw_projectiles(self):
+        """Draws arrows as small black lines."""
+        for p in self.projectiles[:]:
+            p.update()
+            if not p.is_active:
+                self.projectiles.remove(p)
+                continue
+
+            # Convert World to Screen
+            start_x, start_y = self.world_to_screen(p.current_pos[0], p.current_pos[1])
+
+            # Draw a simple line pointing toward target
+            target_x, target_y = self.world_to_screen(p.target_unit.position[0], p.target_unit.position[1])
+
+            # Simple rotation logic for the arrow line
+            angle = atan2(target_y - start_y, target_x - start_x)
+            length = 10 * self.scale_factor
+            end_x = start_x + cos(angle) * length
+            end_y = start_y + sin(angle) * length
+
+            pygame.draw.line(self.screen, (20, 20, 20), (start_x, start_y), (end_x, end_y), 2)
+
     def _draw_game_over(self):
         # Darken the battlefield
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
@@ -560,6 +592,9 @@ class PygameVisualizer:
         for unit in sorted_units:
             if unit.is_alive():
                 self._draw_unit(unit)
+
+        # Draw the projectiles after units
+        self._draw_projectiles()
 
         # Draw minimap
         self._draw_minimap(battlefield)
