@@ -113,7 +113,18 @@ class PygameVisualizer:
         self.grass_source = self.load_img("aoe-empty-map.png")
 
         # Load unit sprites
-        self.unit_sprites = {"knight": self.load_img("knight.png"), "crossbowman": self.load_img("crossbowman.png"), "pikeman": self.load_img("pikeman.png")}
+        self.unit_sprites = {
+            "knight": self.load_img("knight.png"),
+            "crossbowman": self.load_img("crossbowman.png"),
+            "pikeman": self.load_img("pikeman.png"),
+            "onager": self.load_img("onager.png"),
+            "cappedram": self.load_img("cappedram.png"),
+            "cavalryarcher": self.load_img("cavalry-archer.png"),
+            "eliteskirmisher": self.load_img("elite-skirmisher.png"),
+            "lightcavalry": self.load_img("light-cavalry.png"),
+            "longswordsman": self.load_img("long-swordsman.png"),
+            "scorpion": self.load_img("scorpion.png"),
+        }
 
         # Track unit HP to detect damage (for flash effect)
         self.unit_hp_tracker = {}
