@@ -5,9 +5,13 @@ from src.cli.cli import CLIVisualizer
 from src.map.game_map import GameMap
 from src.pygame.pygame_visualizer import PygameVisualizer
 from src.pygame.pygame_input_provider import PygameInputProvider
+from src.engine.input_provider import ConsoleInputProvider
 from .system import UnitController
 from .html_snapshot import HTMLSnapshot
 from .save_load import save_game, load_game
+
+
+CAMERA_SPEED_MULTIPLIER = 2
 
 
 class Simulation:
@@ -31,6 +35,10 @@ class Simulation:
 
     def tick(self, dt):
         """Exécute un tick unique."""
+
+        if self.battlefield.is_battle_over():
+            return
+
         self.tick_count += 1
 
         # 1. Les généraux réfléchissent
@@ -61,11 +69,17 @@ class Simulation:
 
         # 5. Fin de bataille
         if self.battlefield.is_battle_over():
-            self.is_running = False
+            # If we are in GUI mode, we keep the loop alive to show the Game Over screen.
+            # If we are in CLI/Headless mode, we exit immediately.
+            is_gui = isinstance(getattr(self, "visualizer", None), PygameVisualizer)
+
+            if not is_gui:
+                self.is_running = False
 
     def run(self, input_provider, target_tps=30, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
+        self.visualizer = visualizer
 
         # LIMITEUR DE VITESSE (SLEEP)
         tick_duration = 1.0 / target_tps if target_tps > 0 else 0  # Si target_tps = 0 (Tournoi), on ne dort jamais (min_frame_duration = 0).Sinon, on dort pour respecter le rythme (ex: 1/30s)
@@ -81,7 +95,7 @@ class Simulation:
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         is_gui = isinstance(visualizer, PygameVisualizer)
-        step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
+        base_step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
 
         while self.is_running and self.tick_count < max_ticks:
             loop_start = time.time()
@@ -90,23 +104,60 @@ class Simulation:
             if not is_gui:
                 if input_provider:
                     terminal_key = input_provider.get_key()
-                    self.base_key_matching(terminal_key)
+                    switch_signal = self.base_key_matching(terminal_key)
+
+                    if switch_signal == "switch_visualizer":
+                        if visualizer:
+                            visualizer.finish()
+                        if input_provider:
+                            input_provider.__exit__(None, None, None)
+
+                        # Switch to GUI
+                        visualizer = PygameVisualizer(battlefield=self.battlefield)
+                        input_provider = PygameInputProvider()
+                        input_provider.__enter__()
+
+                        is_gui = True
+                        base_step = 20
+                        continue
 
                     if visualizer and terminal_key in ["w", "a", "s", "d", "z", "q"]:  # pour clavier qwerty et azerty
-                        step = 2
+                        step = base_step * CAMERA_SPEED_MULTIPLIER if input_provider.is_shift_pressed() else base_step
                         self.direction_key_matching(terminal_key, step, visualizer=visualizer)
 
             # --- GUI INPUTS ---
             if is_gui:
                 if input_provider:
                     pygame_key = input_provider.get_key()
-                    self.base_key_matching(pygame_key)
+                    switch_signal = self.base_key_matching(pygame_key)
+
+                    if switch_signal == "switch_visualizer":
+                        # Clean up current visualizer
+                        if visualizer:
+                            visualizer.finish()
+                        if input_provider:
+                            input_provider.__exit__(None, None, None)
+
+                        # Switch to CLI
+                        visualizer = CLIVisualizer(self.battlefield.width, self.battlefield.height)
+                        input_provider = ConsoleInputProvider()
+                        input_provider.__enter__()
+
+                        is_gui = False
+                        base_step = 2
+                        continue
+
+                    # Calculate step with shift modifier
+                    step = base_step * CAMERA_SPEED_MULTIPLIER if input_provider.is_shift_pressed() else base_step
+
                     self.direction_key_matching(pygame_key, step, visualizer=visualizer)
                     match pygame_key:
                         case "zoom_in":
                             visualizer.zoom(1)
                         case "zoom_out":
                             visualizer.zoom(-1)
+                        case "F1":
+                            visualizer.show_perf_stats = not visualizer.show_perf_stats
 
                     if hasattr(input_provider, "get_camera_drag"):
                         drag_dx, drag_dy = input_provider.get_camera_drag()
@@ -153,10 +204,13 @@ class Simulation:
                 self.game_speed = 1
             case "tab":
                 self.snapshot_utility.save_and_open_html_file(self.tick_count)
-            case "F11":
+            case "F9":
+                return "switch_visualizer"
+            case "F11" | "k":
                 # autoriser d'autres noms de fichier de sauvegarde plus tard
                 save_game(self)
-            case "F12":
+                # print("\n[GAME SAVED]")
+            case "F12" | "l":
                 # Quick Load
                 try:
                     # Remplacer la simulation actuelle par la version chargée
