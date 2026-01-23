@@ -72,6 +72,11 @@ Examples:
     plot_parser.add_argument("max_n", type=int, help="End N")
     plot_parser.add_argument("step", type=int, help="Step size")
 
+    # COMMAND: plot_time (Validation Temporelle)
+    plot_time_parser = subparsers.add_parser("plot_time", help="Plot survivors over time (Single Battle)")
+    plot_time_parser.add_argument("unit_type", type=str, help="Unit type")
+    plot_time_parser.add_argument("n", type=int, default=50, help="Base army size N (Default 50)")
+
     return parser.parse_args()
 
 
@@ -266,16 +271,24 @@ def run_lanchester_plot(args):
     n_values = range(args.min_n, args.max_n + 1, args.step)
     
     results_n = []
-    results_casualties = [] 
+    results_percent_alive= [] 
 
     print(f"Starting Lanchester Plot for {unit_type}...")
 
     for n in n_values:
-        print(f"Simulating N={n} vs {2*n}...", end="", flush=True)
+        # --- LOGIQUE DE TAILLE D'ARMEE ---
+        count_p0 = n
         
+        if unit_type == "Crossbowman" or unit_type == "EliteSkirmisher":
+            # Attention : N^2 grandit très vite !
+            count_p1 = n * n
+        else:
+            # Loi Linéaire (Corps à corps)
+            count_p1 = n * 2
+
+        print(f"Simulating N={count_p0} vs {count_p1}...", end="", flush=True)
         # 3. Génération Dynamique du Scénario
-        scenario_data = create_lanchester_scenario(unit_type, n)
-        
+        scenario_data = create_lanchester_scenario(unit_type, count_p0, count_p1)        
         # 4. Mise en place du champ du battlefield
         width = scenario_data["map"]["width"]
         height = scenario_data["map"]["height"]
@@ -299,11 +312,11 @@ def run_lanchester_plot(args):
         # 6. Collecte des Données (Après la bataille)
         survivors_p2 = len(bf.units_by_owner(0))
         survivors_p1 = len(bf.units_by_owner(1))
-        initial_p1 = 2 * n
+        initial_p1 = count_p1
         casualties = initial_p1 - survivors_p1
         
         results_n.append(n)
-        results_casualties.append(casualties)
+        results_percent_alive.append((survivors_p1 / initial_p1) * 100)
         
         print(f"nombre de survivants P1: {survivors_p1}")
         print(f"nombre de survivant P2: {survivors_p2}")
@@ -312,17 +325,85 @@ def run_lanchester_plot(args):
     # 7. Tracé du Graphique (Matplotlib)
     plt.figure(figsize=(10, 6))
     
-    plt.plot(results_n, results_casualties, marker='o', linestyle='-', color='b', label=f'{unit_type}')
+    label_text = f'{unit_type} (vs N^2)' if unit_type == "Crossbowman" or unit_type == "EliteSkirmisher" else f'{unit_type} (vs 2N)'
     
-    plt.title(f"Lois de Lanchester : {unit_type} (N vs 2N)")
+    plt.plot(results_n, results_percent_alive, marker='o', linestyle='-', color='b', label=label_text)
+    
+    plt.title(f"Lois de Lanchester : {label_text}")
     plt.xlabel("N (Taille de l'armée perdante)")
-    plt.ylabel("Pertes du Vainqueur (Armée 2N)")
+    plt.ylabel("Pourcentage de Survivants (Vainqueur)")
     plt.grid(True)
     plt.legend()
     
     # Affichage de la fenêtre graphique
     plt.show()
 
+def run_temporal_plot(args):
+    unit_type = args.unit_type
+    n = args.n
+    
+    # Configuration N vs 2N (Standard Lanchester)
+    count_p0 = n
+    count_p1 = n * 2
+    
+    print(f"Starting Temporal Plot for {unit_type} ({count_p0} vs {count_p1})...")
+    
+    # 1. Création du Scénario
+    scenario_data = create_lanchester_scenario(unit_type, count_p0, count_p1)
+    
+    width = scenario_data["map"]["width"]
+    height = scenario_data["map"]["height"]
+    bf = Battlefield(width, height)
+    bf.generals = [create_general("daft", 0), create_general("daft", 1)]
+    ScenarioLoader.spawn_scenario(scenario_data, bf)
+    
+    sim = Simulation(bf.game_map, bf.generals, bf)
+    
+    # 2. Préparation des listes de données
+    history_time = []
+    history_p0 = []
+    history_p1 = []
+    
+    # 3. Boucle de Simulation Manuelle
+    max_ticks = 5000
+    sim.is_running = True
+    dt = 1.0 / 30.0  # Temps logique par tick
+    
+    print("Simulating...", end="", flush=True)
+    
+    while sim.is_running and sim.tick_count < max_ticks:
+        # Exécuter un tick
+        sim.tick(dt)
+        
+        # Enregistrer les données (Tous les 10 ticks pour alléger le graphique si besoin, ou 1 pour précision max)
+        if sim.tick_count % 5 == 0:
+            history_time.append(sim.tick_count)
+            history_p0.append(len(bf.units_by_owner(0)))
+            history_p1.append(len(bf.units_by_owner(1)))
+            
+        # Arrêt si une équipe est morte
+        if bf.is_battle_over():
+            break
+            
+    print(" Done.")
+
+    # 4. Tracé du Graphique
+    plt.figure(figsize=(10, 6))
+    
+    plt.plot(history_time, history_p0, color='red', label=f'Player 0 (N={count_p0})', linewidth=2)
+    plt.plot(history_time, history_p1, color='blue', label=f'Player 1 (2N={count_p1})', linewidth=2)
+    
+    plt.title(f"Évolution des effectifs au cours du temps : {unit_type}")
+    plt.xlabel("Temps (Ticks)")
+    plt.ylabel("Nombre de Survivants")
+    plt.legend()
+    plt.grid(True)
+    
+    # Limites pour bien voir le début et la fin
+    plt.ylim(0, count_p1 + 5)
+    plt.xlim(0, len(history_time) * 5) # Ajusté selon le modulo d'enregistrement
+    
+    plt.show()
 def run_battle(args):
     """Run a battle scenario"""
     print("=" * 60)
@@ -396,6 +477,9 @@ def main():
 
     elif args.command == "tourney":
         run_tournament(args)
+
+    elif args.command == "plot_time":
+        run_temporal_plot(args)
 
     else:
         print(" No command specified. Use --help for usage.")
