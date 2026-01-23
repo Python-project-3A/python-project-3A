@@ -40,6 +40,9 @@ class PygameVisualizer:
         # game perf stats
         self.show_perf_stats = True
 
+        # generals stats
+        self.show_generals_stats = True
+
         self.font = pygame.font.SysFont("Inter", 28)
         # monospace font for stats to avoid jittery effect
         self.mono_font = pygame.font.SysFont("Consolas", 24, bold=True)
@@ -518,6 +521,55 @@ class PygameVisualizer:
                 end_y = start_y + sin(angle_rad) * length
                 pygame.draw.line(self.screen, (30, 30, 30), (start_x, start_y), (end_x, end_y), 2)
 
+    def _draw_generals_ui(self):
+        """
+        Draws live stats in two separate columns (one for each team).
+        """
+        # 1. Dimensions for each individual card
+        card_w = 200
+        card_h = 100
+        spacing = 10
+
+        # Calculate total width to position from the right edge
+        total_w = (card_w * 2) + spacing
+        start_x = self.screen_width - total_w - 10
+        start_y = 5
+
+        # 2. Gather Stats
+        stats = {0: {"count": 0, "hp": 0}, 1: {"count": 0, "hp": 0}}
+        for u in self.battlefield.get_all_units():
+            if u.is_alive():
+                stats[u.owner]["count"] += 1
+                stats[u.owner]["hp"] += u.hp
+
+        # 3. Draw the two columns
+        for i in [0, 1]:
+            color = self.colors[i]
+            gen = self.battlefield.generals[i]
+
+            # Position of this specific card
+            x = start_x + (i * (card_w + spacing))
+            rect = pygame.Rect(x, start_y, card_w, card_h)
+
+            # Draw Card Base (Dark background + Team Color Border)
+            pygame.draw.rect(self.screen, (20, 20, 20, 220), rect, border_radius=5)
+            pygame.draw.rect(self.screen, color, rect, 2, border_radius=5)
+
+            # Header (General Name) - Scaled down slightly if too long
+            name_font = pygame.font.SysFont("Inter", 24, bold=True)
+            name_surf = name_font.render(gen.name[:15].upper(), True, color)
+            self.screen.blit(name_surf, (x + 12, start_y + 10))
+
+            # Stats (Using mono_font for numbers)
+            curr_y = start_y + 40
+            stat_lines = [f"UNITS: {stats[i]['count']:03d}", f"AVG HP:{int(stats[i]['hp']):04d}"]
+
+            for line in stat_lines:
+                # Using a smaller size of mono_font for the cards
+                stat_surf = self.mono_font.render(line, True, (220, 220, 220))
+                self.screen.blit(stat_surf, (x + 12, curr_y))
+                curr_y += 22
+
     def _draw_game_over(self):
         # Darken the battlefield
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
@@ -640,7 +692,7 @@ class PygameVisualizer:
 
         # Display status text
         if self.show_perf_stats:
-            panel_w = 380
+            panel_w = 500
             panel_h = 30
             panel_rect = pygame.Rect(15, 1, panel_w, panel_h)
 
@@ -658,6 +710,9 @@ class PygameVisualizer:
             text_rect = text_surf.get_rect(center=panel_rect.center)
 
             self.screen.blit(text_surf, text_rect)
+
+        if self.show_generals_stats:
+            self._draw_generals_ui()
 
         # we draw the game over screen if the battle is over
         if battlefield.is_battle_over():
