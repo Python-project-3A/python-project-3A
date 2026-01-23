@@ -2,7 +2,7 @@ from screeninfo import get_monitors
 from pathlib import Path
 from src.units.unit_base import Unit
 from .visual_projectile import VisualProjectile
-from math import atan2, sin, cos
+from math import atan2, sin, cos, degrees
 import pygame
 from collections.abc import MutableSequence
 from src.engine.battlefield import Battlefield
@@ -130,6 +130,8 @@ class PygameVisualizer:
             "longswordsman": self.load_img("long-swordsman.png"),
             "scorpion": self.load_img("scorpion.png"),
         }
+
+        self.arrow_sprite = self.load_img("arrow.png")
 
         # Track unit HP to detect damage (for flash effect)
         self.unit_hp_tracker = {}
@@ -458,27 +460,63 @@ class PygameVisualizer:
         new_arrow = VisualProjectile(attacker.position, target)
         self.projectiles.append(new_arrow)
 
-    def _draw_projectiles(self):
-        """Draws arrows as small black lines."""
+    def _draw_projectiles(self, dt):
         for p in self.projectiles[:]:
-            p.update()
+            p.update(dt)
+
             if not p.is_active:
                 self.projectiles.remove(p)
                 continue
 
-            # Convert World to Screen
+            # Get Screen Positions
             start_x, start_y = self.world_to_screen(p.current_pos[0], p.current_pos[1])
+            target_x, target_y = self.world_to_screen(p.impact_point[0], p.impact_point[1])
 
-            # Draw a simple line pointing toward target
-            target_x, target_y = self.world_to_screen(p.target_unit.position[0], p.target_unit.position[1])
+            # Calculate Angle (in degrees for Pygame)
+            # We calculate angle based on the vector from start to impact
+            dx = target_x - start_x
+            dy = target_y - start_y
 
-            # Simple rotation logic for the arrow line
-            angle = atan2(target_y - start_y, target_x - start_x)
-            length = 10 * self.scale_factor
-            end_x = start_x + cos(angle) * length
-            end_y = start_y + sin(angle) * length
+            # If the arrow is exactly on the impact point, avoid angle jitter
+            if p.is_grounded:
+                # We can store the last angle in the projectile class to be perfectly stable,
+                angle_rad = getattr(p, "final_angle", atan2(dy, dx))
+            else:
+                angle_rad = atan2(dy, dx)
+                p.final_angle = angle_rad  # Store it for when it hits the ground
 
-            pygame.draw.line(self.screen, (20, 20, 20), (start_x, start_y), (end_x, end_y), 2)
+            angle_deg = -degrees(angle_rad)
+
+            # Rotate and Scale Sprite
+            if self.arrow_sprite:
+                # Scale the arrow based on zoom level
+                base_w, base_h = self.arrow_sprite.get_size()
+                scale_w = int(base_w * self.scale_factor * 0.4)
+                scale_h = int(base_h * self.scale_factor * 0.4)
+
+                # Minimum size check
+                scale_w, scale_h = max(1, scale_w), max(1, scale_h)
+
+                scaled_arrow = pygame.transform.scale(self.arrow_sprite, (scale_w, scale_h))
+
+                # Rotate
+                rotated_arrow = pygame.transform.rotate(scaled_arrow, angle_deg)
+
+                # Fade out effect (Optional: based on ground_timer)
+                if p.is_grounded and p.ground_timer < 0.5:
+                    # Fade out in the last 0.5 seconds
+                    alpha = int((p.ground_timer / 0.5) * 255)
+                    rotated_arrow.set_alpha(alpha)
+
+                # Blit centered on current position
+                rect = rotated_arrow.get_rect(center=(start_x, start_y))
+                self.screen.blit(rotated_arrow, rect)
+            else:
+                # Fallback to line if sprite is missing
+                length = 12 * self.scale_factor
+                end_x = start_x + cos(angle_rad) * length
+                end_y = start_y + sin(angle_rad) * length
+                pygame.draw.line(self.screen, (30, 30, 30), (start_x, start_y), (end_x, end_y), 2)
 
     def _draw_game_over(self):
         # Darken the battlefield
@@ -594,7 +632,8 @@ class PygameVisualizer:
                 self._draw_unit(unit)
 
         # Draw the projectiles after units
-        self._draw_projectiles()
+        dt_to_pass = 0 if paused else (1.0 / 30.0) * speed
+        self._draw_projectiles(dt_to_pass)
 
         # Draw minimap
         self._draw_minimap(battlefield)
