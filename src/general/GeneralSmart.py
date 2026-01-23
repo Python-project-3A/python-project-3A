@@ -175,16 +175,10 @@ class GeneralSmart(BaseGeneral):
             dist_to_nearest = unit.dist_to(nearest_threat)
             if dist_to_nearest < unit.attack_range + 0.5:
                 enemies_in_range = [e for e in threats if unit.dist_to(e) <= unit.attack_range + 0.5]
-
-                if enemies_in_range:
-                    weakest_target = min(enemies_in_range, key=lambda e: e.hp)
-                    self._order_attack_opti(unit, weakest_target)
-                else:
-                    self._order_attack_opti(unit, nearest_threat)
-
+                target = min(enemies_in_range, key=lambda e: e.hp, default=nearest_threat)
+                self._order_attack_opti(unit, target)
             else:
                 unit.current_order = {"type": "attack_move", "target": nearest_threat.position}
-
             return
         # --- BRANCHE 2 : Contre la CAVALERIE (Interception) ---
 
