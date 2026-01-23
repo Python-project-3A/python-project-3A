@@ -158,8 +158,21 @@ class GeneralSmart(BaseGeneral):
             self._order_attack_opti(unit, target)
 
     def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
-        """Logique : S'interposer entre la menace et les protégés. + Focus cavalerie"""
-        # 1. ANALYSE DE LA MENACE
+        """
+        Logique de protection hybride :
+        1. SELF-DEFENSE : Si on peut taper quelqu'un, on tape (Priorité Cavalerie > PV bas).
+        2. MISSION : Sinon, on intercepte la cavalerie ou on avance vers le front.
+        """
+        # --- 1. ACQUISITION DES CIBLES LOCALES ---
+        enemies_in_range = [e for e in enemies if e.is_alive() and unit.dist_to(e) <= unit.attack_range + 0.5]
+
+        if enemies_in_range:
+            knights_nearby = self._filter_enemies(enemies_in_range, ["knight", "lightcavalry", "cavalryarcher"])
+            target = min(knights_nearby if knights_nearby else enemies_in_range, key=lambda e: e.hp)
+            self._order_attack_opti(unit, target)
+            return
+
+        # --- 2. ANALYSE DE LA MENACE STRATÉGIQUE ---
         knights = self._filter_enemies(enemies, ["knight", "lightcavalry", "cavalryarcher"])
         threats = knights if knights else [e for e in enemies if e.is_alive()]
 
@@ -169,40 +182,30 @@ class GeneralSmart(BaseGeneral):
 
         nearest_threat = min(threats, key=lambda e: unit.dist_to(e))
         is_cavalry_threat = nearest_threat.name.lower() in ["knight", "lightcavalry", "cavalryarcher"]
-        if is_cavalry_threat and unit.dist_to(nearest_threat) > 15:
+
+        if is_cavalry_threat and unit.dist_to(nearest_threat) > 15.0:
             is_cavalry_threat = False
 
-        # --- BRANCHE 1 : Contre l'INFANTERIE (Daft Pikes, etc.) ---
+        # --- 3. EXÉCUTION DE LA MISSION ---
+
+        # BRANCHE A : INFANTERIE (Approche en bloc)
         if not is_cavalry_threat:
-            dist_to_nearest = unit.dist_to(nearest_threat)
-            # if dist_to_nearest < unit.attack_range + 0.5:
-            if dist_to_nearest < 3:
-                enemies_in_range = [e for e in threats if unit.dist_to(e) <= unit.attack_range + 0.5]
-                target = min(enemies_in_range, key=lambda e: e.hp, default=nearest_threat)
-                self._order_attack_opti(unit, target)
-            else:
-                unit.current_order = {"type": "attack_move", "target": nearest_threat.position}
+            unit.current_order = {"type": "attack_move", "target": nearest_threat.position}
             return
-        # --- BRANCHE 2 : Contre la CAVALERIE (Interception) ---
 
-        # 2. PROJECTION DU POINT D'ANCRAGE
+        # BRANCHE B : CAVALERIE (Interception géométrique)
+        # calcule du point de blocage entre nos archers et la charge
         dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
-        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 10.0)  # On projette x mètres devant le groupe
+        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 6.0)
 
-        # 3. CALCUL DU POINT DE BLOCAGE
         dx, dy = self.soustract_vec(nearest_threat.position, (proj_ax, proj_ay))
         dist_threat = (dx**2 + dy**2) ** 0.5
-
         block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), 0.5)
 
-        # --- ACTION ---
-        if unit.dist_to(nearest_threat) < unit.attack_range + 0.5:
-            self._order_attack_opti(unit, nearest_threat)
+        if dist_threat < 4.0:
+            unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
         else:
-            if dist_threat < 4.0:
-                unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
-            else:
-                unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
+            unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
 
     # --- BACKLINE ---
     def _micro_skirmisher_counter(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
