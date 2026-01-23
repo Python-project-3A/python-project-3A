@@ -10,6 +10,13 @@ if TYPE_CHECKING:
 from src.units.knight import Knight
 from src.units.pikeman import Pikeman
 from src.units.crossbowman import Crossbowman
+from src.units.cavalryarcher import CavalryArcher
+from src.units.cappedram import CappedRam
+from src.units.longswordman import LongSwordsman
+from src.units.eliteskirmisher import EliteSkirmisher
+from src.units.lightcavalry import LightCavalry
+from src.units.scorpion import Scorpion
+from src.units.onager import Onager
 from src.units.unit_base import Unit
 
 
@@ -21,8 +28,13 @@ class ScenarioLoader:
         "Pikeman": Pikeman,
         "Knight": Knight,
         "Crossbowman": Crossbowman,
-        # Add more later
-        # "LongSwordsman": LongSwordsman,
+        "LongSwordsman": LongSwordsman,
+        "CavalryArcher": CavalryArcher,
+        "CappedRam": CappedRam,
+        "Onager": Onager,
+        "EliteSkirmisher": EliteSkirmisher,
+        "LightCavalry": LightCavalry,
+        "Scorpion": Scorpion,
     }
 
     # Cache for unit stats
