@@ -119,8 +119,8 @@ class GeneralSmart(BaseGeneral):
 
             # --- LOGIQUE FLANKERS ---
             elif name == "knight":
-                # self._micro_knight_brawler(unit, all_enemies, bf)
-                self._micro_knight_flanker(unit, all_enemies, squad.target_position, bf)
+                self._micro_knight_brawler(unit, all_enemies, bf)
+                # self._micro_knight_flanker(unit, all_enemies, squad.target_position, bf)
             elif name == "lightcavalry":
                 self._micro_lightcav_assassin(unit, all_enemies, bf)
 
@@ -158,8 +158,21 @@ class GeneralSmart(BaseGeneral):
             self._order_attack_opti(unit, target)
 
     def _micro_pikeman_protector(self, unit: Unit, enemies: list["Unit"], protect_target_pos: tuple, default_target_pos: tuple, bf: Battlefield):
-        """Logique : S'interposer entre la menace et les protégés. + Focus cavalerie"""
-        # 1. CIBLAGE
+        """
+        Logique de protection hybride :
+        1. SELF-DEFENSE : Si on peut taper quelqu'un, on tape (Priorité Cavalerie > PV bas).
+        2. MISSION : Sinon, on intercepte la cavalerie ou on avance vers le front.
+        """
+        # --- 1. ACQUISITION DES CIBLES LOCALES ---
+        enemies_in_range = [e for e in enemies if e.is_alive() and unit.dist_to(e) <= unit.attack_range + 0.5]
+
+        if enemies_in_range:
+            knights_nearby = self._filter_enemies(enemies_in_range, ["knight", "lightcavalry", "cavalryarcher"])
+            target = min(knights_nearby if knights_nearby else enemies_in_range, key=lambda e: e.hp)
+            self._order_attack_opti(unit, target)
+            return
+
+        # --- 2. ANALYSE DE LA MENACE STRATÉGIQUE ---
         knights = self._filter_enemies(enemies, ["knight", "lightcavalry", "cavalryarcher"])
         threats = knights if knights else [e for e in enemies if e.is_alive()]
 
@@ -167,39 +180,32 @@ class GeneralSmart(BaseGeneral):
             unit.current_order = {"type": "attack_move", "target": default_target_pos}
             return
 
-        # 2. PROJECTION DU MOUVEMENT
+        nearest_threat = min(threats, key=lambda e: unit.dist_to(e))
+        is_cavalry_threat = nearest_threat.name.lower() in ["knight", "lightcavalry", "cavalryarcher"]
+
+        if is_cavalry_threat and unit.dist_to(nearest_threat) > 15.0:
+            is_cavalry_threat = False
+
+        # --- 3. EXÉCUTION DE LA MISSION ---
+
+        # BRANCHE A : INFANTERIE (Approche en bloc)
+        if not is_cavalry_threat:
+            unit.current_order = {"type": "attack_move", "target": nearest_threat.position}
+            return
+
+        # BRANCHE B : CAVALERIE (Interception géométrique)
+        # calcule du point de blocage entre nos archers et la charge
         dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
-        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 10.0)  # On projette x mètres devant le groupe
+        proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 6.0)
 
-        # 3. INTERCEPTION DE LA MENACE
-        nearest_threat = min(threats, key=lambda e: (e.position[0] - proj_ax) ** 2 + (e.position[1] - proj_ay) ** 2)
-        is_fast_threat = nearest_threat.name.lower() in ["knight"]
-
-        # Calcul du point de blocage
         dx, dy = self.soustract_vec(nearest_threat.position, (proj_ax, proj_ay))
         dist_threat = (dx**2 + dy**2) ** 0.5
+        block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), 0.5)
 
-        # --- LOGIQUE D'INTERCEPTION ---
-        if is_fast_threat:
-            # CAS 1 : CONTRE CAVALERIE
-            if dist_threat > 15.0:
-                ratio = 0.2
-            else:
-                ratio = 0.6  # On va chercher l'ennemi à 60% du chemin (Agressif)
+        if dist_threat < 4.0:
+            unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
         else:
-            # CAS 2 : CONTRE INFANTERIE
-            ratio = 0.1  # On ne s'avance que de 10% vers l'ennemi (Défensif)
-
-        block_x, block_y = self._projection_vector((proj_ax, proj_ay), (dx, dy), ratio)
-
-        # --- ACTION ---
-        if unit.dist_to(nearest_threat) < unit.attack_range + 0.5:
-            self._order_attack_opti(unit, nearest_threat)
-        else:
-            if dist_threat < 8.0:
-                unit.current_order = {"type": "attack_move", "target": (block_x, block_y)}
-            else:
-                unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
+            unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
 
     # --- BACKLINE ---
     def _micro_skirmisher_counter(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
@@ -220,26 +226,60 @@ class GeneralSmart(BaseGeneral):
             self._order_attack_opti(unit, target)
 
     def _micro_crossbow_sniper(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
-        """Reste loin. Focus Armure Lourde."""
-        # Appétence : Knights, Swordsman
-        heavy_targets = self._filter_enemies(enemies, ["knight", "longswordsman"])
-        target = self._get_best_target(unit, heavy_targets, enemies)
-        nearest = self._get_nearest(unit, enemies)
-        if nearest:
-            (is_threatened, _) = self.is_threatened(unit, nearest)
-            if is_threatened:
-                self._do_kiting_move(unit, enemies, bf)
-                return
+        """
+        Logique Mixte :
+        1. Fuite si menacé.
+        2. Sniper : Focus LOURD en priorité.
+        3. Stutter Step : Avance pendant le rechargement pour compresser la ligne.
+        """
+        nearest = CombatSystem.choose_nearest_target(unit, enemies, bf)
+        is_reloading = unit.reload_timer > 0
 
+        # --- 1. FUITE ---
+        if nearest:
+            (is_threatened, is_critical) = self.is_threatened(unit, nearest)
+            if is_threatened:
+                if is_critical or is_reloading:
+                    (move_target_x, move_target_y) = self._fuite_strategique(unit, enemies, bf)
+                    if not (move_target_x, move_target_y) == unit.position:
+                        unit.current_order = {"type": "move_to", "target": (move_target_x, move_target_y)}
+                        return
+
+        # --- 2. SÉLECTION DE CIBLE
+        visible_enemies = [e for e in enemies if e.is_alive() and unit.dist_to(e) <= unit.vision_range]
+        target = None
+
+        if visible_enemies:
+            heavy_targets_in_sight = [e for e in visible_enemies if e.name.lower() in ["knight", "longswordsman"]]
+            if heavy_targets_in_sight:
+                target = self._get_best_target(unit, heavy_targets_in_sight, visible_enemies)
+            else:
+                target = self._get_nearest(unit, visible_enemies)
+        else:
+            heavy_global = self._filter_enemies(enemies, ["knight", "longswordsman"])
+            target = self._get_nearest(unit, heavy_global) if heavy_global else self._get_nearest(unit, enemies)
+
+        if not target:
+            target = nearest
+
+        # --- 3. ACTION  ---
         if target:
-            self._order_attack_opti(unit, target)
+            if not is_reloading:
+                self._order_attack_opti(unit, target)
+            else:
+                dist = unit.dist_to(target)
+                ideal_range_ratio = 0.75
+                if dist > unit.attack_range * ideal_range_ratio:
+                    unit.current_order = {"type": "move_to", "target": target.position}
+                else:
+                    pass
 
     def _micro_onager_artillery(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
         """Tir de zone. Sécurité distance min."""
         # Sécurité Min Range (3m)
         nearest = self._get_nearest(unit, enemies)
         if nearest and unit.dist_to(nearest) < 4.0:  # Marge de 1m
-            self._do_kiting_move(unit, nearest, bf)
+            self._do_kiting_move(unit, [nearest], bf)
             return
 
         center_mass = self._get_centroid(enemies)  # Vise le tas
@@ -252,7 +292,7 @@ class GeneralSmart(BaseGeneral):
         """Comme l'arbalétrier mais fuit plus vite."""
         nearest = self._get_nearest(unit, enemies)
         if nearest and unit.dist_to(nearest) < 8.0:  # Très fragile
-            self._do_kiting_move(unit, nearest, bf)
+            self._do_kiting_move(unit, [nearest], bf)
             return
 
         target = CombatSystem.choose_nearest_target(unit, enemies, bf)
@@ -331,11 +371,11 @@ class GeneralSmart(BaseGeneral):
         # Normalisation
         ndx, ndy = self.normalize_vec((dx, dy))
         if (ndx, ndy) != (0, 0):
-            ndx, ndy = self.scale_vec((ndx, ndy), 2.0)  # POIDS D'ATTRACTION FORT (2.0) pour se mieux se diriger vers la cible
+            ndx, ndy = self.scale_vec((ndx, ndy), 2.5)  # POIDS D'ATTRACTION FORT (2.0) pour se mieux se diriger vers la cible
 
         # B. Vecteur de Répulsion (Éviter les Piquiers)
         # On ne regarde que les piquiers sur le chemin (moins de xm, valeur arbitraire qu'on peut changer)
-        avoid_radius = 8.0
+        avoid_radius = 5.0
         repulsion_x, repulsion_y = 0.0, 0.0
 
         for threat in ennemies_threats:
@@ -346,7 +386,7 @@ class GeneralSmart(BaseGeneral):
                 rx, ry = self.normalize_vec((rx, ry))
 
                 # Force inversement proportionnelle à la distance (linéaire et pas exponentielle)
-                force = 3.0 * (1.0 - (d_threat / avoid_radius))
+                force = 15 * ((1.0 - (d_threat / avoid_radius)) ** 2)
 
                 repulsion_x += rx * force
                 repulsion_y += ry * force

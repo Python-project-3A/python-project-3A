@@ -25,9 +25,7 @@ class GeneralBraindead(BaseGeneral):
 
     def update(self, battlefield: "Battlefield", tick: int, dt) -> None:
         """
-        BRAINDEAD: Stratégie purement réactive.
-        - Ne bouge jamais.
-        - Tire seulement si un ennemi est DEJA à portée de tir (attack_range).
+        BRAINDEAD: pour l'instant : innactif total, répond seulement aux attaquess
         """
         my_units = self.get_my_units(battlefield)
         enemies = self.get_enemy_units(battlefield)
@@ -38,18 +36,11 @@ class GeneralBraindead(BaseGeneral):
         for unit in my_units:
             if not unit.is_alive():
                 continue
-
-            # 1. On cherche la cible la plus proche parmi TOUS les ennemis
-            # (Le général voit tout, mais l'unité ne tirera que si proche)
             target = CombatSystem.choose_nearest_target(unit, enemies, battlefield)
 
             if target:
-                # 2. Vérification critique : Est-on à portée de TIR ?
-                # (utilise attack_range, ex: 0.5 pour piquier, 5.0 pour arbalète)
+                # if unit.dist_to(target) <= unit.vision_range: #Si on veut un braindead moins passif
                 if unit.can_attack(target):
-                    # OUI : On ordonne l'attaque DIRECTE (sans mouvement implicite)
-                    unit.current_order = {"type": "attack_unit", "target": target}
+                    self._order_attack_opti(unit, target)
                 else:
-                    # NON : On ne fait RIEN.
-                    # Surtout pas de "move_towards". L'unité reste Idle.
                     unit.current_order = None

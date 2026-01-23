@@ -298,6 +298,9 @@ class Battlefield:
         if (new_x, new_y) == unit.position:
             return False
 
+        new_x = max(0.01, min(new_x, self.width - 0.01))
+        new_y = max(0.01, min(new_y, self.height - 0.01))
+
         # Update tile occupancy
         ox, oy = unit.position
         oix, oiy = self._tile_index_from_pos(ox, oy)

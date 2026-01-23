@@ -12,7 +12,7 @@
       "units": [
         {
           "type": "Knight",
-          "count": 45,
+          "count": 40,
           "formation": "block",
           "start_x": 2,
           "start_y": 10,
@@ -26,7 +26,7 @@
       "units": [
         {
           "type": "Pikeman",
-          "count": 25,
+          "count": 30,
           "formation": "block",
           "start_x": 35,
           "start_y": 10,
