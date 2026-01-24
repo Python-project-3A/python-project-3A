@@ -31,7 +31,25 @@ class Simulation:
         self.paused = False
         self.game_speed = 1
         self.snapshot_utility = HTMLSnapshot(battlefield)
+        self.error: str | None = None
+        self.error_timer = 0
+        self.game_save: str | None = None
+        self.game_save_timer = 0
+        self.game_load: str | None = None
+        self.game_load_timer = 0
         self.LOGICAL_DT = 1.0 / 30.0
+
+    def trigger_error(self, message: str):
+        self.error = message
+        self.error_timer = 60
+
+    def trigger_game_save(self):
+        self.game_save = "Game saved"
+        self.game_save_timer = 60
+
+    def trigger_game_load(self):
+        self.game_load = "Game loaded"
+        self.game_load_timer = 60
 
     def tick(self, dt):
         """Exécute un tick unique."""
@@ -180,7 +198,7 @@ class Simulation:
 
             # --- RENDU (FPS) ---
             if visualizer:
-                visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused)
+                visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error)
 
             # ---  SYNCHRONISATION (limiteur de frame) ---
             # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s. Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
@@ -189,6 +207,24 @@ class Simulation:
 
             if wait > 0:
                 time.sleep(wait)
+
+            # Decrement timer even when paused so the error message goes away
+            if self.error_timer > 0:
+                self.error_timer -= 1
+                if self.error_timer <= 0:
+                    self.error = None
+
+            # Decrement timer even when paused so the save message goes away
+            if self.game_save_timer > 0:
+                self.game_save_timer -= 1
+                if self.game_save_timer <= 0:
+                    self.game_save = None
+
+            # Decrement timer even when paused so the save message goes away
+            if self.game_load_timer > 0:
+                self.game_load_timer -= 1
+                if self.game_load_timer <= 0:
+                    self.game_load = None
 
         print(f" Simulation terminée après {self.tick_count} ticks. Durée : {(time.time() - debut):.4f}s. Environ : {self.tick_count / (time.time() - debut):.0f} TPS.")
 
@@ -211,7 +247,7 @@ class Simulation:
             case "F11" | "k":
                 # autoriser d'autres noms de fichier de sauvegarde plus tard
                 save_game(self)
-                # print("\n[GAME SAVED]")
+                self.trigger_game_save()
             case "F12" | "l":
                 # Quick Load
                 try:
@@ -223,10 +259,11 @@ class Simulation:
                     self.tick_count = loaded_sim.tick_count
                     self.paused = True
                     self.snapshot_utility = loaded_sim.snapshot_utility  # Mise à jour de l'utilitaire
+                    self.trigger_game_load()
                 except FileNotFoundError:
-                    print("\n Erreur: Pas de Quick Save trouvée.")
+                    self.trigger_error("Error: No quick save found")
                 except Exception as e:
-                    print(f"\n Erreur pendant le rechargement: {e}")
+                    self.trigger_error(f"Error during loading: {e}")
 
     @staticmethod
     def direction_key_matching(key: str, step: int, visualizer):

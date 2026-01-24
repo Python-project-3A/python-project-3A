@@ -12,6 +12,7 @@ YELLOW = "\033[93m"
 CLEAR_LINE = "\033[K"
 UP = "\033[A"
 DOWN = "\033[B"
+HEADER_HEIGHT = 10
 
 
 class CLIVisualizer:
@@ -29,7 +30,7 @@ class CLIVisualizer:
         safe_width = terminal_width - 2  # -2 marge de sécurité
         max_terminal_width = safe_width // 2
         self.view_width = min(map_width, max_terminal_width)
-        available_height = terminal_height - 7  # 7 c'est le nb de lignes de headers + 1 (marge de sécu)
+        available_height = terminal_height - HEADER_HEIGHT  # c'est le nb de lignes de headers + 1 (marge de sécu)
         safe_height = max(5, available_height)  # on affiche au moins 5 lignes de la map même si fait du scroll up
         self.view_height = min(map_height, safe_height)
 
@@ -64,7 +65,7 @@ class CLIVisualizer:
         self.cam_x = max(0, min(self.cam_x, max_x))
         self.cam_y = max(0, min(self.cam_y, max_y))
 
-    def render(self, bf: Battlefield, tick: int, speed: float = 1.0, paused: bool = False):
+    def render(self, bf: Battlefield, tick: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None):
         # 1. Remonter le curseur (Double Buffering simulation)
         if not self.first_frame and self.lines_printed > 0:
             # On remonte de N lignes
@@ -108,12 +109,21 @@ class CLIVisualizer:
         # 4. Construire le buffer de texte
         lines = []
 
-        # Header (6 lignes)
+        # Header (9 lignes)
         lines.append(f"{'=' * 60}")
         status_str = f"{f'TICK {tick:05d}':15} Speed: x{speed:<4.1f}"
         if paused:
             status_str += f" {YELLOW}[PAUSED]{RESET}"
         lines.append(status_str + CLEAR_LINE)
+
+        if error:
+            lines.append(f"{RED}{error}{RESET}" + CLEAR_LINE)
+        elif game_save:
+            lines.append(f"{YELLOW}{game_save}{RESET}" + CLEAR_LINE)
+        elif game_load:
+            lines.append(f"{YELLOW}{game_load}{RESET}" + CLEAR_LINE)
+        else:
+            lines.append("" + CLEAR_LINE)
 
         g0 = bf.generals[0].name if bf.generals else "P0"
         g1 = bf.generals[1].name if bf.generals else "P1"
