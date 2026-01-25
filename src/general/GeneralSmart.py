@@ -109,7 +109,7 @@ class GeneralSmart(BaseGeneral):
 
             # --- LOGIQUE BACKLINE ---
             elif name == "eliteskirmisher":
-                self._micro_skirmisher_counter(unit, all_enemies, bf)
+                self._micro_skirmisher_meatshield(unit, all_enemies, bf)
             elif name == "crossbowman":
                 self._micro_crossbow_sniper(unit, all_enemies, bf)
             elif name == "onager":
@@ -208,22 +208,32 @@ class GeneralSmart(BaseGeneral):
             unit.current_order = {"type": "move_to", "target": (block_x, block_y)}
 
     # --- BACKLINE ---
-    def _micro_skirmisher_counter(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
-        """Se place DEVANT les archers. Focus Archers."""
-        # 1. Appétence : CavArcher > Crossbow > Skirmisher
-        priority_targets = self._filter_enemies(enemies, ["cavalryarcher", "crossbowman", "eliteskirmisher"])
-        target = self._get_best_target(unit, priority_targets, enemies)
-
-        # Fuite stratégique si menacé
+    def _micro_skirmisher_meatshield(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
+        # --- GESTION DE LA FUITE ---
         nearest = self._get_nearest(unit, enemies)
         if nearest:
-            (_, is_critical) = self.is_threatened(unit, nearest)
-            if is_critical:  # On ne fuit que si critique (Skirmisher doit/peut tanker un peu)
-                self._do_kiting_move(unit, enemies, bf)
+            dist = unit.dist_to(nearest)
+            ranged_units = ["crossbowman", "eliteskirmisher", "cavalryarcher", "scorpion", "onager"]
+            is_ranged_threat = nearest.name.lower() in ranged_units
+
+            if not is_ranged_threat and dist < 5.0:
+                self._do_kiting_move(unit, [nearest], bf)
                 return
 
+        # --- CIBLAGE ---
+        enemy_archers = self._filter_enemies(enemies, ["crossbowman", "eliteskirmisher", "cavalryarcher"])
+        target = self._get_nearest(unit, enemy_archers) if enemy_archers else self._get_nearest(unit, enemies)
+
+        # --- ACTION AVEC PRESSION VERS L'AVANT ---
         if target:
-            self._order_attack_opti(unit, target)
+            real_attack_range = unit.attack_range
+            tanking_range = real_attack_range * 0.70
+
+            dist_to_target = unit.dist_to(target)
+            if unit.reload_timer > 0 or dist_to_target > tanking_range:
+                unit.current_order = {"type": "move_to", "target": target.position}
+            else:
+                self._order_attack_opti(unit, target)
 
     def _micro_crossbow_sniper(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
         """
