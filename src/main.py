@@ -30,6 +30,7 @@ Examples:
   python -m src.main run knights_vs_pikemen smart daft -t
   python -m src.main list
   python -m src.main plot Pikeman 10 50 5
+  python -m src.main plot_time Pikeman 50
         """,
     )
 
