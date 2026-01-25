@@ -752,6 +752,19 @@ class PygameVisualizer:
 
             self.screen.blit(text_surf, text_rect)
 
+            fps_button_w = 100 
+            fps_button_h = 30
+            button_rect = pygame.Rect(15, 36, fps_button_w, fps_button_h)
+
+            # Draw the fps button (Same style for consistency)
+            pygame.draw.rect(self.screen, (30, 30, 30, 200), button_rect, border_radius=5)
+            pygame.draw.rect(self.screen, (201, 152, 104), button_rect, 1, border_radius=5)
+
+            fps = 0
+            val_surf = self.mono_font.render(f"{fps} FPS", True, (255, 255, 255))
+            val_rect = val_surf.get_rect(center=button_rect.center)
+            self.screen.blit(val_surf, val_rect)
+        
         if self.show_generals_stats:
             self._draw_generals_ui()
 
