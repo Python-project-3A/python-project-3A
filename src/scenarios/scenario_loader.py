@@ -86,18 +86,28 @@ class ScenarioLoader:
         """
         all_stats = ScenarioLoader.load_unit_stats()
 
-        if unit_type not in all_stats:
-            # Fallback utile si le JSON est mal formé ou incomplet
-            raise ValueError(f"Unknown unit type: {unit_type}")
+        stats_key = unit_type
 
-        stats = all_stats[unit_type]
+        if unit_type not in all_stats:
+            found_key = None
+            for key in all_stats.keys():
+                if key.lower() == unit_type.lower():
+                    found_key = key
+                    break
+
+            if found_key:
+                stats_key = found_key
+            else:
+                # Vraiment introuvable
+                raise ValueError(f"Unknown unit type: {unit_type} (Not found in units.json)")
+
+        stats = all_stats[stats_key]
 
         # Récupération de la classe (Pikeman, Knight...) ou Unit par défaut
         cls = ScenarioLoader.UNIT_CLASSES.get(unit_type, Unit)
 
         # 1. Instanciation "Sécurisée" :
         # On utilise .get(key, 0) pour fournir des valeurs par défaut au constructeur __init__
-        # car tes nouvelles unités n'ont plus de clé "damage" ou "armor" simple.
         unit = cls(
             name=unit_type,
             owner=owner,
@@ -113,9 +123,6 @@ class ScenarioLoader:
             speed=stats.get("speed", 1.0),
         )
 
-        # 2. Injection Dynamique (Magie Python) :
-        # C'est ici qu'on ajoute unit.damage_cavalry, unit.armor_pierce, etc.
-        # sans avoir besoin de les déclarer dans le __init__ de la classe.
         for key, value in stats.items():
             setattr(unit, key, value)
 
