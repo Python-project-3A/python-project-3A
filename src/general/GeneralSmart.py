@@ -242,6 +242,9 @@ class GeneralSmart(BaseGeneral):
         2. Sniper : Focus LOURD en priorité.
         3. Stutter Step : Avance pendant le rechargement pour compresser la ligne.
         """
+        if unit.reload_timer > (unit.attack_cooldown - unit.recovery_time):
+            return
+
         nearest = CombatSystem.choose_nearest_target(unit, enemies, bf)
         is_reloading = unit.reload_timer > 0
 
