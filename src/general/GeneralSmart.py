@@ -299,15 +299,42 @@ class GeneralSmart(BaseGeneral):
         if target:
             self._order_attack_opti(unit, target)
 
-    # --- FLANKERS ---*
+    # --- FLANKERS ---
     def _micro_knight_brawler(self, unit: Unit, enemies: list[Unit], bf: Battlefield):
-        """Tape fort. Focus Cavalerie ou Infanterie."""
-        # Appétence : Knights > Infanterie
-        # Évite les béliers (perte de temps)
-        valid_enemies = [e for e in enemies if e.name.lower() != "cappedram"]
-        priorities = self._filter_enemies(valid_enemies, ["knight", "cavalryarcher", "longswordsman"])
+        """Préfère combattre les cavaliers."""
 
-        target = self._get_best_target(unit, priorities, valid_enemies)
+        # --- PERSISTANCE ---
+        if unit.current_order and unit.current_order["type"] == "attack_unit":
+            current_target = unit.current_order["target"]
+            if current_target.is_alive() and unit.dist_to(current_target) <= unit.attack_range + 0.5:
+                return
+
+        # Filtrage de base
+        valid_enemies = [e for e in enemies if e.name.lower() != "cappedram"]
+        if not valid_enemies:
+            return
+
+        target = None
+
+        # ---  ANALYSE LOCALE ---
+        visible_enemies = [e for e in valid_enemies if e.is_alive() and unit.dist_to(e) <= unit.vision_range]
+
+        if visible_enemies:
+            local_priorities = [e for e in visible_enemies if e.name.lower() in ["knight", "cavalryarcher", "longswordsman"]]
+
+            if local_priorities:
+                target = self._get_nearest(unit, local_priorities)
+            else:
+                target = self._get_nearest(unit, visible_enemies)
+
+        else:
+            global_priorities = self._filter_enemies(valid_enemies, ["knight", "cavalryarcher", "longswordsman"])
+
+            if global_priorities:
+                target = self._get_nearest(unit, global_priorities)
+            else:
+                target = self._get_nearest(unit, valid_enemies)
+
         if target:
             self._order_attack_opti(unit, target)
 
@@ -452,3 +479,44 @@ class GeneralSmart(BaseGeneral):
         (mx, my) = self._fuite_strategique(unit, enemies, bf)
         if (mx, my) != unit.position:
             unit.current_order = {"type": "move_to", "target": (mx, my)}
+
+    def _is_path_obscured(self, unit: Unit, target: Unit, bf: Battlefield) -> bool:
+        """
+        Vérifie si le chemin direct vers la cible est bloqué par une autre unité (Allié ou Ennemi).
+        Utilisé pour éviter de charger une cible inaccessible derrière un mur de chair.
+        """
+        dist_target = unit.dist_to(target)
+        obstacles = bf.units_in_radius_opti(unit.position[0], unit.position[1], dist_target)
+
+        valid_obstacles = [o for o in obstacles if o != unit and o != target and o.is_alive()]
+
+        if not valid_obstacles:
+            return False
+
+        # 2. Pré-calcul du segment AB (Unit -> Target)
+        ax, ay = unit.position
+        bx, by = target.position
+        dx, dy = bx - ax, by - ay
+        seg_len_sq = dx * dx + dy * dy
+
+        if seg_len_sq == 0:
+            return False
+
+        collision_threshold = 0.8
+
+        for obs in valid_obstacles:
+            cx, cy = obs.position
+
+            # Projection du point C sur le segment AB
+            t = ((cx - ax) * dx + (cy - ay) * dy) / seg_len_sq
+
+            # On regarde si l'obstacle est ENTRE le début et la fin (0 < t < 1)
+            if 0 < t < 1:
+                proj_x = ax + t * dx
+                proj_y = ay + t * dy
+                dist_sq = (cx - proj_x) ** 2 + (cy - proj_y) ** 2
+
+                if dist_sq < collision_threshold**2:
+                    return True  # CHEMIN BLOQUÉ
+
+        return False
