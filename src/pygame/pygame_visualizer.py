@@ -351,8 +351,8 @@ class PygameVisualizer:
         cam_x, cam_y = self.world_to_minimap(camera_center_world_x, camera_center_world_y, left, top, diamond_width, diamond_height)
 
         # Calculate rectangle dimensions relative to the minimap scale
-        rect_w = int(self.minimap_size * 0.3 * (self.screen_width / (self.battlefield.width * self._tile_width)))
-        rect_h = int((self.minimap_size // 2) * 0.3 * (self.screen_height / (self.battlefield.height * self._tile_height)))
+        rect_w = int(self.minimap_size * 0.6 * (self.screen_width / (self.battlefield.width * self._tile_width)))
+        rect_h = int((self.minimap_size // 2) * 0.6 * (self.screen_height / (self.battlefield.height * self._tile_height)))
 
         camera_rect = pygame.Rect(0, 0, rect_w, rect_h)
         camera_rect.center = (cam_x, cam_y)
