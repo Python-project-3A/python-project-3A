@@ -40,6 +40,9 @@ class PygameVisualizer:
         # game perf stats
         self.show_perf_stats = True
 
+        # generals stats
+        self.show_generals_stats = True
+
         self.font = pygame.font.SysFont("Inter", 28)
         # monospace font for stats to avoid jittery effect
         self.mono_font = pygame.font.SysFont("Consolas", 24, bold=True)
@@ -518,6 +521,96 @@ class PygameVisualizer:
                 end_y = start_y + sin(angle_rad) * length
                 pygame.draw.line(self.screen, (30, 30, 30), (start_x, start_y), (end_x, end_y), 2)
 
+    def _draw_generals_ui(self):
+        """
+        Draws live stats in two separate columns (one for each team).
+        """
+        # 1. Dimensions for each individual card
+        card_w = 200
+        card_h = 100
+        spacing = 10
+
+        # Calculate total width to position from the right edge
+        total_w = (card_w * 2) + spacing
+        start_x = self.screen_width - total_w - 10
+        start_y = 5
+
+        # 2. Gather Stats
+        stats = {0: {"count": 0, "hp": 0}, 1: {"count": 0, "hp": 0}}
+        for u in self.battlefield.get_all_units():
+            if u.is_alive():
+                stats[u.owner]["count"] += 1
+                stats[u.owner]["hp"] += u.hp
+
+        # 3. Draw the two columns
+        for i in [0, 1]:
+            color = self.colors[i]
+            gen = self.battlefield.generals[i]
+
+            # Position of this specific card
+            x = start_x + (i * (card_w + spacing))
+            rect = pygame.Rect(x, start_y, card_w, card_h)
+
+            # Draw Card Base (Dark background + Team Color Border)
+            pygame.draw.rect(self.screen, (20, 20, 20, 220), rect, border_radius=5)
+            pygame.draw.rect(self.screen, color, rect, 2, border_radius=5)
+
+            # Header (General Name) - Scaled down slightly if too long
+            name_font = pygame.font.SysFont("Inter", 24, bold=True)
+            name_surf = name_font.render(gen.name[:15].upper(), True, color)
+            self.screen.blit(name_surf, (x + 12, start_y + 10))
+
+            # Stats (Using mono_font for numbers)
+            curr_y = start_y + 40
+            stat_lines = [f"UNITS: {stats[i]['count']:03d}", f"AVG HP:{int(stats[i]['hp']):04d}"]
+
+            for line in stat_lines:
+                # Using a smaller size of mono_font for the cards
+                stat_surf = self.mono_font.render(line, True, (220, 220, 220))
+                self.screen.blit(stat_surf, (x + 12, curr_y))
+                curr_y += 22
+
+    def _draw_notification_panel(self, game_save, game_load, error):
+        """Draws a message box for simulation feedback (Save/Load/Error)."""
+        # Determine if we have anything to show
+        message = None
+        color = (255, 255, 255)  # Default White
+
+        if error:
+            message = f"{error}"
+            color = (255, 80, 80)
+        elif game_load:
+            message = f"{game_load}"
+            color = (100, 255, 100)
+        elif game_save:
+            message = f"{game_save}"
+            color = (200, 200, 255)
+
+        # If no message, we don't draw anything
+        if not message:
+            return
+
+        # Fixed positioning: 5px under the Perf Stats box
+        panel_w = 500
+        panel_h = 35
+        panel_rect = pygame.Rect(15, 36, panel_w, panel_h)
+
+        # Draw the Notification Panel
+        pygame.draw.rect(self.screen, (10, 10, 10, 220), panel_rect, border_radius=5)
+        # Border uses the message color for emphasis
+        pygame.draw.rect(self.screen, color, panel_rect, 1, border_radius=5)
+
+        # Render Text using mono_font for consistency
+        msg_surf = self.mono_font.render(message.upper(), True, color)
+        msg_rect = msg_surf.get_rect(center=panel_rect.center)
+
+        # Clipping in case the message is too long for the 500px box
+        if msg_surf.get_width() > panel_w - 20:
+            msg_surf = pygame.transform.scale(msg_surf, (panel_w - 20, msg_surf.get_height()))
+            msg_rect = msg_surf.get_rect(center=panel_rect.center)
+
+        self.screen.blit(msg_surf, msg_rect)
+
     def _draw_game_over(self):
         # Darken the battlefield
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
@@ -609,7 +702,7 @@ class PygameVisualizer:
         hint_surf = pygame.font.SysFont("Inter", 18).render("PRESS ESCAPE TO EXIT", True, (120, 120, 120))
         self.screen.blit(hint_surf, (x + (w - hint_surf.get_width()) // 2, y + h - 45))
 
-    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False):
+    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None):
         """
         Renders the entire scene.
         1. Fills the background.
@@ -640,7 +733,7 @@ class PygameVisualizer:
 
         # Display status text
         if self.show_perf_stats:
-            panel_w = 380
+            panel_w = 500
             panel_h = 30
             panel_rect = pygame.Rect(15, 1, panel_w, panel_h)
 
@@ -658,6 +751,11 @@ class PygameVisualizer:
             text_rect = text_surf.get_rect(center=panel_rect.center)
 
             self.screen.blit(text_surf, text_rect)
+
+        if self.show_generals_stats:
+            self._draw_generals_ui()
+
+        self._draw_notification_panel(game_save, game_load, error)
 
         # we draw the game over screen if the battle is over
         if battlefield.is_battle_over():
