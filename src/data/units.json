@@ -37,6 +37,7 @@
     "damage_spearmen": 3.0,
     "attack_range": 5.0,
     "attack_cooldown": 2.0,
+    "recovery_time": 0.5,
     "vision_range": 7.0,
     "speed": 0.96,
     "width": 0.7,
