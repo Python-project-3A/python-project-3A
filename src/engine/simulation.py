@@ -100,8 +100,6 @@ class Simulation:
         self.is_running = True
         self.visualizer = visualizer
 
-        # LIMITEUR DE VITESSE (SLEEP)
-        # tick_duration = 1.0 / target_tps if target_tps > 0 else 0  # Si target_tps = 0 (Tournoi), on ne dort jamais (min_frame_duration = 0).Sinon, on dort pour respecter le rythme (ex: 1/30s)
         if target_tps > 0:
             self.TARGET_TPS = target_tps
             self.FIXED_DT = 1.0 / self.TARGET_TPS
@@ -112,16 +110,17 @@ class Simulation:
         debut = time.time()  # juste pour connaitre le temps d'execution d'une simulation
         self.real_tick_rate = 0  # Pour une consultation externe
 
+        # INITIALISATION ACCUMULATOR
+        current_time = time.time()
+        accumulator = 0.0
+
+        # INITIALISATION VISUALIZER
         if visualizer:
             visualizer.render(self.battlefield, 0, speed=self.game_speed, paused=self.paused)  # On affiche le TICK 0, pour voir la position initiale des unités.
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
 
         is_gui = isinstance(visualizer, PygameVisualizer)
         base_step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
-
-        # INITIALISATION ACCUMULATOR
-        current_time = time.time()
-        accumulator = 0.0
 
         while self.is_running and self.tick_count < max_ticks:
             # CALCUL DU TEMPS ÉCOULÉ
@@ -135,9 +134,10 @@ class Simulation:
 
             # ON REMPLIT L'ACCUMULATOR
             if not self.paused:
-                accumulator += frame_time * self.game_speed
-
-            # TODO : mettre tout ça dans une fonction : self._handle_inputs(input_provider, visualizer, base_step, is_gui)
+                if visualizer:
+                    accumulator += frame_time * self.game_speed
+                else:
+                    accumulator += self.FIXED_DT + 0.001
 
             # --- TERMINAL INPUTS ---
             if not is_gui:
@@ -205,12 +205,6 @@ class Simulation:
                         if drag_dx != 0 or drag_dy != 0:
                             visualizer.move_camera(drag_dx, drag_dy)
 
-                    # ------------------------ FIN DE LA FONCTION INPUT ----------------------------------------
-
-            # Récupération du visualiser au cas où ça ait changé
-            # if getattr(self, "visualizer", None):
-            #     is_gui = isinstance(self.visualizer, PygameVisualizer)
-
             # BOUCLE PHYSIQUE (Consommation Accumulateur)
             # == executer autant de ticks que nécessaire pour vider le temps accumulé.
             while accumulator >= self.FIXED_DT:
@@ -228,11 +222,18 @@ class Simulation:
 
             # --- RENDU (FPS) ---
             # Le rendu se fait "autant que possible", décorrélé de la physique
-            if self.visualizer:
-                self.visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error)
+            if visualizer:
+                try:
+                    visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error)
+                except Exception as e:
+                    print(f"Render error: {e}")
+                    self.is_running = False
 
-            # [MODIF] PAUSE CPU (VSYNC-like)
-            time.sleep(0.005)
+            if visualizer:
+                # PAUSE CPU (Comme VSYNC) pour pas cramer le CPU
+                time.sleep(0.005)
+            else:
+                pass
 
             if self.error_timer > 0:
                 self.error_timer -= 1
