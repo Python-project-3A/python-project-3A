@@ -84,6 +84,10 @@ class PygameInputProvider:
                     return "F11"
                 if event.key == pygame.K_F12:
                     return "F12"
+                if event.key == pygame.K_k:
+                    return "k"
+                if event.key == pygame.K_l:
+                    return "l"
 
         return None
 

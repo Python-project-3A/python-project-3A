@@ -224,7 +224,7 @@ class Simulation:
             # Le rendu se fait "autant que possible", décorrélé de la physique
             if visualizer:
                 try:
-                    visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error)
+                    visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error, real_tick_rate=self.real_tick_rate)
                 except Exception as e:
                     print(f"Render error: {e}")
                     self.is_running = False

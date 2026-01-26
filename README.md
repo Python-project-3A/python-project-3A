@@ -2,6 +2,18 @@
 
 The main repository for the third year python project, group 7
 
+## Members (Mapping between usernames and members of the group)
+
+| Username          | Name                              |
+| ----------------- | --------------------------------- |
+| Shadow            | SCHREYECK Romain                  |
+| Friedrich482      | WEKENON TOKPONTO Sedjro Friedrich |
+| manuvall2         | Manuel VALLEDOR                   |
+| memenikoi         | Emir REKIKI                       |
+| isselmouabdijiyed | ABDI OULD JIYID Isselmou          |
+| ibounass21        | ABDOUL NASSIROU GARBA Ibrahim     |
+| .                 | TRAN HUU QUANG Vinh               |
+
 ## Project setup
 
 - Clone the repository:
@@ -10,26 +22,59 @@ The main repository for the third year python project, group 7
   git clone https://github.com/Python-project-3A/python-project-3A.git
   ```
 
-- place yourself at the root of the directory
-- create a virtual environment if you haven't yet: `python3 -m venv .venv`. This will add a `.venv` directory at the root of the project:
+- run `pip install contourpy cycler fonttools keyboard kiwisolver   matplotlib
+numpy
+packaging
+pillow
+pygame
+pyparsing
+python-dateutil
+ruff
+screeninfo
+six` to install the dependencies
 
-  <img width="232" height="30" alt="Screenshot from 2025-10-27 16-18-13" src="https://github.com/user-attachments/assets/cb111553-d164-48f1-9256-bc7446c3b431" />
-- activate it : `source .venv/bin/activate`. Now in your terminal it should show `(.venv)` before the prompt:
-  
-  <img width="135" height="41" alt="Screenshot from 2025-10-27 16-31-52" src="https://github.com/user-attachments/assets/db165022-241f-4862-91a6-32fdcc0e9077" />
+## All commands
 
-- run `pip install -r requirements.txt` to install the dependencies
+- Run a scenario in terminal mode
 
-## Linting/Formatting commands
+  ```bash
+  python3 -m src.main run <scenario> <general1> <general2> -t
+  ```
 
-- lint the code (reveal the syntax errors): `ruff check .`
-- and to format the code properly: `ruff format .`
+- Run a scenario in graphical mode
 
-## Git commits
+  ```bash
+  python3 -m src.main run <scenario> <general1> <general2> -gui
+  ```
 
-I have put the commands to create a git commit in the common Notion document, but here they are:
+- Run a scenario in headless mode
 
-- `git add .` (stage all the changes)
-- `git commit -m <commit message in double quotes>` (local commit)
-  Example: `git commit -m "Init Project"`
-- `git push origin <branch name>`
+  ```bash
+  python3 -m src.main run <scenario> <general1> <general2>
+  ```
+
+- Load a save
+
+  ```bash
+  python3 -m src.main load <save_name>
+  ```
+
+- Tournament
+
+  ```bash
+  python3 -m src.main tourney -S <scenarios> -G <generals> -N <number_of_games> -na <dont_alternate_units_positions>
+  ```
+
+- List all scenarios
+
+  ```bash
+  python3 -m src.main list
+  ```
+
+- Plot Lanchester
+
+  ```bash
+  python3 -m src.main plot [-h] <unit_type> <min_n> <max_n> <step>
+  ```
+
+## Commands we used for the presentation

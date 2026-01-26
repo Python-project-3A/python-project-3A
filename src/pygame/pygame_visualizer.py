@@ -351,8 +351,8 @@ class PygameVisualizer:
         cam_x, cam_y = self.world_to_minimap(camera_center_world_x, camera_center_world_y, left, top, diamond_width, diamond_height)
 
         # Calculate rectangle dimensions relative to the minimap scale
-        rect_w = int(self.minimap_size * 0.3 * (self.screen_width / (self.battlefield.width * self._tile_width)))
-        rect_h = int((self.minimap_size // 2) * 0.3 * (self.screen_height / (self.battlefield.height * self._tile_height)))
+        rect_w = int(self.minimap_size * 0.6 * (self.screen_width / (self.battlefield.width * self._tile_width)))
+        rect_h = int((self.minimap_size // 2) * 0.6 * (self.screen_height / (self.battlefield.height * self._tile_height)))
 
         camera_rect = pygame.Rect(0, 0, rect_w, rect_h)
         camera_rect.center = (cam_x, cam_y)
@@ -702,7 +702,7 @@ class PygameVisualizer:
         hint_surf = pygame.font.SysFont("Inter", 18).render("PRESS ESCAPE TO EXIT", True, (120, 120, 120))
         self.screen.blit(hint_surf, (x + (w - hint_surf.get_width()) // 2, y + h - 45))
 
-    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None):
+    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None, real_tick_rate: int=0):
         """
         Renders the entire scene.
         1. Fills the background.
@@ -752,6 +752,19 @@ class PygameVisualizer:
 
             self.screen.blit(text_surf, text_rect)
 
+            fps_button_w = 100 
+            fps_button_h = 30
+            button_rect = pygame.Rect(15, 36, fps_button_w, fps_button_h)
+
+            # Draw the fps button (Same style for consistency)
+            pygame.draw.rect(self.screen, (30, 30, 30, 200), button_rect, border_radius=5)
+            pygame.draw.rect(self.screen, (201, 152, 104), button_rect, 1, border_radius=5)
+
+            fps = real_tick_rate
+            val_surf = self.mono_font.render(f"{fps} FPS", True, (255, 255, 255))
+            val_rect = val_surf.get_rect(center=button_rect.center)
+            self.screen.blit(val_surf, val_rect)
+        
         if self.show_generals_stats:
             self._draw_generals_ui()
 
