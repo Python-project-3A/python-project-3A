@@ -1,0 +1,70 @@
+{
+  "name": "Classic Trinity Clash",
+  "description": "Large scale Rock-Paper-Scissors test. 120 units vs 120 units. Only Base Units.",
+  "map": {
+    "width": 120,
+    "height": 120
+  },
+  "armies": [
+    {
+      "player_id": 0,
+      "general": null,
+      "units": [
+        {
+          "type": "Knight",
+          "count": 20,
+          "formation": "block",
+          "start_x": 10,
+          "start_y": 10,
+          "spacing": 2
+        },
+        {
+          "type": "Pikeman",
+          "count": 50,
+          "formation": "block",
+          "start_x": 40,
+          "start_y": 40,
+          "spacing": 1
+        },
+        {
+          "type": "eliteskirmisher",
+          "count": 30,
+          "formation": "block",
+          "start_x": 10,
+          "start_y": 40,
+          "spacing": 2
+        }
+      ]
+    },
+    {
+      "player_id": 1,
+      "general": "Smart",
+      "units": [
+        {
+          "type": "Knight",
+          "count": 20,
+          "formation": "block",
+          "start_x": 90,
+          "start_y": 10,
+          "spacing": 2
+        },
+        {
+          "type": "Pikeman",
+          "count": 50,
+          "formation": "block",
+          "start_x": 70,
+          "start_y": 40,
+          "spacing": 1
+        },
+        {
+          "type": "EliteSkirmisher",
+          "count": 30,
+          "formation": "block",
+          "start_x": 90,
+          "start_y": 40,
+          "spacing": 2
+        }
+      ]
+    }
+  ]
+}

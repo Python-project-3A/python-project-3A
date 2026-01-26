@@ -29,7 +29,7 @@ class Simulation:
         self.tick_count = 0
         self.is_running = False
         self.paused = False
-        self.game_speed = 1
+        self.game_speed = 1.0
         self.snapshot_utility = HTMLSnapshot(battlefield)
         self.error: str | None = None
         self.error_timer = 0
@@ -37,7 +37,9 @@ class Simulation:
         self.game_save_timer = 0
         self.game_load: str | None = None
         self.game_load_timer = 0
-        self.LOGICAL_DT = 1.0 / 30.0
+
+        self.TARGET_TPS = 60
+        self.FIXED_DT = 1.0 / self.TARGET_TPS
 
     def trigger_error(self, message: str):
         self.error = message
@@ -90,17 +92,17 @@ class Simulation:
             # If we are in GUI mode, we keep the loop alive to show the Game Over screen.
             # If we are in CLI/Headless mode, we exit immediately.
             is_gui = isinstance(getattr(self, "visualizer", None), PygameVisualizer)
-
             if not is_gui:
                 self.is_running = False
 
-    def run(self, input_provider, target_tps=30, max_ticks=20000, visualizer=None):
+    def run(self, input_provider, target_tps=60, max_ticks=20000, visualizer=None):
         """Boucle principale."""
         self.is_running = True
         self.visualizer = visualizer
 
-        # LIMITEUR DE VITESSE (SLEEP)
-        tick_duration = 1.0 / target_tps if target_tps > 0 else 0  # Si target_tps = 0 (Tournoi), on ne dort jamais (min_frame_duration = 0).Sinon, on dort pour respecter le rythme (ex: 1/30s)
+        if target_tps > 0:
+            self.TARGET_TPS = target_tps
+            self.FIXED_DT = 1.0 / self.TARGET_TPS
 
         # VARIABLES DE STATS
         frames_this_second = 0
@@ -108,6 +110,11 @@ class Simulation:
         debut = time.time()  # juste pour connaitre le temps d'execution d'une simulation
         self.real_tick_rate = 0  # Pour une consultation externe
 
+        # INITIALISATION ACCUMULATOR
+        current_time = time.time()
+        accumulator = 0.0
+
+        # INITIALISATION VISUALIZER
         if visualizer:
             visualizer.render(self.battlefield, 0, speed=self.game_speed, paused=self.paused)  # On affiche le TICK 0, pour voir la position initiale des unités.
             time.sleep(0.05)  # Laisse le temps au visualizer de se mettre en place
@@ -116,7 +123,21 @@ class Simulation:
         base_step = 20 if is_gui else 2  # vitesse de déplacement de la cam, on met ce qu'on veut
 
         while self.is_running and self.tick_count < max_ticks:
-            loop_start = time.time()
+            # CALCUL DU TEMPS ÉCOULÉ
+            new_time = time.time()
+            frame_time = new_time - current_time
+            current_time = new_time
+
+            # "Spiral of Death" protection (lu sur un Reddit) : pour pas rattraper 5000 ticks si on a un freeze
+            if frame_time > 0.25:
+                frame_time = 0.25
+
+            # ON REMPLIT L'ACCUMULATOR
+            if not self.paused:
+                if visualizer:
+                    accumulator += frame_time * self.game_speed
+                else:
+                    accumulator += self.FIXED_DT + 0.001
 
             # --- TERMINAL INPUTS ---
             if not is_gui:
@@ -184,43 +205,46 @@ class Simulation:
                         if drag_dx != 0 or drag_dy != 0:
                             visualizer.move_camera(drag_dx, drag_dy)
 
-            # --- LOGIQUE (TPS) ----
-            if not self.paused:
-                self.tick(self.LOGICAL_DT * self.game_speed)
+            # BOUCLE PHYSIQUE (Consommation Accumulateur)
+            # == executer autant de ticks que nécessaire pour vider le temps accumulé.
+            while accumulator >= self.FIXED_DT:
+                self.tick(self.FIXED_DT)
+                accumulator -= self.FIXED_DT
+                if not self.is_running or self.tick_count >= max_ticks:
+                    break
 
-                # STATS DE PERFORMANCE
-                frames_this_second += 1
-                if time.time() - second_timer >= 1.0:
-                    self.real_tick_rate = frames_this_second
-                    frames_this_second = 0
-                    second_timer = time.time()
-                    # print(f"TPS Réel: {self.real_tick_rate}")
+            # STATS PERF
+            frames_this_second += 1
+            if time.time() - second_timer >= 1.0:
+                self.real_tick_rate = frames_this_second
+                frames_this_second = 0
+                second_timer = time.time()
 
             # --- RENDU (FPS) ---
+            # Le rendu se fait "autant que possible", décorrélé de la physique
             if visualizer:
-                visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error)
+                try:
+                    visualizer.render(self.battlefield, self.tick_count, speed=self.game_speed, paused=self.paused, game_save=self.game_save, game_load=self.game_load, error=self.error)
+                except Exception as e:
+                    print(f"Render error: {e}")
+                    self.is_running = False
 
-            # ---  SYNCHRONISATION (limiteur de frame) ---
-            # Si on veut 30 TPS, et que le calcul a pris 0.01s, on sleep 0.023s. Si le calcul a pris 0.04s (lag), on ne dort pas (on est déjà en retard)
-            elapsed = time.time() - loop_start
-            wait = tick_duration - elapsed
+            if visualizer:
+                # PAUSE CPU (Comme VSYNC) pour pas cramer le CPU
+                time.sleep(0.005)
+            else:
+                pass
 
-            if wait > 0:
-                time.sleep(wait)
-
-            # Decrement timer even when paused so the error message goes away
             if self.error_timer > 0:
                 self.error_timer -= 1
                 if self.error_timer <= 0:
                     self.error = None
 
-            # Decrement timer even when paused so the save message goes away
             if self.game_save_timer > 0:
                 self.game_save_timer -= 1
                 if self.game_save_timer <= 0:
                     self.game_save = None
 
-            # Decrement timer even when paused so the save message goes away
             if self.game_load_timer > 0:
                 self.game_load_timer -= 1
                 if self.game_load_timer <= 0:
@@ -235,9 +259,9 @@ class Simulation:
             case "escape":
                 self.is_running = False
             case "=":
-                self.game_speed += 0.2
+                self.game_speed += 0.2  # TODO : RETIRER CE FONCTIONNEMENT
             case "-":
-                self.game_speed = max(0.2, self.game_speed - 0.2)
+                self.game_speed = max(0.2, self.game_speed - 0.2)  # TODO : RETIRER CE FONCTIONNEMENT
             case "r":
                 self.game_speed = 1
             case "tab":

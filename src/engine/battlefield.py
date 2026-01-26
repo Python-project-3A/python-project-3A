@@ -286,36 +286,34 @@ class Battlefield:
         - soft push
         - tile update
         """
-        # Boundaries
-        if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-            return False
-
-        # Circle collision detect
-        if self.check_position(unit, new_x, new_y):
-            new_x, new_y = self.attempt_sliding_move(unit, new_x, new_y)
-
-        # If still blocked → no movement
-        if (new_x, new_y) == unit.position:
-            return False
-
         new_x = max(0.01, min(new_x, self.width - 0.01))
         new_y = max(0.01, min(new_y, self.height - 0.01))
 
-        # Update tile occupancy
+        if self.check_position(unit, new_x, new_y):
+            new_x, new_y = self.attempt_sliding_move(unit, new_x, new_y)
+
+            new_x = max(0.01, min(new_x, self.width - 0.01))
+            new_y = max(0.01, min(new_y, self.height - 0.01))
+
+        if abs(new_x - unit.position[0]) < 1e-5 and abs(new_y - unit.position[1]) < 1e-5:
+            return False
+
         ox, oy = unit.position
+
+        # Update tiles
         oix, oiy = self._tile_index_from_pos(ox, oy)
-        old_tile = self.game_map.get_tile(oix, oiy)
-        if old_tile:
-            old_tile.remove_occupant(unit)
-
         nix, niy = self._tile_index_from_pos(new_x, new_y)
-        new_tile = self.game_map.ensure_tile(nix, niy)
-        new_tile.add_occupant(unit)
 
-        # Update unit floating position
+        if (oix, oiy) != (nix, niy):
+            old_tile = self.game_map.get_tile(oix, oiy)
+            if old_tile:
+                old_tile.remove_occupant(unit)
+
+            new_tile = self.game_map.ensure_tile(nix, niy)
+            new_tile.add_occupant(unit)
+
         unit.position = (float(new_x), float(new_y))
 
-        # apply soft push like old code
         self.apply_soft_push(unit)
         return True
 
