@@ -1,0 +1,102 @@
+{
+  "name": "War same unit types",
+  "description": "Combat unit types vs unit same types and formations",
+  "map": {
+    "width": 120,
+    "height": 120
+  },
+  "armies": [
+    {
+      "player_id": 0,
+      "general": "Smart",
+      "units": [
+        {
+          "type": "Knight",
+          "count": 16,
+          "formation": "block",
+          "start_x": 30,
+          "start_y": 10,
+          "spacing": 1.5
+        },
+        {
+          "type": "Pikeman",
+          "count": 16,
+          "formation": "block",
+          "start_x": 30,
+          "start_y": 30,
+          "spacing": 1
+        },
+        {
+          "type": "LongSwordsman",
+          "count": 16,
+          "formation": "block",
+          "start_x": 30,
+          "start_y": 50,
+          "spacing": 1.2
+        },
+        {
+          "type": "Crossbowman",
+          "count": 16,
+          "formation": "block",
+          "start_x": 30,
+          "start_y": 70,
+          "spacing": 1.5
+        },
+        {
+          "type": "eliteskirmisher",
+          "count": 16,
+          "formation": "block",
+          "start_x": 30,
+          "start_y": 90,
+          "spacing": 2
+        }
+      ]
+    },
+    {
+      "player_id": 1,
+      "general": "Smart",
+      "units": [
+        {
+          "type": "Knight",
+          "count": 16,
+          "formation": "block",
+          "start_x": 50,
+          "start_y": 10,
+          "spacing": 1.5
+        },
+        {
+          "type": "Pikeman",
+          "count": 16,
+          "formation": "block",
+          "start_x": 50,
+          "start_y": 30,
+          "spacing": 1
+        },
+        {
+          "type": "LongSwordsman",
+          "count": 16,
+          "formation": "block",
+          "start_x": 50,
+          "start_y": 50,
+          "spacing": 1.2
+        },
+        {
+          "type": "Crossbowman",
+          "count": 16,
+          "formation": "block",
+          "start_x": 50,
+          "start_y": 70,
+          "spacing": 1.5
+        },
+        {
+          "type": "eliteskirmisher",
+          "count": 16,
+          "formation": "block",
+          "start_x": 50,
+          "start_y": 90,
+          "spacing": 2
+        }
+      ]
+    }
+  ]
+}

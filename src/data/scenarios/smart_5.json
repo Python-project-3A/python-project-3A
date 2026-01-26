@@ -1,6 +1,6 @@
 {
-  "name": "Classic Trinity Clash",
-  "description": "Large scale Rock-Paper-Scissors test. 120 units vs 120 units. Only Base Units.",
+  "name": "smart vs daft",
+  "description": "smart vs daft big war",
   "map": {
     "width": 120,
     "height": 120
@@ -14,24 +14,24 @@
           "type": "Knight",
           "count": 20,
           "formation": "block",
-          "start_x": 10,
-          "start_y": 10,
+          "start_x": 20,
+          "start_y": 40,
           "spacing": 2
         },
         {
           "type": "Pikeman",
-          "count": 50,
+          "count": 40,
           "formation": "block",
           "start_x": 40,
-          "start_y": 40,
+          "start_y": 60,
           "spacing": 1
         },
         {
-          "type": "eliteskirmisher",
-          "count": 30,
+          "type": "Crossbowman",
+          "count": 40,
           "formation": "block",
-          "start_x": 10,
-          "start_y": 40,
+          "start_x": 20,
+          "start_y": 60,
           "spacing": 2
         }
       ]
@@ -44,24 +44,24 @@
           "type": "Knight",
           "count": 20,
           "formation": "block",
-          "start_x": 90,
-          "start_y": 10,
+          "start_x": 80,
+          "start_y": 40,
           "spacing": 2
         },
         {
           "type": "Pikeman",
-          "count": 50,
+          "count": 40,
           "formation": "block",
-          "start_x": 70,
-          "start_y": 40,
+          "start_x": 60,
+          "start_y": 60,
           "spacing": 1
         },
         {
-          "type": "EliteSkirmisher",
-          "count": 30,
+          "type": "Crossbowman",
+          "count": 40,
           "formation": "block",
-          "start_x": 90,
-          "start_y": 40,
+          "start_x": 80,
+          "start_y": 60,
           "spacing": 2
         }
       ]

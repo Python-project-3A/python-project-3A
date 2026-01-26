@@ -1,18 +1,18 @@
 {
-  "name": "Small Battle",
-  "description": "10v10 Pikemen on open field",
+  "name": "Pikemen vs Pikemen",
+  "description": "scenario for tournament",
   "map": {
-    "width": 50,
-    "height": 30
+    "width": 20,
+    "height": 20
   },
   "armies": [
     {
       "player_id": 0,
-      "general": "daft",
+      "general": null,
       "units": [
         {
           "type": "Pikeman",
-          "count": 10,
+          "count": 5,
           "formation": "column",
           "start_x": 5,
           "start_y": 10,
@@ -22,13 +22,13 @@
     },
     {
       "player_id": 1,
-      "general": "braindead",
+      "general": null,
       "units": [
         {
           "type": "Pikeman",
-          "count": 10,
+          "count": 5,
           "formation": "column",
-          "start_x": 40,
+          "start_x": 10,
           "start_y": 10,
           "spacing": 1.5
         }
