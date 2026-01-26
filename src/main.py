@@ -17,7 +17,7 @@ from src.pygame.pygame_input_provider import PygameInputProvider
 from src.engine.input_provider import ConsoleInputProvider
 from src.engine.save_load import save_game, load_game, get_save_dir
 from src.engine.html_snapshot import HTMLSnapshot
-from src.data.scenarios.lanchester import create_lanchester_scenario
+from src.lanchester.lanchester import create_lanchester_scenario
 
 
 def parse_args():
