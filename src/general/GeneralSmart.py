@@ -195,6 +195,11 @@ class GeneralSmart(BaseGeneral):
 
         # BRANCHE B : CAVALERIE (Interception géométrique)
         # calcule du point de blocage entre nos archers et la charge
+        dist_to_enemy = unit.dist_to(nearest_threat)
+        if dist_to_enemy < 3.0:
+            self._order_attack_opti(unit, nearest_threat)
+            return
+
         dir_x, dir_y = self.soustract_vec(default_target_pos, protect_target_pos)
         proj_ax, proj_ay = self._projection_vector(protect_target_pos, self.normalize_vec((dir_x, dir_y)), 6.0)
 
