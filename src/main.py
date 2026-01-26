@@ -28,6 +28,7 @@ def parse_args():
 Examples:
   python -m src.main run small_battle daft braindead
   python -m src.main run knights_vs_pikemen smart daft -t
+  python -m src.main run knights_vs_pikemen smart daft -gui
   python -m src.main list
   python -m src.main plot Pikeman 10 50 5
   python -m src.main plot_time Pikeman 50
@@ -279,13 +280,7 @@ def run_lanchester_plot(args):
     for n in n_values:
         # --- LOGIQUE DE TAILLE D'ARMEE ---
         count_p0 = n
-        
-        if unit_type == "Crossbowman" or unit_type == "EliteSkirmisher":
-            # Attention : N^2 grandit très vite !
-            count_p1 = n * n
-        else:
-            # Loi Linéaire (Corps à corps)
-            count_p1 = n * 2
+        count_p1 = n * 2
 
         print(f"Simulating N={count_p0} vs {count_p1}...", end="", flush=True)
         # 3. Génération Dynamique du Scénario
@@ -300,7 +295,7 @@ def run_lanchester_plot(args):
         
         bf.generals = [create_general(p1_ai, 0), create_general(p2_ai, 1)]
         
-        # On passe les overrides au loader au cas où il en a besoin pour l'initialisation
+        # On passe les overrides au loader pour l'initialisation
         overrides = {0: p1_ai, 1: p2_ai}
         
         ScenarioLoader.spawn_scenario(scenario_data, bf, overrides)
@@ -308,7 +303,7 @@ def run_lanchester_plot(args):
         sim = Simulation(bf.game_map, bf.generals, bf)
         
         with ConsoleInputProvider() as inp:
-            sim.run(inp, visualizer=None, target_tps=0, max_ticks=10000)
+            sim.run(inp, visualizer=None, target_tps=0, max_ticks=100000)
             
         # 6. Collecte des Données (Après la bataille)
         survivors_p2 = len(bf.units_by_owner(0))
@@ -326,7 +321,7 @@ def run_lanchester_plot(args):
     # 7. Tracé du Graphique (Matplotlib)
     plt.figure(figsize=(10, 6))
     
-    label_text = f'{unit_type} (vs N^2)' if unit_type == "Crossbowman" or unit_type == "EliteSkirmisher" else f'{unit_type} (vs 2N)'
+    label_text = f'{unit_type} (vs 2N)'
     
     plt.plot(results_n, results_percent_alive, marker='o', linestyle='-', color='b', label=label_text)
     
