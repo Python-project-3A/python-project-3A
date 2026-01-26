@@ -702,7 +702,7 @@ class PygameVisualizer:
         hint_surf = pygame.font.SysFont("Inter", 18).render("PRESS ESCAPE TO EXIT", True, (120, 120, 120))
         self.screen.blit(hint_surf, (x + (w - hint_surf.get_width()) // 2, y + h - 45))
 
-    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None):
+    def render(self, battlefield: Battlefield, tick_count: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None, real_tick_rate: int=0):
         """
         Renders the entire scene.
         1. Fills the background.
@@ -760,7 +760,7 @@ class PygameVisualizer:
             pygame.draw.rect(self.screen, (30, 30, 30, 200), button_rect, border_radius=5)
             pygame.draw.rect(self.screen, (201, 152, 104), button_rect, 1, border_radius=5)
 
-            fps = 0
+            fps = real_tick_rate
             val_surf = self.mono_font.render(f"{fps} FPS", True, (255, 255, 255))
             val_rect = val_surf.get_rect(center=button_rect.center)
             self.screen.blit(val_surf, val_rect)

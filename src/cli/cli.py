@@ -65,7 +65,7 @@ class CLIVisualizer:
         self.cam_x = max(0, min(self.cam_x, max_x))
         self.cam_y = max(0, min(self.cam_y, max_y))
 
-    def render(self, bf: Battlefield, tick: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None):
+    def render(self, bf: Battlefield, tick: int, speed: float = 1.0, paused: bool = False, game_save: str | None = None, game_load: str | None = None, error: str | None = None, real_tick_rate:int=0):
         # 1. Remonter le curseur (Double Buffering simulation)
         if not self.first_frame and self.lines_printed > 0:
             # On remonte de N lignes
