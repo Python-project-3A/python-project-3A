@@ -361,7 +361,7 @@ def run_temporal_plot(args):
     history_p1 = []
     
     # 3. Boucle de Simulation Manuelle
-    max_ticks = 5000
+    max_ticks = 10000
     sim.is_running = True
     dt = 1.0 / 30.0  # Temps logique par tick
     
