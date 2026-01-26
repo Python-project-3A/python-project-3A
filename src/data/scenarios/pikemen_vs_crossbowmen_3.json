@@ -1,9 +1,9 @@
 {
-  "name": "Pikemen vs Pikemen",
-  "description": "Slow infantry trying to close the gap against ranged units",
+  "name": "Pikemen vs Crossbowmen",
+  "description": "test pikemen vs Crossbowmen",
   "map": {
-    "width": 60,
-    "height": 40
+    "width": 120,
+    "height": 120
   },
   "armies": [
     {
@@ -14,9 +14,9 @@
           "type": "Pikeman",
           "count": 20,
           "formation": "block",
-          "start_x": 20,
-          "start_y": 15,
-          "spacing": 1.5
+          "start_x": 30,
+          "start_y": 30,
+          "spacing": 1
         }
       ]
     },
@@ -25,12 +25,12 @@
       "general": null,
       "units": [
         {
-          "type": "Pikeman",
-          "count": 40,
+          "type": "Crossbowman",
+          "count": 20,
           "formation": "block",
-          "start_x": 40,
-          "start_y": 15,
-          "spacing": 1.5
+          "start_x": 50,
+          "start_y": 30,
+          "spacing": 1
         }
       ]
     }

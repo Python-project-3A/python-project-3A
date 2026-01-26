@@ -1,9 +1,9 @@
 {
-  "name": "far armies",
-  "description": "Move test",
+  "name": "daft_vs_braindead",
+  "description": "test daft vs braindead",
   "map": {
-    "width": 60,
-    "height": 40
+    "width": 120,
+    "height": 120
   },
   "armies": [
     {
@@ -11,11 +11,11 @@
       "general": null,
       "units": [
         {
-          "type": "Knight",
+          "type": "longswordsman",
           "count": 20,
           "formation": "block",
-          "start_x": 2,
-          "start_y": 2,
+          "start_x": 50,
+          "start_y": 50,
           "spacing": 1.5
         }
       ]
@@ -25,12 +25,12 @@
       "general": null,
       "units": [
         {
-          "type": "Pikeman",
+          "type": "longswordsman",
           "count": 20,
           "formation": "block",
-          "start_x": 50,
-          "start_y": 30,
-          "spacing": 1
+          "start_x": 70,
+          "start_y": 50,
+          "spacing": 1.5
         }
       ]
     }
