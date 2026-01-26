@@ -4,7 +4,7 @@ def create_lanchester_scenario(unit_type: str, count_p0: int, count_p1: int) -> 
     """
     Génère un scénario Lanchester dynamiquement
     """
-    
+
     scenario_data = {
     "name": f"Lanchester {unit_type} ({count_p0} vs {count_p1})",
         "description": "Lanchester Law verification",
@@ -39,7 +39,7 @@ def create_lanchester_scenario(unit_type: str, count_p0: int, count_p1: int) -> 
                         "formation": "block", #lanchester
                         "start_x": 20,
                         "start_y": 30,
-                        "spacing": 1.5 # construction mirroir
+                        "spacing": 1.5
                     }
                 ]
             }
