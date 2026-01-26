@@ -303,16 +303,16 @@ def run_lanchester_plot(args):
         sim = Simulation(bf.game_map, bf.generals, bf)
         
         with ConsoleInputProvider() as inp:
-            sim.run(inp, visualizer=None, target_tps=0, max_ticks=100000)
+            sim.run(inp, visualizer=None, target_tps=0, max_ticks=20000)
             
         # 6. Collecte des Données (Après la bataille)
         survivors_p2 = len(bf.units_by_owner(0))
         survivors_p1 = len(bf.units_by_owner(1))
-        initial_p1 = count_p1
-        casualties = initial_p1 - survivors_p1
+        # initial = count_p1 + count_p0
+        casualties = count_p1 - survivors_p1
         
         results_n.append(n)
-        results_percent_alive.append((survivors_p1 / initial_p1) * 100)
+        results_percent_alive.append((survivors_p1 / count_p1) * 100)
         
         print(f"nombre de survivants P1: {survivors_p1}")
         print(f"nombre de survivant P2: {survivors_p2}")
@@ -325,7 +325,7 @@ def run_lanchester_plot(args):
     
     plt.plot(results_n, results_percent_alive, marker='o', linestyle='-', color='b', label=label_text)
     
-    plt.title(f"Lois de Lanchester : {label_text}")
+    plt.title(f"Lois de Lanchester efficacité du surnombre : {label_text}")
     plt.xlabel("N (Taille de l'armée perdante)")
     plt.ylabel("Pourcentage de Survivants (Vainqueur)")
     plt.grid(True)
