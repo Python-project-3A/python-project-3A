@@ -78,3 +78,25 @@ six` to install the dependencies
   ```
 
 ## Commands we used for the presentation
+
+  ```bash
+  python -m src.main run daft_vs_braindead_1 daft braindead -t
+  ```
+  ```bash
+  python -m src.main run daft_vs_braindead_1 daft braindead 
+  ```
+  ```bash
+  python -m src.main run all_units_2 daft braindead -gui
+  ```
+  ```bash
+  python -m src.main run pikemen_vs_crossbowmen_3 daft generalsmart -gui
+  ```
+  ```bash
+  python -m src.main tourney -S tournament_4 -G  daft braindead -N 10 
+  ```
+  ```bash
+  python -m src.main plot_time pikeman 50
+  ```
+  ```bash
+  python -m src.main run smart_5 daft generalsmart -gui
+  ```
