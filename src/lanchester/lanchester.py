@@ -30,8 +30,8 @@ def create_lanchester_scenario(unit_type: str, count_p0: int, count_p1: int) -> 
                     {
                         "type": unit_type,
                         "count": count_p0,
-                        "formation": "block",
-                        "start_x": 10,
+                        "formation": "lanchester",
+                        "start_x": 20,
                         "start_y": 15,
                         "spacing": 1.5
                     }
@@ -45,10 +45,10 @@ def create_lanchester_scenario(unit_type: str, count_p0: int, count_p1: int) -> 
                     {
                         "type": unit_type,
                         "count": count_p1, 
-                        "formation": "block",
-                        "start_x": 30,
-                        "start_y": 35,
-                        "spacing": -1.5 # construction mirroir
+                        "formation": "lanchester",
+                        "start_x": 20,
+                        "start_y": 30,
+                        "spacing": 1.5 # construction mirroir
                     }
                 ]
             }

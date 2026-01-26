@@ -193,6 +193,17 @@ class ScenarioLoader:
                 side = 1 if i % 2 == 0 else -1
                 positions.append((start_x + side * row * spacing * 0.7, start_y + row * spacing))
 
+
+        elif formation == "lanchester":
+            # Lanchester formation: Fixed width of 10 units per row
+            cols = 10
+            for i in range(count):
+                # Division entière pour trouver la ligne (0, 1, 2...)
+                row = i // cols
+                # Modulo pour trouver la colonne (0 à 9)
+                col = i % cols
+                positions.append((start_x + col * spacing, start_y + row * spacing))
+
         else:
             # Default to column
             for i in range(count):
